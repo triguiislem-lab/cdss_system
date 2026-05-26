@@ -1,9 +1,9 @@
 name: Docker
 
 on:
-  push:
-    branches: ["main"]
-    tags: ["v*.*.*"]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -17,6 +17,7 @@ jobs:
   docker:
     name: Build and publish images
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
 
     strategy:
       matrix:
@@ -37,6 +38,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Docker metadata
         id: meta
@@ -44,8 +47,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.image_suffix }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=tag
+            type=raw,value=main,enable=${{ github.event_name == 'workflow_run' }}
+            type=ref,event=branch,enable=${{ github.event_name == 'workflow_dispatch' }}
             type=sha,prefix=sha-
 
       - name: Login to GHCR

@@ -33,9 +33,31 @@ The default Docker compose CDSS configuration uses stub/demo backends so the sta
 
 Root-level GitHub Actions live in `.github/workflows`:
 
-- `ci.yml`: builds and checks all three codebases.
-- `docker.yml`: builds and publishes frontend, NestJS API, and CDSS images to GHCR.
-- `deploy-template.yml`: manual deployment handoff template.
+- `ci.yml`: runs on pushes and pull requests, and checks the frontend, NestJS backend, FastAPI CDSS, and Docker Compose config.
+- `docker.yml`: runs only after `CI` succeeds on `main`, then builds and publishes frontend, NestJS API, and CDSS images to GHCR.
+- `deploy-ec2.yml`: runs only after `Docker` succeeds on `main`, then updates the EC2 checkout and restarts Docker Compose.
+- `deploy-template.yml`: manual deployment handoff/reference template.
+
+For EC2 deployment, configure these repository settings in GitHub:
+
+Secrets:
+
+```text
+EC2_HOST=ec2-...compute-1.amazonaws.com
+EC2_SSH_KEY=<contents of the private .pem key>
+```
+
+Variables:
+
+```text
+EC2_USER=ubuntu
+EC2_APP_DIR=/opt/cdss_system
+VITE_API_BASE_URL=
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+```
+
+Recommended branch protection for `main`: require the `CI` workflow to pass before merging pull requests.
 
 ## Images
 
