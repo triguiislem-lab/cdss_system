@@ -1,0 +1,33 @@
+PATCH21 Professional Stabilization - Test Report
+Date: 2026-05-14
+
+Validation scope
+- Unit test collection: 200 tests collected.
+- Result: 199 passed, 1 skipped, 0 failed.
+- Note: The monolithic command `python -m pytest tests/unit -q` exceeded the interactive command wall-time in this environment. The same unit suite was then validated file-by-file to avoid command timeout while preserving full coverage.
+
+Key commands validated
+1. python -m pytest tests/unit/test_patch21_professional_stabilization.py -q
+   Result: 5 passed.
+
+2. python -m pytest tests/unit/test_api_endpoint_contracts.py tests/unit/test_patch19_monitoring_human_in_loop.py tests/unit/test_patch21_professional_stabilization.py -q
+   Result: 10 passed.
+
+3. python -m pytest tests/unit/test_patch10_product_policy.py tests/unit/test_patch11_readiness_hardening.py tests/unit/test_patch12_integration_consistency.py -q
+   Result: 25 passed.
+
+4. File-by-file validation of all tests/unit/test_*.py
+   Result: all files passed; one intentional skip in test_cdss_final_runtime_connectors.py.
+
+Important regressions covered
+- no known allergy / absence allergie does not create a contraindication.
+- unknown allergy status requires missing information/review, not a false forbidden drug.
+- confirmed penicillin allergy blocks amoxicillin generation.
+- doctor-authorized NSAID is review_draft_allowed only when explicit negative safety screens are present.
+- negated pregnancy/renal phrases such as "pas enceinte" and "fonction rénale normale" no longer trigger safety-policy false positives.
+- SQLite feedback repository uses isolated test directory support through CDSS_FEEDBACK_DIR.
+- Corrupted SQLite feedback database is renamed aside, recreated, and audited.
+- Real API endpoint tests cover monitoring, feedback clinician submission, and audit-trace route contracts.
+
+Release note
+- All prescription generation remains draft-only and requires clinician validation.

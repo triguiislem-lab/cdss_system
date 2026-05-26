@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main", "develop"]
+  workflow_dispatch:
+
+jobs:
+  frontend:
+    name: Frontend React
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: medcity-app
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: medcity-app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+  backend:
+    name: Backend NestJS
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend_template
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend_template/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  cdss:
+    name: FastAPI CDSS
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: cdss_professional/cdss_professional_v4181_patch22_multikg_evidence_validation_exact_fix
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install CDSS dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Compile Python modules
+        run: python -m compileall apps libs services
+
+      - name: Unit smoke tests
+        env:
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: "1"
+        run: python -m pytest tests/unit/test_health.py tests/unit/test_api_endpoint_contracts.py -q
+
+  compose:
+    name: Docker Compose Config
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate compose file
+        run: docker compose -f docker-compose.yml config

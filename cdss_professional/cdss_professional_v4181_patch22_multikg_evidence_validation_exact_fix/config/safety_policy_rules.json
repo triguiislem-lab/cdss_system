@@ -1,0 +1,1235 @@
+[
+  {
+    "rule_id": "young_infant_fever_emergency",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 101,
+    "category": "pediatric_emergency",
+    "trigger": {
+      "structured_conditions": {
+        "age_years_lt": 0.25
+      },
+      "text_terms_any": [
+        "fever",
+        "fievre",
+        "fièvre",
+        "temperature",
+        "température",
+        "38.0",
+        "38.5",
+        "38.6",
+        "skhana",
+        "s5ana",
+        "حمى",
+        "سخانة"
+      ]
+    },
+    "action": {
+      "route_override": "emergency",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": []
+    },
+    "severity": "critical",
+    "safety_explanation": "Fever in an infant under 3 months requires urgent assessment; no outpatient automatic prescription should be generated.",
+    "source_refs": [
+      "local_pediatric_safety_policy"
+    ],
+    "audit_tags": [
+      "pediatric",
+      "infant",
+      "fever",
+      "emergency"
+    ]
+  },
+  {
+    "rule_id": "paracetamol_already_taken_overuse_structured",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 96,
+    "category": "overuse",
+    "trigger": {
+      "structured_conditions": {
+        "already_taken_medications_any": [
+          "paracetamol",
+          "doliprane",
+          "adol",
+          "acetaminophen"
+        ]
+      },
+      "text_terms_any": [
+        "8 comprimés",
+        "8 comprimes",
+        "8 tablets",
+        "sachet grippe",
+        "contient aussi du paracetamol",
+        "contains paracetamol",
+        "plusieurs doses",
+        "depuis ce matin",
+        "aujourd'hui",
+        "aujourd hui",
+        "barcha",
+        "brcha",
+        "khdhit doliprane",
+        "5dhit doliprane"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [
+        "paracetamol"
+      ],
+      "required_missing_data": [
+        "total_paracetamol_daily_dose",
+        "time_of_last_dose"
+      ]
+    },
+    "severity": "high",
+    "safety_explanation": "Paracetamol/Doliprane already taken with repeated-dose or combination-cold-medicine context requires clinician review; do not generate additional paracetamol.",
+    "source_refs": [
+      "local_safety_policy"
+    ],
+    "audit_tags": [
+      "overuse",
+      "paracetamol",
+      "structured_medical_order"
+    ]
+  },
+  {
+    "rule_id": "child_codeine_cough_review",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 94,
+    "category": "pediatric_safety",
+    "trigger": {
+      "structured_conditions": {
+        "age_years_lt": 18
+      },
+      "text_terms_group_all": [
+        [
+          "codeine",
+          "codéine",
+          "codine"
+        ],
+        [
+          "cough",
+          "toux",
+          "k7a",
+          "ka7a",
+          "sirop"
+        ]
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [
+        "codeine"
+      ]
+    },
+    "severity": "high",
+    "safety_explanation": "Codeine-containing cough treatment in a child must not be generated automatically and requires clinician review.",
+    "source_refs": [
+      "local_pediatric_safety_policy"
+    ],
+    "audit_tags": [
+      "pediatric",
+      "codeine",
+      "cough"
+    ]
+  },
+  {
+    "rule_id": "arabizi_antibiotic_patient_request_review",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 86,
+    "category": "antimicrobial_stewardship",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "nheb",
+          "n7eb",
+          "a3tini",
+          "3tini",
+          "7abbit",
+          "habbit",
+          "نحب"
+        ],
+        [
+          "augmentin",
+          "amoxicillin",
+          "amoxicilline",
+          "antibiotique",
+          "antibiotic"
+        ]
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [
+        "amoxicillin",
+        "amoxicillin + clavulanic acid"
+      ]
+    },
+    "severity": "medium_high",
+    "safety_explanation": "Franco-arabizi patient request for antibiotics is not a clinician authorization; automatic antibiotic generation is blocked.",
+    "source_refs": [
+      "antimicrobial_stewardship_policy"
+    ],
+    "audit_tags": [
+      "arabizi",
+      "antibiotic_stewardship"
+    ]
+  },
+  {
+    "rule_id": "nsaid_pregnancy_or_renal_review",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 91,
+    "category": "nsaid_safety",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "ibuprofen",
+          "ibuprofene",
+          "ibuprofène",
+          "diclofenac",
+          "naproxen",
+          "nsaid",
+          "ains"
+        ],
+        [
+          "pregnant",
+          "grossesse",
+          "enceinte",
+          "renal impairment",
+          "insuffisance renale",
+          "insuffisance rénale",
+          "kidney disease"
+        ]
+      ],
+      "negation_terms": [
+        "pas enceinte",
+        "non enceinte",
+        "no renal impairment",
+        "pas d insuffisance renale",
+        "pas d insuffisance rénale",
+        "fonction renale normale",
+        "fonction rénale normale"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [
+        "ibuprofen",
+        "diclofenac",
+        "naproxen"
+      ]
+    },
+    "severity": "high",
+    "safety_explanation": "NSAID request with pregnancy or renal-risk context requires clinician review; do not generate NSAIDs automatically.",
+    "source_refs": [
+      "local_safety_policy"
+    ],
+    "audit_tags": [
+      "nsaid",
+      "pregnancy",
+      "renal"
+    ]
+  },
+  {
+    "rule_id": "emergency_chest_pain_red_flags",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 100,
+    "category": "emergency",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "chest pain",
+          "douleur thoracique",
+          "oppression thoracique"
+        ],
+        [
+          "sweating",
+          "sueurs",
+          "dyspnea",
+          "dyspnée",
+          "dyspnee",
+          "syncope",
+          "radiation"
+        ]
+      ],
+      "negation_terms": [
+        "pain resolved completely",
+        "resolved without recurrence"
+      ]
+    },
+    "action": {
+      "route_override": "emergency",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": []
+    },
+    "severity": "critical",
+    "safety_explanation": "Chest pain with red-flag features requires urgent clinical evaluation rather than an automatic prescription proposal.",
+    "source_refs": [
+      "local_emergency_policy"
+    ],
+    "audit_tags": [
+      "emergency",
+      "cardiac_red_flags"
+    ],
+    "positive_test_examples": [
+      "Oppressive chest pain with sweating and dyspnea."
+    ],
+    "negative_test_examples": [
+      "Chest discomfort resolved without recurrence."
+    ]
+  },
+  {
+    "rule_id": "pregnancy_preeclampsia_red_flags",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 100,
+    "category": "emergency",
+    "trigger": {
+      "structured_conditions": {
+        "pregnant": true
+      },
+      "text_terms_any": [
+        "visual blur",
+        "vision floue",
+        "blurred vision",
+        "severe headache",
+        "céphalée intense",
+        "cephalee intense",
+        "hypertension",
+        "preeclampsia",
+        "prééclampsie"
+      ],
+      "negation_terms": [
+        "not pregnant",
+        "pas enceinte",
+        "non enceinte",
+        "denies pregnancy",
+        "pregnancy status missing",
+        "ask pregnancy status"
+      ]
+    },
+    "action": {
+      "route_override": "emergency",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": []
+    },
+    "severity": "critical",
+    "safety_explanation": "Pregnancy with headache, visual symptoms, hypertension, or explicit preeclampsia concern requires urgent evaluation.",
+    "source_refs": [
+      "local_emergency_policy"
+    ],
+    "audit_tags": [
+      "pregnancy",
+      "preeclampsia",
+      "emergency"
+    ],
+    "positive_test_examples": [
+      "Pregnant patient with severe headache and blurred vision."
+    ],
+    "negative_test_examples": [
+      "Pregnancy status missing; ask pregnancy status."
+    ]
+  },
+  {
+    "rule_id": "anticoagulant_nsaid_interaction",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 95,
+    "category": "ddi",
+    "trigger": {
+      "structured_conditions": {
+        "current_medications_any": [
+          "warfarin",
+          "acenocoumarol",
+          "anticoagulant",
+          "avk"
+        ]
+      },
+      "text_terms_any": [
+        "ibuprofen",
+        "ibuprofene",
+        "ibuprofène",
+        "diclofenac",
+        "naproxen",
+        "nsaid",
+        "ains"
+      ],
+      "negation_terms": [
+        "not taking warfarin",
+        "no anticoagulant",
+        "denies anticoagulant"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [
+        "ibuprofen",
+        "diclofenac",
+        "naproxen"
+      ]
+    },
+    "severity": "major",
+    "clinical_consequence": "increased bleeding risk",
+    "mechanism": "pharmacodynamic bleeding risk",
+    "management": "Avoid automatic NSAID proposal; require clinician review.",
+    "safety_explanation": "NSAID request in a patient taking an anticoagulant may increase bleeding risk and requires clinician review.",
+    "source_refs": [
+      "PDDI_minimum_information_model",
+      "local_safety_policy"
+    ],
+    "audit_tags": [
+      "ddi",
+      "bleeding_risk",
+      "review_required"
+    ],
+    "positive_test_examples": [
+      "Patient on warfarin asks for ibuprofen."
+    ],
+    "negative_test_examples": [
+      "Patient asks for ibuprofen and denies anticoagulant use."
+    ]
+  },
+  {
+    "rule_id": "penicillin_allergy_beta_lactam_review",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 92,
+    "category": "allergy",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "penicillin allergy",
+          "allergie penicilline",
+          "allergy to penicillin"
+        ],
+        [
+          "amoxicillin",
+          "amoxicilline",
+          "beta lactam",
+          "betalactam"
+        ]
+      ],
+      "negation_terms": [
+        "no penicillin allergy",
+        "denies penicillin allergy"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [
+        "amoxicillin"
+      ]
+    },
+    "severity": "high",
+    "safety_explanation": "A beta-lactam request in a patient with penicillin allergy requires clinician review.",
+    "source_refs": [
+      "local_allergy_policy"
+    ],
+    "audit_tags": [
+      "allergy",
+      "beta_lactam"
+    ],
+    "positive_test_examples": [
+      "Patient with penicillin allergy asks for amoxicillin."
+    ],
+    "negative_test_examples": [
+      "Patient asks for amoxicillin and has no allergy."
+    ]
+  },
+  {
+    "rule_id": "antibiotic_stewardship_viral_request",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 80,
+    "category": "antimicrobial_stewardship",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "amoxicillin",
+          "amoxicilline",
+          "antibiotic",
+          "antibiotique"
+        ],
+        [
+          "viral",
+          "virus",
+          "urti",
+          "rhume",
+          "sore throat",
+          "mal de gorge",
+          "cough",
+          "toux"
+        ]
+      ],
+      "negation_terms": [
+        "confirmed bacterial infection",
+        "positive strep",
+        "pneumonia confirmed",
+        "angine bacterienne",
+        "angine bactérienne",
+        "infection bacterienne confirmee",
+        "infection bactérienne confirmée",
+        "infection bacterienne documentee",
+        "infection bactérienne documentée",
+        "streptocoque positif",
+        "test streptococcique positif",
+        "tdr positif",
+        "bacterien documente",
+        "bactérien documenté",
+        "diagnostic bacterien confirme",
+        "diagnostic bactérien confirmé",
+        "bacterial confirmed",
+        "confirmed bacterial pneumonia"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [
+        "amoxicillin"
+      ]
+    },
+    "severity": "medium_high",
+    "safety_explanation": "Antibiotic request with viral or URTI features should not be automatically prescribed.",
+    "source_refs": [
+      "antimicrobial_stewardship_policy"
+    ],
+    "audit_tags": [
+      "antimicrobial_stewardship"
+    ],
+    "positive_test_examples": [
+      "Viral sore throat asking for amoxicillin."
+    ],
+    "negative_test_examples": [
+      "Confirmed bacterial pneumonia with clinician-selected antibiotic."
+    ]
+  },
+  {
+    "rule_id": "paracetamol_overuse_review",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 90,
+    "category": "overuse",
+    "trigger": {
+      "text_terms_any": [
+        "paracetamol overuse",
+        "too much paracetamol",
+        "already took several doses",
+        "took 8 tablets",
+        "surconsommation paracetamol",
+        "surconsommation paracétamol",
+        "prise excessive paracetamol",
+        "acetaminophen overuse",
+        "already took doliprane"
+      ],
+      "negation_terms": [
+        "has not taken paracetamol",
+        "no paracetamol taken",
+        "pas pris paracetamol"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [
+        "paracetamol"
+      ]
+    },
+    "severity": "high",
+    "safety_explanation": "Possible paracetamol overuse requires clinician review; do not generate additional paracetamol.",
+    "source_refs": [
+      "local_safety_policy"
+    ],
+    "audit_tags": [
+      "overuse",
+      "paracetamol"
+    ],
+    "positive_test_examples": [
+      "Already took several doses of paracetamol."
+    ],
+    "negative_test_examples": [
+      "Fever and no paracetamol taken yet."
+    ]
+  },
+  {
+    "rule_id": "pediatric_weight_required",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 85,
+    "category": "pediatric",
+    "trigger": {
+      "structured_conditions": {
+        "age_years_lt": 18,
+        "weight_kg_missing": true
+      },
+      "text_terms_any": [
+        "child",
+        "enfant",
+        "pediatric",
+        "pédiatrique",
+        "bébé",
+        "bebe",
+        "infant"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [],
+      "required_missing_data": [
+        "weight_kg"
+      ]
+    },
+    "severity": "high",
+    "safety_explanation": "Pediatric dosing requires weight-based calculation before generating a medication proposal.",
+    "source_refs": [
+      "local_pediatric_safety_policy"
+    ],
+    "audit_tags": [
+      "pediatric",
+      "missing_weight"
+    ],
+    "positive_test_examples": [
+      "Child with fever, weight not provided."
+    ],
+    "negative_test_examples": [
+      "Adult with fever."
+    ]
+  },
+  {
+    "rule_id": "elderly_polypharmacy_review",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 75,
+    "category": "geriatric",
+    "trigger": {
+      "structured_conditions": {
+        "age_years_gte": 65
+      },
+      "text_terms_any": [
+        "polypharmacy",
+        "polymedication",
+        "polymédication",
+        "multiple medications",
+        "elderly",
+        "personne âgée",
+        "personne agee"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": []
+    },
+    "severity": "medium_high",
+    "safety_explanation": "Older patient with polypharmacy requires medication review before adding new treatment.",
+    "source_refs": [
+      "geriatric_safety_policy"
+    ],
+    "audit_tags": [
+      "geriatric",
+      "polypharmacy"
+    ],
+    "positive_test_examples": [
+      "Elderly patient with multiple medications."
+    ],
+    "negative_test_examples": [
+      "Young adult with headache."
+    ]
+  },
+  {
+    "rule_id": "rash_allergy_review",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 82,
+    "category": "allergy",
+    "trigger": {
+      "text_terms_any": [
+        "rash",
+        "eruption",
+        "éruption",
+        "urticaria",
+        "urticaire",
+        "itching",
+        "prurit",
+        "lip swelling",
+        "gonflement des lèvres",
+        "allergic reaction",
+        "reaction allergique"
+      ],
+      "negation_terms": [
+        "no rash",
+        "denies rash"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": []
+    },
+    "severity": "medium_high",
+    "safety_explanation": "Rash or allergy-like symptoms require clinician review before medication proposal.",
+    "source_refs": [
+      "local_allergy_policy"
+    ],
+    "audit_tags": [
+      "allergy",
+      "rash"
+    ],
+    "positive_test_examples": [
+      "Diffuse rash after medication."
+    ],
+    "negative_test_examples": [
+      "Fever and denies rash."
+    ]
+  },
+  {
+    "rule_id": "vomiting_diarrhea_dehydration_review",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 78,
+    "category": "gastrointestinal",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "vomiting",
+          "vomissements",
+          "diarrhea",
+          "diarrhée",
+          "diarrhee"
+        ],
+        [
+          "dehydration",
+          "déshydratation",
+          "blood",
+          "sang",
+          "severe",
+          "persistent",
+          "child",
+          "elderly"
+        ]
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": []
+    },
+    "severity": "medium",
+    "safety_explanation": "Vomiting/diarrhea with dehydration risk, blood, persistent symptoms, or vulnerable population requires clinician review.",
+    "source_refs": [
+      "local_triage_policy"
+    ],
+    "audit_tags": [
+      "gastrointestinal",
+      "dehydration_risk"
+    ],
+    "positive_test_examples": [
+      "Child with vomiting and diarrhea dehydration."
+    ],
+    "negative_test_examples": [
+      "Adult mild nausea no red flags."
+    ]
+  },
+  {
+    "rule_id": "non_pharma_refraction_or_lifestyle",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 70,
+    "category": "non_pharma",
+    "trigger": {
+      "text_terms_any": [
+        "myopia",
+        "myopie",
+        "astigmatism",
+        "astigmatisme",
+        "glasses",
+        "lunettes",
+        "diet",
+        "régime",
+        "lifestyle",
+        "hygiène de vie"
+      ]
+    },
+    "action": {
+      "route_override": "non_pharma",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": []
+    },
+    "severity": "low",
+    "safety_explanation": "This situation is not primarily managed by an automatic medication proposal.",
+    "source_refs": [
+      "local_workflow_policy"
+    ],
+    "audit_tags": [
+      "non_pharma"
+    ],
+    "positive_test_examples": [
+      "Myopia needs glasses."
+    ],
+    "negative_test_examples": [
+      "Fever asks symptom relief."
+    ]
+  },
+  {
+    "rule_id": "sinusitis_short_duration_patient_antibiotic_request",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 88,
+    "category": "antimicrobial_stewardship",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "augmentin",
+          "amoxicillin clavulanic acid",
+          "amoxicillin + clavulanic acid",
+          "amoxicilline acide clavulanique",
+          "amoxicillin",
+          "amoxicilline"
+        ],
+        [
+          "sinus",
+          "nez bouche",
+          "nez bouché",
+          "nasal congestion",
+          "pression front",
+          "facial pressure",
+          "ecoulement clair",
+          "écoulement clair",
+          "trois jours",
+          "3 jours",
+          "short duration"
+        ]
+      ],
+      "negation_terms": [
+        "infection bacterienne confirmee",
+        "infection bactérienne confirmée",
+        "complication orbitaire",
+        "fièvre élevée persistante"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [
+        "amoxicillin",
+        "amoxicillin + clavulanic acid"
+      ]
+    },
+    "severity": "medium_high",
+    "safety_explanation": "Short-duration likely viral rhinosinusitis with patient-requested Augmentin/amoxicillin-clavulanate must not generate an antibiotic automatically.",
+    "source_refs": [
+      "antimicrobial_stewardship_policy",
+      "MEDIQA_OE_order_source_patient_request"
+    ],
+    "audit_tags": [
+      "sinusitis",
+      "antibiotic_stewardship",
+      "patient_request"
+    ]
+  },
+  {
+    "rule_id": "nsaid_gi_bleed_or_antiplatelet_review",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 93,
+    "category": "nsaid_safety",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "ibuprofen",
+          "ibuprofene",
+          "ibuprofène",
+          "diclofenac",
+          "naproxen",
+          "nsaid",
+          "ains"
+        ],
+        [
+          "ulcere",
+          "ulcère",
+          "gi bleed",
+          "saignement digestif",
+          "ulcere qui saignait",
+          "ulcère qui saignait",
+          "hospitalise pour ulcere",
+          "hospitalisé pour ulcère",
+          "aspirin",
+          "aspirine",
+          "antiplatelet"
+        ]
+      ],
+      "negation_terms": [
+        "pas d ulcere",
+        "pas d ulcère",
+        "no ulcer",
+        "no gi bleeding",
+        "pas de saignement",
+        "sans aspirine"
+      ]
+    },
+    "action": {
+      "route_override": "review",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": [
+        "ibuprofen",
+        "diclofenac",
+        "naproxen"
+      ]
+    },
+    "severity": "high",
+    "safety_explanation": "NSAID request with prior GI bleeding/ulcer or aspirin/antiplatelet context requires clinician review and should be blocked from automatic generation.",
+    "source_refs": [
+      "local_safety_policy"
+    ],
+    "audit_tags": [
+      "nsaid",
+      "gi_bleed",
+      "antiplatelet"
+    ]
+  },
+  {
+    "rule_id": "diabetic_foot_infection_emergency",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 102,
+    "category": "emergency_infection",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "diabetes",
+          "diabete",
+          "diabète",
+          "diabetic"
+        ],
+        [
+          "foot",
+          "pied",
+          "orteil",
+          "gros orteil",
+          "plaie",
+          "wound"
+        ],
+        [
+          "fever",
+          "fievre",
+          "fièvre",
+          "rouge",
+          "gonfle",
+          "gonflée",
+          "swelling",
+          "reduced sensation",
+          "sent moins",
+          "odeur"
+        ]
+      ]
+    },
+    "action": {
+      "route_override": "emergency",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": []
+    },
+    "severity": "critical",
+    "safety_explanation": "Diabetic foot wound with fever/swelling/reduced sensation suggests potentially serious infection and must be escalated rather than handled by outpatient automatic prescription.",
+    "source_refs": [
+      "local_emergency_policy"
+    ],
+    "audit_tags": [
+      "diabetes",
+      "foot_wound",
+      "infection",
+      "emergency"
+    ]
+  },
+  {
+    "rule_id": "fever_neck_stiffness_petechiae_emergency",
+    "version": "1.0.0",
+    "status": "active",
+    "priority": 103,
+    "category": "emergency_infection",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "fever",
+          "fievre",
+          "fièvre",
+          "39",
+          "temperature",
+          "température"
+        ],
+        [
+          "neck stiffness",
+          "raideur nuque",
+          "nuque raide",
+          "raide"
+        ],
+        [
+          "petechiae",
+          "pétéchies",
+          "petechies",
+          "purpura",
+          "taches violettes",
+          "ne blanchissent pas"
+        ]
+      ]
+    },
+    "action": {
+      "route_override": "emergency",
+      "allowed_to_generate": false,
+      "localization_required": false,
+      "forbidden_ingredients": []
+    },
+    "severity": "critical",
+    "safety_explanation": "Fever with neck stiffness and non-blanching/petechial rash is a meningitis/sepsis red flag; route to emergency and suppress outpatient prescription generation.",
+    "source_refs": [
+      "local_emergency_policy"
+    ],
+    "audit_tags": [
+      "meningitis",
+      "sepsis",
+      "fever",
+      "petechiae",
+      "emergency"
+    ]
+  },
+  {
+    "rule_id": "uti_flank_fever_systemic_emergency",
+    "version": "patch16",
+    "status": "active",
+    "category": "emergency_infection",
+    "priority": 104,
+    "severity": "critical",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "dysuria",
+          "brulures urinaires",
+          "brûlures urinaires",
+          "urinary"
+        ],
+        [
+          "flank pain",
+          "douleur au flanc",
+          "flanc droit",
+          "flanc gauche",
+          "douleur lombaire"
+        ],
+        [
+          "fever",
+          "fievre",
+          "fièvre",
+          "39",
+          "vomiting",
+          "vomissements",
+          "frissons",
+          "rigors"
+        ]
+      ]
+    },
+    "action": {
+      "route_override": "emergency",
+      "allowed_to_generate": false,
+      "forbidden_ingredients": [],
+      "required_missing_data": []
+    },
+    "safety_explanation": "Urinary symptoms with flank pain and systemic features require urgent assessment for pyelonephritis/sepsis rather than outpatient prescription draft.",
+    "source_refs": [
+      "NICE_UTI_NG109"
+    ],
+    "audit_tags": [
+      "patch16",
+      "red_flag",
+      "uti"
+    ]
+  },
+  {
+    "rule_id": "thunderclap_headache_neuro_emergency",
+    "version": "patch16",
+    "status": "active",
+    "category": "emergency_neuro",
+    "priority": 104,
+    "severity": "critical",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "thunderclap",
+          "sudden",
+          "d un coup",
+          "d'un coup",
+          "brutale",
+          "pire mal de tete",
+          "pire mal de tête",
+          "worst headache"
+        ],
+        [
+          "headache",
+          "cephalee",
+          "céphalée",
+          "mal de tete",
+          "mal de tête"
+        ],
+        [
+          "main faible",
+          "weakness",
+          "arm weakness",
+          "deficit neurologique",
+          "déficit neurologique",
+          "speech",
+          "vision floue",
+          "vomiting",
+          "vomissements",
+          "vomi",
+          "main droite faible",
+          "faible",
+          "confus",
+          "confusion",
+          "neurologic deficit",
+          "déficit",
+          "deficit"
+        ]
+      ]
+    },
+    "action": {
+      "route_override": "emergency",
+      "allowed_to_generate": false,
+      "forbidden_ingredients": [],
+      "required_missing_data": []
+    },
+    "safety_explanation": "Sudden/worst headache with neurologic or vomiting features requires emergency neurologic assessment.",
+    "source_refs": [
+      "NHS_stroke_FAST"
+    ],
+    "audit_tags": [
+      "patch16",
+      "red_flag",
+      "neuro"
+    ]
+  },
+  {
+    "rule_id": "dental_swelling_trismus_fever_emergency",
+    "version": "patch16",
+    "status": "active",
+    "category": "emergency_dental_infection",
+    "priority": 104,
+    "severity": "critical",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "dental",
+          "dentaire",
+          "dent",
+          "joue gonflee",
+          "joue gonflée"
+        ],
+        [
+          "swelling",
+          "gonflee",
+          "gonflée",
+          "abces",
+          "abcès"
+        ],
+        [
+          "fever",
+          "fievre",
+          "fièvre",
+          "39",
+          "trismus",
+          "ouvrir la bouche",
+          "difficulte a avaler",
+          "difficulté à avaler",
+          "avaler fait mal"
+        ]
+      ]
+    },
+    "action": {
+      "route_override": "emergency",
+      "allowed_to_generate": false,
+      "forbidden_ingredients": [],
+      "required_missing_data": []
+    },
+    "safety_explanation": "Dental/facial swelling with fever, trismus or swallowing difficulty may indicate deep odontogenic infection and needs urgent assessment.",
+    "source_refs": [
+      "clinical_safety_red_flags"
+    ],
+    "audit_tags": [
+      "patch16",
+      "red_flag",
+      "dental"
+    ]
+  },
+  {
+    "rule_id": "anaphylaxis_airway_emergency",
+    "version": "patch16",
+    "status": "active",
+    "category": "emergency_allergy",
+    "priority": 104,
+    "severity": "critical",
+    "trigger": {
+      "text_terms_group_all": [
+        [
+          "urticaire",
+          "hives",
+          "lip swelling",
+          "gonflement des levres",
+          "gonflement des lèvres",
+          "allergic reaction"
+        ],
+        [
+          "wheezing",
+          "sifflement",
+          "throat tightness",
+          "serre dans la gorge",
+          "dyspnea",
+          "dyspnee",
+          "dyspnée"
+        ]
+      ]
+    },
+    "action": {
+      "route_override": "emergency",
+      "allowed_to_generate": false,
+      "forbidden_ingredients": [],
+      "required_missing_data": []
+    },
+    "safety_explanation": "Allergic reaction with airway or respiratory features requires emergency handling, not antihistamine-only outpatient draft.",
+    "source_refs": [
+      "clinical_safety_red_flags"
+    ],
+    "audit_tags": [
+      "patch16",
+      "red_flag",
+      "allergy"
+    ]
+  }
+]

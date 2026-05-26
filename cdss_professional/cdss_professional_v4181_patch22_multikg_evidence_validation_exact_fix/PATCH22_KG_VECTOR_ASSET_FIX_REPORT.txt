@@ -1,0 +1,76 @@
+Patch22 MultiKG KG + Vector Asset Fix
+=====================================
+
+Context
+-------
+The uploaded builder/review notebooks show that the Hetionet/PrimeKG backup KG
+and the medical vector fallback have concrete Kaggle packaging constraints that
+must be handled by the project runtime, not only by endpoint probes.
+
+KG backup facts extracted from the notebooks
+--------------------------------------------
+- Kaggle dataset: islemtrigui6/hetionet-primekg-kuzu-database
+- Dataset file: hetionet_primekg_kuzu_full.zip
+- Real Kuzu database inside the zip: hetionet_primekg_kuzu_full/db.kuzu
+- Kuzu node table: Entity
+- Kuzu relation table: RELATED
+- Node fields used by queries: name, type_family, node_id/id/label fallbacks
+- Relation fields used by queries: rel_type, source
+- Build size reported by notebook: 137,234 nodes and 10,350,695 RELATED edges
+- Top relation families include synergistic interaction, interacts, causes,
+  contraindication, treats, off-label/off, associates, regulates.
+
+Vector fallback facts extracted from the notebooks
+--------------------------------------------------
+- Kaggle dataset: islemtrigui6/medical-vector-store-cdss
+- Required files:
+  - medical_knowledge.faiss
+  - all_metadata.pkl
+  - all_texts.pkl
+  - vector_store_stats.json
+  - embedding_benchmark.json
+- Index model: pritamdeka/S-PubMedBert-MS-MARCO
+- Passage count: 1,377,365
+- Index strategy: HNSW
+- Chunking: max_chars=1200, overlap=200
+- Notebook benchmark: mean top-1 score 0.9217, proxy R@5 1.00
+
+Code changes
+------------
+1. Kuzu asset resolver now supports Kaggle ZIP packaging:
+   - detects hetionet_primekg_kuzu_full.zip under the dataset root;
+   - extracts to CDSS_KUZU_EXTRACT_DIR, defaulting to /kaggle/working/cdss_kuzu_backups;
+   - resolves the real db.kuzu directory after extraction;
+   - readiness reports the resolved extracted DB path.
+
+2. Hetionet/PrimeKG Kuzu query compatibility:
+   - supports RELATED relations with r.rel_type and r.source;
+   - keeps fallback variants for older r.relation schemas;
+   - supports node name, label, id and node_id fallbacks;
+   - prevents the previous situation where readiness was green but backup_only returned zero facts.
+
+3. Vector fallback compatibility:
+   - VECTOR_FALLBACK_FAISS_STATS_PATH added;
+   - vector_store_stats.json is used as source of truth for the FAISS embedding model;
+   - avoids E5/BGE vs S-PubMedBert dimension mismatch on the backup FAISS index;
+   - .env.kaggle and runtime envs point to vector_store_stats.json.
+
+4. Notebook update:
+   - stages/extracts the KG backup zip before endpoint probes;
+   - records KG zip, resolved DB and vector stats paths in the source coverage report;
+   - fixes backup ablation overlays so KG_SOURCE_MODE is primary_plus_backups / primary_plus_all_backups when backups are enabled.
+
+Validation in sandbox
+---------------------
+- compileall: OK
+- target tests: 25 passed
+- full unit collection: 217 tests collected
+
+Kaggle acceptance expectations
+------------------------------
+After Kernel -> Restart & Run All using the asset-fix project zip and notebook:
+- /v1/system/readiness should show backup_kuzu_db_exists=true;
+- resource_checks.kg.resolved_backup_kuzu_db_path should end with db.kuzu;
+- /v1/prescriptions/kg/search?source_mode=backup_only should return backup_kg_1 facts;
+- backup facts must have support_only=true;
+- vector fallback diagnostics should no longer be blocked by embedding dimension mismatch.

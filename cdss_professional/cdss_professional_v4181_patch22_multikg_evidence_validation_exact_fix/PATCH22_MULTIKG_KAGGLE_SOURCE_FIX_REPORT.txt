@@ -1,0 +1,36 @@
+Patch22 MultiKG Kaggle Source Fix
+=================================
+
+Issue observed in executed notebook cell 57/68:
+- /v1/system/readiness returned backup_kuzu_db_exists=true.
+- /v1/prescriptions/kg/search returned HTTP 200 for all source_mode values.
+- backup_only returned 0 backup facts.
+- primary_plus_backups returned 0 backup facts.
+- The notebook correctly failed the hard gates:
+  backup_only_returns_backup_facts=false
+  primary_plus_returns_backup_facts=false
+
+Root cause:
+- The Kaggle Hetionet/PrimeKG dataset root contains a nested Kuzu database named db.kuzu, not always a directory ending with *.kuzu.
+- The resolver could therefore pass the dataset/container directory instead of the concrete Kuzu database path.
+- The Kuzu query path assumed the CDSS primary schema relationship table KG_REL, while the Hetionet/PrimeKG Kuzu export uses Entity nodes and RELATED relationships.
+
+Fixes:
+- apps/api/container.py: robust Kuzu resolver now detects nested db.kuzu, *.kuzu, and common Kuzu marker files.
+- apps/api/routers/system.py: readiness reports the concrete resolved backup Kuzu path using the same resolver logic.
+- libs/knowledge_connectors/neo4j_client.py: Kuzu retrieval now tries schema-tolerant query variants for both KG_REL and RELATED relationship tables.
+- Backup facts remain source-attributed and support-only through MultiKGRetriever.
+
+Expected Kaggle rerun gates:
+- backup_only_returns_backup_facts=true
+- primary_plus_returns_backup_facts=true
+- backup_facts_are_support_only=true
+- no_core_fact_nulls=true
+- evidence_http_200=true
+
+Validation performed in this sandbox:
+- python -m compileall -q apps libs services tests: OK
+- pytest tests/unit/test_patch22_multikg_evidence_validation.py tests/unit/test_patch21_multi_kg_retriever.py -q: 15 passed
+
+Note:
+The true Hetionet/PrimeKG Kuzu dataset is not mounted in this sandbox, so final confirmation of backup_only facts must be done by rerunning the supplied Kaggle notebook with this fixed zip.

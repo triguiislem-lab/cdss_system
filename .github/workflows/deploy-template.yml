@@ -1,0 +1,35 @@
+name: Deploy Template
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Deployment environment name
+        required: true
+        default: staging
+
+jobs:
+  deploy:
+    name: Deployment handoff
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show deployment inputs
+        run: |
+          echo "Images are published by .github/workflows/docker.yml"
+          echo "Use these image families for deployment:"
+          echo "- ghcr.io/${{ github.repository }}-frontend"
+          echo "- ghcr.io/${{ github.repository }}-api"
+          echo "- ghcr.io/${{ github.repository }}-cdss"
+          echo "Required runtime secrets:"
+          echo "- JWT_SECRET"
+          echo "- JWT_REFRESH_SECRET"
+          echo "- production database credentials"
+          echo "- CDSS model/data volume configuration if not using stub mode"
+
+      - name: Validate compose file
+        run: docker compose -f docker-compose.yml config

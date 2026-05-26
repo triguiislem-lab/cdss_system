@@ -1,0 +1,53 @@
+{
+  "checks": {
+    "activation_defaults": {
+      "ok": true,
+      "expected": {
+        "safety_policy_mode": "audit",
+        "clinical_action_enabled": false,
+        "medical_order_extraction_mode": "off",
+        "post_generation_validator_mode": "off",
+        "multilingual_retrieval_enabled": false,
+        "professional_validation_enabled": true
+      },
+      "actual": {
+        "safety_policy_mode": "audit",
+        "clinical_action_enabled": false,
+        "medical_order_extraction_mode": "off",
+        "post_generation_validator_mode": "off",
+        "multilingual_retrieval_enabled": false,
+        "professional_validation_enabled": true
+      }
+    },
+    "multilingual_offline_safety": {
+      "enabled": false,
+      "allow_online_download": false,
+      "paths_exist": {
+        "nllb_model_path": false,
+        "multilingual_e5_model_path": false,
+        "mini_lm_reranker_path": false,
+        "alias_model_path": false
+      },
+      "offline_safe": true,
+      "ok": true
+    },
+    "case_id_leakage": {
+      "ok": true,
+      "offenders": [],
+      "offender_count": 0
+    }
+  },
+  "policy_benchmark": {
+    "returncode": 0,
+    "metrics": {
+      "case_count": 7,
+      "pass_rate": 1.0,
+      "failure_count": 0,
+      "failure_map": []
+    }
+  },
+  "staged_activation_smoke": {
+    "returncode": 0
+  },
+  "ok": true
+}

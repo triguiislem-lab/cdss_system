@@ -1,0 +1,101 @@
+Patch22 MultiKG Evidence Validation - Implementation Report
+==========================================================
+
+Base archive
+------------
+cdss_professional_v4181_patch21_multikg_kaggle_hotfix.zip
+
+Goal
+----
+Turn Patch21 MultiKG from "backup configured" into a measurable evidence-validation version.
+This patch makes Hetionet/PrimeKG and vector-fallback contribution visible in endpoints,
+ablation tables and diagnostics, and it closes two false-safe red-flag patterns observed in the notebook.
+
+Implemented changes
+-------------------
+1. MultiKGRetriever source modes
+   - primary_only
+   - backup_only
+   - primary_plus_backups
+   - primary_plus_all_backups
+
+2. Reserved backup support slots
+   - New KG_BACKUP_MIN_SUPPORT_FACTS, default 3
+   - New KG_BACKUP_RESERVED_LIMIT, default 8
+   - New KG_SOURCE_MODE, default primary_plus_backups
+   - Combined retrieval over-fetches backups and reserves support-only backup slots when available.
+   - Backup facts remain support_only=true and score-reduced via KG_BACKUP_SCORE_MULTIPLIER.
+
+3. API endpoint diagnostics
+   - /v1/prescriptions/kg/search now accepts source_mode.
+   - Existing route/disease filters are preserved.
+   - backup_only can be used in Kaggle to prove Hetionet/PrimeKG is queryable independently.
+
+4. Source attribution in retrieval diagnostics
+   - /v1/prescriptions/evidence now exposes retrieval_diagnostics.source_attribution.
+   - Attribution includes source, fact count, support_only fact count and influence.
+   - Primary safety facts can be marked as blocking; backup facts remain support_only.
+
+5. Evaluation metric support
+   - tools/run_pipeline_evaluation_metrics.py now exports:
+     - primary_kg_facts_mean
+     - backup_kg_facts_mean
+     - backup_kg_used_rate
+     - kg_support_only_mean
+     - vector_fallback_used_rate
+     - fallback_evidence_count_mean
+     - critical_safety_recall
+     - false_safe_rate
+     - safety_gate_false_safe_zero
+     - false_safe_case_ids
+
+6. Backup KG recall improvements
+   - Added aliases for CYP2C9 and VKORC1 around warfarin/pharmacogenomics.
+   - Preserved SINTROM/acénocoumarol aliases from the Kaggle hotfix.
+
+7. False-safe red-flag closure
+   - Added defensive FAST/stroke red-flag detection: face + arm + speech, AVC/stroke/FAST expressions.
+   - Added Arabizi chest-pain/cardiac red-flag detection: wja3/wje3 sder(i), t3arra9, left arm/yed isar.
+   - These rules are implemented in both the domain classifier and execution-planner fallback.
+
+8. Tests added/updated
+   - backup_only returns SINTROM/acénocoumarol support facts.
+   - backup_only returns ibuprofen-warfarin support facts.
+   - backup_only returns warfarin-CYP2C9-VKORC1 support facts.
+   - primary_only excludes backups.
+   - primary_plus_backups reserves backup slots.
+   - endpoint forwards source_mode.
+   - hybrid retrieval exposes source_attribution.
+   - stroke FAST pattern routes emergency, not prescription.
+   - Arabizi chest pain + sweating + left arm routes emergency, not prescription.
+
+Validated locally
+-----------------
+- compileall apps/libs/services/tools/tests subset: OK
+- tests/unit/test_patch21_multi_kg_retriever.py + tests/unit/test_patch22_multikg_evidence_validation.py: 15 passed
+- critical compatibility subset: 54 passed
+- unit collection: 215 tests collected
+- Additional hybrid extraction/planning chunks were checked successfully.
+
+Limitations
+-----------
+- Kaggle live assets are not mounted in this sandbox, so backup_only must be rerun in Kaggle against:
+  /kaggle/input/datasets/islemtrigui6/hetionet-primekg-kuzu-database
+- The full `pytest tests/unit -q` command exceeds the interactive timeout here. Critical subsets and file chunks were validated.
+- Patch22 closes the observed false-safe patterns in unit tests and exposes false_safe_rate metrics; the full notebook must be rerun to confirm false_safe_rate == 0.0 on the complete benchmark.
+
+Recommended Kaggle probes
+-------------------------
+GET /v1/prescriptions/kg/search?query=acenocoumarol SINTROM anticoagulant bleeding interaction&limit=20&source_mode=backup_only
+GET /v1/prescriptions/kg/search?query=ibuprofen warfarin&limit=20&source_mode=backup_only
+GET /v1/prescriptions/kg/search?query=warfarin CYP2C9 VKORC1&limit=20&source_mode=backup_only
+GET /v1/prescriptions/kg/search?query=ibuprofen warfarin&limit=20&source_mode=primary_plus_backups
+POST /v1/prescriptions/evidence and inspect retrieval_diagnostics.source_attribution
+
+Expected evidence-validation targets
+------------------------------------
+backup_kg_used_rate > 0.0 for backup-enabled ablation configs
+kg_support_only_mean > 0.0 for primary_plus_backups
+false_safe_rate == 0.0
+critical_safety_recall == 1.0
+forbidden_ingredient_violation_rate == 0.0

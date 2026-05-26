@@ -1,0 +1,54 @@
+CLINICAL CONTEXT:
+{clinical_context}
+
+CLINICAL EVIDENCE:
+{evidence_context}
+
+CLINICAL REQUEST:
+{clinical_request}
+
+Generate a structured prescription. Do not include hidden reasoning or chain-of-thought. Use the clinical evidence and patient-specific safety context only.
+
+First write the human-readable clinical sections below:
+
+## DIAGNOSIS
+[Principal diagnosis based on the clinical data]
+
+## PROPOSED PRESCRIPTION
+| Drug (DCI) | Dose | Route | Frequency | Duration | AMM-TN Equivalent |
+|---|---|---|---|---|---|
+[One row per drug. If no outpatient medication is appropriate, state that explicitly below the table section.]
+
+## SAFETY REVIEW
+### Contraindications checked:
+[Explicit list from patient context and retrieved evidence]
+### Drug interactions:
+[Detected or suspected interactions with clinical significance]
+### Patient-specific alerts:
+[Vulnerable population flags: pregnancy/renal/pediatric/elderly/allergy]
+
+## CLINICAL EVIDENCE
+[2-3 concise citations using [KG], [VS], or [LOCAL] tags]
+
+## MONITORING REQUIRED
+[Lab tests, vital parameters, follow-up schedule]
+
+## DISCLAIMER
+This CDSS proposal MUST be validated by the prescribing physician before administration.
+
+MANDATORY MACHINE-READABLE OUTPUT:
+At the end of your answer, always append these exact machine-readable lines. Do not omit dose, frequency, duration, or route for any medication. If no medication is appropriate, omit medication lines and use non_drug instead.
+
+problem_summary: concise diagnosis or prescribing target
+triage: outpatient_follow_up OR clinician_review OR emergency_referral
+confidence: 0.0-1.0
+medication: DCI | indication | dose | frequency | duration | route | rationale
+support: DCI | VS/KG/LOCAL | evidence note
+monitoring: clinical monitoring and follow-up
+question: remaining critical question, if any
+
+Rules:
+- Prefer DCI/generic ingredient names, not brand names.
+- Use oral route only for oral products; use inhalation only for inhalers; never map an oral draft to injectable products.
+- For simple adult fever without contraindication, a complete medication line should include paracetamol, a numeric dose, a frequency, a duration, and oral route.
+- If the case is unsafe, unclear, pregnancy-related, emergency-like, or lacks critical information, set triage to clinician_review or emergency_referral and explain why in monitoring/question lines.

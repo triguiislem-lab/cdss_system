@@ -1,0 +1,25 @@
+{
+  "request_id": "scn-001",
+  "patient": {
+    "patient_id": "p-urti",
+    "age_years": 31,
+    "sex": "female",
+    "pregnant": false,
+    "known_allergies": [],
+    "current_medications": []
+  },
+  "consultation": {
+    "language": "fr",
+    "doctor_notes": "Fever and sore throat for two days with no dyspnea.",
+    "transcript": [
+      {
+        "speaker": "doctor",
+        "text": "What is bothering you?"
+      },
+      {
+        "speaker": "patient",
+        "text": "I have fever and sore throat since yesterday."
+      }
+    ]
+  }
+}

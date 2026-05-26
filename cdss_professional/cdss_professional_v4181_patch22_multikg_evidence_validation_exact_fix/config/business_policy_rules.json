@@ -1,0 +1,50 @@
+[
+  {
+    "rule_id": "DOMAIN_EMERGENCY_PRECEDENCE",
+    "category": "route_decision",
+    "severity": "critical",
+    "trigger_summary": "Any emergency classification or emergency safety policy hit",
+    "action": {"route": "emergency", "allowed_to_generate": false},
+    "clinical_explanation": "Emergency red flags always override medication draft generation."
+  },
+  {
+    "rule_id": "DOMAIN_BLOCKING_POLICY_PRECEDENCE",
+    "category": "safety_policy",
+    "severity": "critical",
+    "trigger_summary": "SafetyPolicyEngine returns a blocking policy",
+    "action": {"route": "review_or_emergency", "allowed_to_generate": false},
+    "clinical_explanation": "Safety policy blocks are authoritative over candidate therapy selection."
+  },
+  {
+    "rule_id": "DOMAIN_PATIENT_REQUEST_NOT_AUTHORIZED",
+    "category": "medication_authorization",
+    "severity": "high",
+    "trigger_summary": "Target medication was requested by patient without doctor authorization",
+    "action": {"route": "review", "display_route": "review_blocked", "allowed_to_generate": false},
+    "clinical_explanation": "Patient requests must not become prescriptions without clinician authorization."
+  },
+  {
+    "rule_id": "DOMAIN_BLOCKING_MISSING_INFO",
+    "category": "missing_information",
+    "severity": "high",
+    "trigger_summary": "Required clinical information is missing for the target risk class",
+    "action": {"route": "review", "display_route": "missing_info", "allowed_to_generate": false},
+    "clinical_explanation": "Generation is blocked only when missing data are clinically blocking for the candidate medication."
+  },
+  {
+    "rule_id": "DOMAIN_VULNERABLE_LOW_RISK_REVIEW_DRAFT",
+    "category": "clinician_review",
+    "severity": "medium",
+    "trigger_summary": "Vulnerable context with a low-risk protocol medication",
+    "action": {"route": "review", "display_route": "review_draft_allowed", "allowed_to_generate": true},
+    "clinical_explanation": "Low-risk drafts may be shown to a clinician in vulnerable contexts but never finalized automatically."
+  },
+  {
+    "rule_id": "DOMAIN_LOW_RISK_PROTOCOL_DRAFT",
+    "category": "generation_permission",
+    "severity": "low",
+    "trigger_summary": "Low-risk target, no blocking safety policy, no blocking missing data",
+    "action": {"route": "prescription", "display_route": "draft_prescription", "allowed_to_generate": true},
+    "clinical_explanation": "Only controlled low-risk protocols can enter automatic draft generation."
+  }
+]

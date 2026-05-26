@@ -1,0 +1,15 @@
+PATCH20_RELEASE_STABILIZATION_REPORT.md
+services/domain/utils.py
+services/domain/clinical_case_classifier.py
+services/domain/route_decision_engine.py
+services/domain/generation_permission_policy.py
+services/planning/execution_planner.py
+services/clinical_understanding/llm_extractor.py
+services/order_extraction/llm_mediqa_oe_extractor.py
+tests/unit/test_patch16_dynamic_logic_hardening.py
+tests/unit/test_patch20_release_regression.py
+Removed from release package:
+  data/audit/trace-*.json
+  data/feedback/clinician_feedback.jsonl
+  data/feedback/clinician_feedback.sqlite
+  data/feedback/by_trace/*

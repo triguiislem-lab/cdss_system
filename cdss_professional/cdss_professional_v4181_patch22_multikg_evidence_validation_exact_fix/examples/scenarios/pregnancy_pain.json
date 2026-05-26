@@ -1,0 +1,25 @@
+{
+  "request_id": "scn-002",
+  "patient": {
+    "patient_id": "p-preg",
+    "age_years": 29,
+    "sex": "female",
+    "pregnant": true,
+    "known_allergies": [],
+    "current_medications": []
+  },
+  "consultation": {
+    "language": "fr",
+    "doctor_notes": "Pregnant patient with body aches and headache.",
+    "transcript": [
+      {
+        "speaker": "doctor",
+        "text": "Describe the pain."
+      },
+      {
+        "speaker": "patient",
+        "text": "I am pregnant and I have headache and body pain."
+      }
+    ]
+  }
+}

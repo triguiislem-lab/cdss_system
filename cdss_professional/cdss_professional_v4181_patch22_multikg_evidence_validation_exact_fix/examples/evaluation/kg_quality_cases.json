@@ -1,0 +1,63 @@
+{
+  "description": "Starter KG quality benchmark cases.",
+  "cases": [
+    {
+      "case_id": "kg_renal_ibuprofen",
+      "query": "ibuprofen renal impairment",
+      "expected_subjects_any": [
+        "ibuprofen",
+        "NSAID"
+      ],
+      "expected_predicates_any": [
+        "contraindicated_in",
+        "caution_in",
+        "renal_warning",
+        "contraindication"
+      ],
+      "forbidden_subjects": [
+        "paracetamol_only"
+      ],
+      "expected_triples_any": [
+        [
+          "ibuprofen",
+          "caution_in",
+          "renal_impairment"
+        ],
+        [
+          "NSAID",
+          "caution_in",
+          "renal_impairment"
+        ]
+      ]
+    },
+    {
+      "case_id": "kg_warfarin_ibuprofen",
+      "query": "ibuprofen warfarin interaction bleeding",
+      "expected_subjects_any": [
+        "ibuprofen",
+        "NSAID",
+        "warfarin"
+      ],
+      "expected_predicates_any": [
+        "interacts_with",
+        "interaction",
+        "caution_in"
+      ],
+      "forbidden_subjects": [
+        "paracetamol_only"
+      ],
+      "expected_triples_any": [
+        [
+          "ibuprofen",
+          "interacts_with",
+          "warfarin"
+        ],
+        [
+          "ibuprofen_warfarin",
+          "increases_risk_of",
+          "bleeding"
+        ]
+      ]
+    }
+  ]
+}

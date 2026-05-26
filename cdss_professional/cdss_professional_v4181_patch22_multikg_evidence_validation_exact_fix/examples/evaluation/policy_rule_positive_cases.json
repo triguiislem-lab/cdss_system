@@ -1,0 +1,26 @@
+[
+  {
+    "case_id": "policy_pos_warfarin_nsaid",
+    "text": "Patient on warfarin asks for ibuprofen for back pain.",
+    "expected_rule_id": "anticoagulant_nsaid_interaction",
+    "expected_route": "review"
+  },
+  {
+    "case_id": "policy_pos_antibiotic_viral",
+    "text": "Patient with viral sore throat asks for amoxicillin.",
+    "expected_rule_id": "antibiotic_stewardship_viral_request",
+    "expected_route": "review"
+  },
+  {
+    "case_id": "policy_pos_paracetamol_overuse",
+    "text": "Patient already took several doses of paracetamol today and still has fever.",
+    "expected_rule_id": "paracetamol_overuse_review",
+    "expected_route": "review"
+  },
+  {
+    "case_id": "policy_pos_non_pharma",
+    "text": "Patient asks for glasses because of myopia.",
+    "expected_rule_id": "non_pharma_refraction_or_lifestyle",
+    "expected_route": "non_pharma"
+  }
+]

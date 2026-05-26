@@ -1,0 +1,173 @@
+[
+  {
+    "case_id": "fever_paracetamol_simple",
+    "description": "Adult uncomplicated fever with explicit paracetamol context.",
+    "request_id": "eval-fever-paracetamol-001",
+    "patient": {
+      "patient_id": "p-eval-fever",
+      "age_years": 30,
+      "sex": "female",
+      "weight_kg": 65,
+      "pregnant": false,
+      "breastfeeding": false,
+      "renal_impairment": false,
+      "hepatic_impairment": false,
+      "known_allergies": [],
+      "current_medications": [],
+      "chronic_conditions": []
+    },
+    "consultation": {
+      "language": "fr",
+      "doctor_notes": "Fievre depuis 2 jours. Pas d'allergie connue. Non enceinte. Paracetamol traitement symptomatique.",
+      "transcript": []
+    },
+    "expected_route": "prescription",
+    "expected_symptoms": ["fever"],
+    "expected_active_ingredients": ["paracetamol"],
+    "expected_min_vector_chunks": 1,
+    "expected_min_local_products": 1
+  },
+  {
+    "case_id": "urti_fever_cough_sore_throat",
+    "description": "Upper respiratory symptoms, no pregnancy and no allergy.",
+    "request_id": "eval-urti-001",
+    "patient": {
+      "patient_id": "p-eval-urti",
+      "age_years": 30,
+      "sex": "female",
+      "weight_kg": 65,
+      "pregnant": false,
+      "breastfeeding": false,
+      "renal_impairment": false,
+      "hepatic_impairment": false,
+      "known_allergies": [],
+      "current_medications": [],
+      "chronic_conditions": []
+    },
+    "consultation": {
+      "language": "fr",
+      "doctor_notes": "Fievre, toux et mal de gorge depuis 2 jours. Pas d'allergie connue. Non enceinte.",
+      "transcript": []
+    },
+    "expected_route": "prescription",
+    "expected_symptoms": ["fever", "cough", "sore throat"],
+    "expected_active_ingredients": ["paracetamol"],
+    "expected_min_vector_chunks": 1,
+    "expected_min_local_products": 1
+  },
+  {
+    "case_id": "pregnancy_fever_review",
+    "description": "Pregnancy should force clinician review even if symptomatic treatment may be considered.",
+    "request_id": "eval-pregnancy-fever-001",
+    "patient": {
+      "patient_id": "p-eval-pregnancy",
+      "age_years": 29,
+      "sex": "female",
+      "weight_kg": 62,
+      "pregnant": true,
+      "breastfeeding": false,
+      "renal_impairment": false,
+      "hepatic_impairment": false,
+      "known_allergies": [],
+      "current_medications": [],
+      "chronic_conditions": []
+    },
+    "consultation": {
+      "language": "fr",
+      "doctor_notes": "Patiente enceinte avec fievre et toux depuis 2 jours. Pas d'allergie connue.",
+      "transcript": []
+    },
+    "expected_route": "review",
+    "expected_symptoms": ["fever", "cough"],
+    "expected_active_ingredients": [],
+    "expected_min_vector_chunks": 1,
+    "expected_min_local_products": 0
+  },
+  {
+    "case_id": "asthma_wheezing_bronchodilator",
+    "description": "Asthma-like wheezing case to exercise KG and local product retrieval.",
+    "request_id": "eval-asthma-001",
+    "patient": {
+      "patient_id": "p-eval-asthma",
+      "age_years": 26,
+      "sex": "female",
+      "weight_kg": 60,
+      "pregnant": false,
+      "breastfeeding": false,
+      "renal_impairment": false,
+      "hepatic_impairment": false,
+      "known_allergies": [],
+      "current_medications": [],
+      "chronic_conditions": ["asthma"]
+    },
+    "consultation": {
+      "language": "fr",
+      "doctor_notes": "Patiente asthmatique avec wheezing et toux. Pas d'allergie connue. Non enceinte. Besoin de bronchodilatateur.",
+      "transcript": []
+    },
+    "expected_route": "prescription",
+    "expected_symptoms": ["cough"],
+    "expected_conditions": ["asthma"],
+    "expected_active_ingredients": ["salbutamol"],
+    "expected_min_kg_facts": 1,
+    "expected_min_local_products": 1
+  },
+  {
+    "case_id": "chest_pain_emergency",
+    "description": "Emergency red flag case; outpatient prescription should be suppressed.",
+    "request_id": "eval-chest-pain-001",
+    "patient": {
+      "patient_id": "p-eval-emergency",
+      "age_years": 58,
+      "sex": "male",
+      "weight_kg": 82,
+      "pregnant": false,
+      "breastfeeding": false,
+      "renal_impairment": false,
+      "hepatic_impairment": false,
+      "known_allergies": [],
+      "current_medications": [],
+      "chronic_conditions": ["hypertension"]
+    },
+    "consultation": {
+      "language": "fr",
+      "doctor_notes": "Douleur thoracique oppressive avec dyspnee et sueurs depuis 1 heure. Suspicion STEMI.",
+      "transcript": []
+    },
+    "expected_route": "emergency",
+    "expected_symptoms": ["chest pain", "dyspnea"],
+    "expected_conditions": ["stemi"],
+    "expected_active_ingredients": [],
+    "expected_min_vector_chunks": 0,
+    "expected_min_local_products": 0
+  },
+  {
+    "case_id": "myopia_non_pharma",
+    "description": "Non-pharmacological optical case.",
+    "request_id": "eval-myopia-001",
+    "patient": {
+      "patient_id": "p-eval-myopia",
+      "age_years": 18,
+      "sex": "male",
+      "weight_kg": 70,
+      "pregnant": false,
+      "breastfeeding": false,
+      "renal_impairment": false,
+      "hepatic_impairment": false,
+      "known_allergies": [],
+      "current_medications": [],
+      "chronic_conditions": []
+    },
+    "consultation": {
+      "language": "fr",
+      "doctor_notes": "Patient avec myopie et vision floue sans douleur. Demande de correction optique.",
+      "transcript": []
+    },
+    "expected_route": "non_pharma",
+    "expected_symptoms": ["visual blur"],
+    "expected_conditions": ["myopia"],
+    "expected_active_ingredients": [],
+    "expected_min_vector_chunks": 0,
+    "expected_min_local_products": 0
+  }
+]

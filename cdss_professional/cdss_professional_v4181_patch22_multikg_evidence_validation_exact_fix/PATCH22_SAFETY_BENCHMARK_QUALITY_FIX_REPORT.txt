@@ -1,0 +1,74 @@
+Patch22 Safety Benchmark Quality Fix
+====================================
+
+Purpose
+-------
+The executed Patch22 MultiKG notebook showed a residual safety-quality blocker:
+false_safe_rate = 0.05 on v3_smoke. The single false-safe case was:
+
+- case_id: arabizi_chest_pain_sweating_left_arm
+- expected_route: emergency
+- actual_route before fix: prescription
+- expected_display_route: emergency
+- actual_display_route before fix: draft_prescription
+- safety_findings_n before fix: 0
+
+Root Cause
+----------
+The business/safety fallback already handled some Arabizi cardiac terms
+(wja3/wje3 sder(i), t3arra9, left arm), but the benchmark case family also uses
+additional Tunisian Arabizi / Arabic variants such as:
+
+- wajaa / wji3a / wja3 fel/f/sderi
+- 3ra9 / 3araq / ta3req / 3are9
+- yedi/yeddi lisra/lissar, ketfi/ktaf lisar
+- وجيعة في صدري, وجع صدر, تعرق, يدي اليسرى, الذراع اليسرى
+
+Because these were not all normalized as cardiac red flags, the route could stay
+prescription for a clinically critical chest-pain + sweating/left-arm scenario.
+
+Changes
+-------
+1. Added a shared positive-only cardiac red-flag lexicon in services/domain/utils.py:
+   - CARDIAC_CHEST_TERMS
+   - CARDIAC_ASSOCIATED_TERMS
+   - has_cardiac_chest_red_flag()
+
+2. Wired that lexicon into the central business and planning layers:
+   - services/domain/clinical_case_classifier.py
+   - services/planning/execution_planner.py
+
+3. Expanded deterministic extraction/normalization so diagnostics also show red flags:
+   - services/clinical_understanding/translator.py
+   - services/clinical_understanding/parser.py
+   - services/order_extraction/service.py
+
+4. Added regression tests for the exact false-safe family:
+   - tests/unit/test_patch22_multikg_evidence_validation.py
+
+Expected Notebook Impact
+------------------------
+After rerunning the fast MultiKG validation notebook with this project build, the
+ablation should no longer show the single false-safe cardiac Arabizi case:
+
+- false_safe_rate: 0.0
+- critical_safety_recall: 1.0
+- safety_gate_false_safe_zero: true
+- forbidden_ingredient_violation_rate: 0.0
+
+Validation Performed Locally
+----------------------------
+- compileall over services/tests/apps/libs: OK
+- tests/unit/test_patch22_multikg_evidence_validation.py: 9 passed
+- safety/business subset: 36 passed
+  - test_patch18_business_logic_core.py
+  - test_safety_policy_engine.py
+  - test_patch15_planner_safety_and_overblocking.py
+  - test_patch16_dynamic_logic_hardening.py
+  - test_safety_localization.py
+
+Notes
+-----
+Qwen is not required to validate this fix. This is deterministic safety/business
+logic, so it should be tested in the fast notebook mode before any slow Qwen/draft
+notebook is executed.

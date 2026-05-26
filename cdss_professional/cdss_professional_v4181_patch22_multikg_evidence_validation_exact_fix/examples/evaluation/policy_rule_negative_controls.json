@@ -1,0 +1,24 @@
+[
+  {
+    "case_id": "policy_neg_simple_fever",
+    "text": "Adult patient with fever, not pregnant, no allergy, no kidney disease.",
+    "must_not_trigger": [
+      "pregnancy_preeclampsia_red_flags",
+      "paracetamol_overuse_review"
+    ]
+  },
+  {
+    "case_id": "policy_neg_pregnancy_status_missing",
+    "text": "Adult fever. Pregnancy status missing; ask pregnancy status.",
+    "must_not_trigger": [
+      "pregnancy_preeclampsia_red_flags"
+    ]
+  },
+  {
+    "case_id": "policy_neg_no_anticoagulant",
+    "text": "Patient asks for ibuprofen and denies anticoagulant use.",
+    "must_not_trigger": [
+      "anticoagulant_nsaid_interaction"
+    ]
+  }
+]

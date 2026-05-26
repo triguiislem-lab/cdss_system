@@ -1,0 +1,43 @@
+{
+  "description": "Starter localization benchmark cases.",
+  "cases": [
+    {
+      "case_id": "loc_paracetamol_oral",
+      "active_ingredient": "paracetamol",
+      "dose": "500 mg",
+      "route": "oral",
+      "must_include_any": [
+        "ADOL",
+        "ADOLINE",
+        "ANALGAN",
+        "ALGESIC",
+        "DOLIPRANE",
+        "DOLIPRANE TN"
+      ],
+      "must_exclude_any": [
+        "ACTIFED",
+        "GOLDIX"
+      ],
+      "reject_combination": true,
+      "reject_wrong_route": true
+    },
+    {
+      "case_id": "loc_salbutamol_inhaled",
+      "active_ingredient": "salbutamol",
+      "dose": "100 mcg",
+      "route": "inhalation",
+      "must_include_any": [
+        "AEROL",
+        "VENTOL",
+        "VENTAXX",
+        "VENTOLINE"
+      ],
+      "must_exclude_form": [
+        "sirop",
+        "comprime",
+        "tablet"
+      ],
+      "reject_wrong_route": true
+    }
+  ]
+}

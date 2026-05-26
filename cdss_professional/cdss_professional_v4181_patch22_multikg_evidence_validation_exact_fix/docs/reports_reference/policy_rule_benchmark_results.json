@@ -1,0 +1,67 @@
+{
+  "metrics": {
+    "case_count": 7,
+    "pass_rate": 1.0,
+    "failure_count": 0,
+    "failure_map": []
+  },
+  "rows": [
+    {
+      "case_id": "policy_pos_warfarin_nsaid",
+      "type": "positive",
+      "hit_ids": [
+        "anticoagulant_nsaid_interaction"
+      ],
+      "route_override": "review",
+      "passed": true
+    },
+    {
+      "case_id": "policy_pos_antibiotic_viral",
+      "type": "positive",
+      "hit_ids": [
+        "antibiotic_stewardship_viral_request"
+      ],
+      "route_override": "review",
+      "passed": true
+    },
+    {
+      "case_id": "policy_pos_paracetamol_overuse",
+      "type": "positive",
+      "hit_ids": [
+        "paracetamol_overuse_review"
+      ],
+      "route_override": "review",
+      "passed": true
+    },
+    {
+      "case_id": "policy_pos_non_pharma",
+      "type": "positive",
+      "hit_ids": [
+        "non_pharma_refraction_or_lifestyle"
+      ],
+      "route_override": "non_pharma",
+      "passed": true
+    },
+    {
+      "case_id": "policy_neg_simple_fever",
+      "type": "negative",
+      "hit_ids": [],
+      "route_override": null,
+      "passed": true
+    },
+    {
+      "case_id": "policy_neg_pregnancy_status_missing",
+      "type": "negative",
+      "hit_ids": [],
+      "route_override": null,
+      "passed": true
+    },
+    {
+      "case_id": "policy_neg_no_anticoagulant",
+      "type": "negative",
+      "hit_ids": [],
+      "route_override": null,
+      "passed": true
+    }
+  ]
+}

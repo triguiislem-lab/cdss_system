@@ -1,0 +1,28 @@
+Patch22 Kaggle Exact Source Fix
+===============================
+
+Purpose
+-------
+This patch fixes the repeated Kaggle notebook failure where the source-mode probe failed:
+- backup_only_returns_backup_facts = false
+- primary_plus_returns_backup_facts = false
+
+Root cause
+----------
+The notebook staged an older Patch22 project directory from Kaggle input instead of the latest fixed zip. That older project did not materialize the Hetionet/PrimeKG Kuzu database from /kaggle/input into /kaggle/working and therefore readiness could show the backup path existed while backup_only returned zero facts.
+
+Corrections
+-----------
+1. Strict notebook staging must require this exact marker file before starting FastAPI.
+2. The Kuzu resolver materializes db.kuzu directories from /kaggle/input into /kaggle/working/cdss_kuzu_backups/materialized.
+3. Readiness reports the resolved/materialized backup Kuzu path.
+4. The Kuzu client supports the Hetionet/PrimeKG schema: Entity-[RELATED]->Entity with rel_type/relation/source fields.
+5. If live Kuzu querying still returns no results, the KG client can use the portable nodes.csv + edges.csv export located next to db.kuzu as a backup diagnostic retrieval path.
+
+Expected notebook gates
+-----------------------
+- backup_only_returns_backup_facts = true
+- primary_plus_returns_backup_facts = true
+- backup_facts_are_support_only = true
+- no_core_fact_nulls = true
+- evidence_http_200 = true

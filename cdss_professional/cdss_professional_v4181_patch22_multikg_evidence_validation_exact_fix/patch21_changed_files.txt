@@ -1,0 +1,29 @@
+Added
+- PATCH21_PROFESSIONAL_STABILIZATION_REPORT.md
+- PATCH21_TEST_REPORT.txt
+- apps/api/routers/audit.py
+- apps/api/routers/feedback.py
+- docs/runbooks/patch21_clean_notebook_execution.md
+- notebooks/patch20_clean_evaluation.ipynb
+- services/domain/allergy_evidence.py
+- tests/unit/test_patch21_professional_stabilization.py
+
+Changed
+- Makefile
+- README.md
+- apps/api/main.py
+- apps/api/routers/monitoring.py
+- data/runtime/tn_indication_therapy_map.csv
+- libs/config/runtime.py
+- services/domain/business_rule_registry.py
+- services/domain/clinical_case_classifier.py
+- services/domain/contracts.py
+- services/domain/generation_permission_policy.py
+- services/domain/medication_authorization_policy.py
+- services/domain/route_decision_engine.py
+- services/feedback/repository.py
+- services/monitoring/analytics.py
+- services/planning/execution_planner.py
+- services/planning/indication_therapy_planner.py
+- services/safety/policy_engine.py
+- tests/unit/test_notebook_prompt_and_parser.py

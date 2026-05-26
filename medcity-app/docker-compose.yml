@@ -1,0 +1,115 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "5173:80"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../backend_template
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      API_PREFIX: api
+      DATABASE_TYPE: postgres
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USER: medcity
+      DATABASE_PASSWORD: medcity
+      DATABASE_NAME: medcity_connect
+      DATABASE_SYNC: "true"
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-too}
+      JWT_REFRESH_EXPIRES_IN: 7d
+      CDSS_API_BASE_URL: http://cdss:8000/v1
+      CDSS_API_TIMEOUT_MS: 60000
+      LIBRETRANSLATE_URL: http://libretranslate:5000
+      TRANSLATION_SOURCE_LANG: fr
+      TRANSLATION_TARGET_LANGS: en,ar
+      TRANSLATION_TIMEOUT_MS: 15000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cdss:
+        condition: service_healthy
+      libretranslate:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  cdss:
+    build:
+      context: ../cdss_professional/cdss_professional_v4181_patch22_multikg_evidence_validation_exact_fix
+      dockerfile: Dockerfile
+    environment:
+      APP_ENV: docker
+      API_PREFIX: /v1
+      GENERATION_BACKEND: stub
+      LLM_BACKEND: stub
+      VECTOR_BACKEND: stub
+      KG_BACKEND: stub
+      LOCAL_FORMULARY_BACKEND: stub
+      ALLOW_STUB_FALLBACKS: "true"
+      AUDIT_DIR: /app/data/audit
+      FEEDBACK_DIR: /app/data/feedback
+    volumes:
+      - cdss-audit:/app/data/audit
+      - cdss-feedback:/app/data/feedback
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3).read()\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: medcity
+      POSTGRES_PASSWORD: medcity
+      POSTGRES_DB: medcity_connect
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medcity -d medcity_connect"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  libretranslate:
+    image: libretranslate/libretranslate:latest
+    environment:
+      LT_LOAD_ONLY: fr,en,ar
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  cdss-audit:
+  cdss-feedback:

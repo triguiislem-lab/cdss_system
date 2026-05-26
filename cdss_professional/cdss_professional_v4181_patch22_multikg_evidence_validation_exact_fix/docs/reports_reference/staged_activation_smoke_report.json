@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "checks": [
+    "activation defaults ok",
+    "medical order extraction ok",
+    "clinical action builder ok",
+    "post-generation validator audit ok",
+    "multilingual scaffold ok"
+  ]
+}

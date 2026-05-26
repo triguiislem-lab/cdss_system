@@ -1,0 +1,29 @@
+[
+  {
+    "case_id": "stemi_red_flag_001",
+    "language": "fr",
+    "text": "Homme 58 ans avec douleur thoracique oppressive, dyspnee et sueurs depuis 1 jour. Suspicion STEMI.",
+    "patient": {"patient_id": "p-stemi", "age_years": 58, "sex": "male"},
+    "expected_symptoms": ["chest pain", "dyspnea"],
+    "expected_conditions": ["stemi"],
+    "expected_route": "emergency"
+  },
+  {
+    "case_id": "pregnancy_review_001",
+    "language": "fr",
+    "text": "Femme enceinte avec toux et fievre depuis 2 jours, pas d'allergie connue.",
+    "patient": {"patient_id": "p-preg", "age_years": 30, "sex": "female", "pregnant": true},
+    "expected_symptoms": ["cough", "fever"],
+    "expected_conditions": ["respiratory infection"],
+    "expected_route": "review"
+  },
+  {
+    "case_id": "myopia_non_pharma_001",
+    "language": "fr",
+    "text": "Patient 18 ans avec myopie et vision floue sans douleur.",
+    "patient": {"patient_id": "p-myopia", "age_years": 18, "sex": "male"},
+    "expected_symptoms": ["visual blur"],
+    "expected_conditions": ["myopia"],
+    "expected_route": "non_pharma"
+  }
+]

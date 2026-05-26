@@ -1,0 +1,20 @@
+{
+  "request_id": "demo-001",
+  "patient": {
+    "patient_id": "p-001",
+    "age_years": 34,
+    "sex": "female",
+    "weight_kg": 67,
+    "pregnant": false,
+    "known_allergies": ["penicillin"],
+    "current_medications": ["metformin"]
+  },
+  "consultation": {
+    "language": "fr",
+    "doctor_notes": "Patient with fever, sore throat, and body aches for 2 days.",
+    "transcript": [
+      {"speaker": "doctor", "text": "What brings you in today?"},
+      {"speaker": "patient", "text": "I have fever, sore throat, and body aches."}
+    ]
+  }
+}

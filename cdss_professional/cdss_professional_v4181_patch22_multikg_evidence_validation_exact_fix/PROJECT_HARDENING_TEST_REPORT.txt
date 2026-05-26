@@ -1,0 +1,8 @@
+Post-hardening local test run
+=============================
+Command: pytest -q
+Result: 78 passed, 1 skipped
+
+Notes:
+- Tests were run after code hardening and before final cache cleanup.
+- __pycache__, .pytest_cache, and generated audit traces are removed from the release archive after this report is written.

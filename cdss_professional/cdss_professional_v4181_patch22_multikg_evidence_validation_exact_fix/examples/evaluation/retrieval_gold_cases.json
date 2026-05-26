@@ -1,0 +1,44 @@
+{
+  "description": "Starter retrieval gold cases for evidence quality validation.",
+  "cases": [
+    {
+      "case_id": "retrieval_paracetamol_fever",
+      "query": "paracetamol fever adult dose contraindication",
+      "expected_active_ingredient": "paracetamol",
+      "expected_section_kinds_any": [
+        "dosage",
+        "contraindication",
+        "warning"
+      ],
+      "preferred_sources_any": [
+        "tunisia_dpm_local_rcp_pdf",
+        "formulaire_therapeutique_tunisien_2012",
+        "dailymed_spl"
+      ],
+      "forbidden_sources": [
+        "pubchem_annotations",
+        "general_biomedical_qa"
+      ],
+      "accepted_for_clinical_use_required": true
+    },
+    {
+      "case_id": "retrieval_ibuprofen_renal",
+      "query": "ibuprofen renal impairment contraindication warning NSAID",
+      "expected_active_ingredient": "ibuprofen",
+      "expected_section_kinds_any": [
+        "renal",
+        "warning",
+        "contraindication"
+      ],
+      "preferred_sources_any": [
+        "tunisia_dpm_local_rcp_pdf",
+        "formulaire_therapeutique_tunisien_2012",
+        "dailymed_spl"
+      ],
+      "forbidden_sources": [
+        "pubchem_annotations"
+      ],
+      "accepted_for_clinical_use_required": true
+    }
+  ]
+}
