@@ -81,10 +81,10 @@ export class Prescription {
   @Column({ name: 'ai_payload', type: 'simple-json', nullable: true })
   aiPayload?: unknown;
 
-  @Column({ name: 'validated_at', type: 'datetime', nullable: true })
+  @Column({ name: 'validated_at', nullable: true })
   validatedAt?: Date;
 
-  @Column({ name: 'printed_at', type: 'datetime', nullable: true })
+  @Column({ name: 'printed_at', nullable: true })
   printedAt?: Date;
 
   @OneToMany(() => PrescriptionMedication, (medication) => medication.prescription, {

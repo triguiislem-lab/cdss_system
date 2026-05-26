@@ -54,6 +54,6 @@ export class PrescriptionPrintSnapshot {
   @Column({ name: 'footer_number', nullable: true })
   footerNumber?: string;
 
-  @Column({ name: 'printed_at', type: 'datetime' })
+  @Column({ name: 'printed_at' })
   printedAt: Date;
 }

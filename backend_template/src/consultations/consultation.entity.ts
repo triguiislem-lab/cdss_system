@@ -38,7 +38,7 @@ export class Consultation {
   @Column({ type: 'text', nullable: true })
   reason?: string;
 
-  @Column({ name: 'scheduled_at', type: 'datetime' })
+  @Column({ name: 'scheduled_at' })
   scheduledAt: Date;
 
   @Column({
@@ -54,10 +54,10 @@ export class Consultation {
   @Column({ type: 'text', nullable: true })
   diagnosis?: string;
 
-  @Column({ name: 'started_at', type: 'datetime', nullable: true })
+  @Column({ name: 'started_at', nullable: true })
   startedAt?: Date;
 
-  @Column({ name: 'ended_at', type: 'datetime', nullable: true })
+  @Column({ name: 'ended_at', nullable: true })
   endedAt?: Date;
 
   @Column({ name: 'recording_url', type: 'text', nullable: true })

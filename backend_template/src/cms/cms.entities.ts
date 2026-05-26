@@ -45,10 +45,10 @@ export class Post {
   @Column({ default: false })
   featured: boolean;
 
-  @Column({ name: 'published_at', type: 'datetime', nullable: true })
+  @Column({ name: 'published_at', nullable: true })
   publishedAt?: Date;
 
-  @Column({ name: 'scheduled_date', type: 'datetime', nullable: true })
+  @Column({ name: 'scheduled_date', nullable: true })
   scheduledDate?: Date;
 
   @Column({ default: 0 })

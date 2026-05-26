@@ -60,7 +60,7 @@ export class ConsultationVitals {
   @Column({ name: 'respiratory_rate', nullable: true })
   respiratoryRate?: number;
 
-  @Column({ name: 'measured_at', type: 'datetime' })
+  @Column({ name: 'measured_at' })
   measuredAt: Date;
 
   @CreateDateColumn({ name: 'created_at' })

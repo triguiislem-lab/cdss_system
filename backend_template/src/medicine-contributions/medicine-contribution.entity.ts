@@ -86,7 +86,7 @@ export class MedicineContribution {
   @Column({ name: 'reviewer_name', nullable: true })
   reviewerName?: string;
 
-  @Column({ name: 'reviewed_at', type: 'datetime', nullable: true })
+  @Column({ name: 'reviewed_at', nullable: true })
   reviewedAt?: Date;
 
   @Column({ name: 'refusal_reason', type: 'text', nullable: true })

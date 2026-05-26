@@ -43,6 +43,6 @@ export class AuditEntry {
   @Column({ name: 'final_status' })
   finalStatus: string;
 
-  @Column({ type: 'datetime' })
+  @Column()
   timestamp: Date;
 }

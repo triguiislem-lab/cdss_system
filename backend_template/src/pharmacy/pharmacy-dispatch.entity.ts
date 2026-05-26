@@ -55,7 +55,7 @@ export class PharmacyDispatch {
   @Column({ type: 'text', nullable: true })
   note?: string;
 
-  @Column({ name: 'sent_at', type: 'datetime' })
+  @Column({ name: 'sent_at' })
   sentAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
