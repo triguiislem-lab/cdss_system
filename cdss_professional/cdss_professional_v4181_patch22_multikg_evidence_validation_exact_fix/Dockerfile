@@ -15,7 +15,7 @@ COPY apps ./apps
 COPY libs ./libs
 COPY services ./services
 COPY tools ./tools
-COPY data ./data
+RUN mkdir -p data/audit data/feedback
 
 RUN pip install --upgrade pip \
     && pip install .
