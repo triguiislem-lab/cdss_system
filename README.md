@@ -12,6 +12,7 @@ Monorepo for the MedCity clinical decision support and automatic prescription as
 
 - [Backend architecture and contracts](docs/BACKEND_ARCHITECTURE.md)
 - [DevOps and Docker](DEVOPS.md)
+- CI/CD: GitHub Actions runs CI first, then Docker image publishing, then EC2 deployment when the previous stage succeeds on `main`.
 
 ## Local Docker
 
