@@ -52,3 +52,16 @@ The Docker workflow publishes:
 - Set `DATABASE_SYNC=false` and use migrations for production.
 - CDSS clinical deployment must use real vector/KG/formulary/model assets and pass the CDSS governance/readiness checks.
 - Keep the frontend behind the NestJS API; do not expose FastAPI CDSS directly to browser clients.
+
+## Supabase Frontend Configuration
+
+The React frontend is a Vite app, so Supabase browser variables must use the `VITE_` prefix:
+
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+```
+
+Local development can place these values in `medcity-app/.env.local`. Docker builds can read them from the repository-root `.env` file through `docker-compose.yml` build args.
+
+Do not put Supabase service-role keys in the frontend. Service-role keys belong only in secure backend/server environments.
