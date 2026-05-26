@@ -5,6 +5,7 @@ cd /opt/cdss_system
 
 {
   grep '^VITE_' .env.frontend 2>/dev/null || true
+  printf 'FRONTEND_PORT=80\n'
   printf 'DATABASE_TYPE=postgres\n'
   printf 'DATABASE_HOST=postgres\n'
   printf 'DATABASE_PORT=5432\n'
