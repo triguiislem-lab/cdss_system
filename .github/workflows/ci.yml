@@ -20,6 +20,7 @@ jobs:
 
     steps:
       - name: Checkout
+        working-directory: .
         run: |
           git init .
           git remote add origin "https://github.com/${{ github.repository }}.git"
@@ -51,6 +52,7 @@ jobs:
 
     steps:
       - name: Checkout
+        working-directory: .
         run: |
           git init .
           git remote add origin "https://github.com/${{ github.repository }}.git"
@@ -79,6 +81,7 @@ jobs:
 
     steps:
       - name: Checkout
+        working-directory: .
         run: |
           git init .
           git remote add origin "https://github.com/${{ github.repository }}.git"
