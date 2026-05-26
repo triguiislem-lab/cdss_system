@@ -37,9 +37,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+        env:
+          CHECKOUT_REF: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          git init .
+          git remote add origin "https://github.com/${{ github.repository }}.git"
+          git fetch --depth=1 origin "$CHECKOUT_REF"
+          git checkout --force FETCH_HEAD
 
       - name: Docker metadata
         id: meta
