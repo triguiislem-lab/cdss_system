@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   frontend:
@@ -119,3 +120,20 @@ jobs:
 
       - name: Validate compose file
         run: docker compose -f docker-compose.yml config
+
+  docker-build:
+    name: Docker Build Validation
+    runs-on: ubuntu-latest
+    needs: [frontend, backend, cdss, compose]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+    steps:
+      - name: Checkout
+        run: |
+          git init .
+          git remote add origin "https://github.com/${{ github.repository }}.git"
+          git fetch --depth=1 origin "$GITHUB_REF"
+          git checkout --force FETCH_HEAD
+
+      - name: Build Docker images
+        run: docker compose -f docker-compose.yml build frontend api cdss
