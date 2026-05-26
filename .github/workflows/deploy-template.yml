@@ -28,7 +28,14 @@ jobs:
           echo "Required runtime secrets:"
           echo "- JWT_SECRET"
           echo "- JWT_REFRESH_SECRET"
-          echo "- production database credentials"
+          echo "- DATABASE_PASSWORD"
+          echo "Required runtime database variables:"
+          echo "- DATABASE_TYPE=postgres"
+          echo "- DATABASE_HOST"
+          echo "- DATABASE_PORT=5432"
+          echo "- DATABASE_USER"
+          echo "- DATABASE_NAME"
+          echo "- DATABASE_SSL=true for Supabase"
           echo "- CDSS model/data volume configuration if not using stub mode"
 
       - name: Validate compose file

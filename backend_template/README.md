@@ -34,6 +34,23 @@ DATABASE_SYNC=true
 
 When you run `npm run seed` or start the API, TypeORM creates the SQLite database file and tables automatically. All records created through the API are saved in `data/medcity.sqlite`.
 
+## Supabase/PostgreSQL
+
+For Supabase direct Postgres, switch the backend to Postgres and enable SSL:
+
+```env
+DATABASE_TYPE=postgres
+DATABASE_HOST=db.<project-ref>.supabase.co
+DATABASE_PORT=5432
+DATABASE_USER=postgres
+DATABASE_PASSWORD=<your-database-password>
+DATABASE_NAME=postgres
+DATABASE_SSL=true
+DATABASE_SSL_REJECT_UNAUTHORIZED=false
+```
+
+Keep the real password in `.env` or deployment secrets only.
+
 ## Implemented Modules
 
 - `auth`: login, refresh, me, logout placeholder

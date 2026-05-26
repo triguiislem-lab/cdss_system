@@ -65,3 +65,20 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 Local development can place these values in `medcity-app/.env.local`. Docker builds can read them from the repository-root `.env` file through `docker-compose.yml` build args.
 
 Do not put Supabase service-role keys in the frontend. Service-role keys belong only in secure backend/server environments.
+
+## Supabase Postgres for NestJS
+
+The NestJS API can use Supabase Postgres through TypeORM. Keep these values in local `.env` files or deployment secrets, not in committed files:
+
+```env
+DATABASE_TYPE=postgres
+DATABASE_HOST=db.<project-ref>.supabase.co
+DATABASE_PORT=5432
+DATABASE_USER=postgres
+DATABASE_PASSWORD=<your-database-password>
+DATABASE_NAME=postgres
+DATABASE_SSL=true
+DATABASE_SSL_REJECT_UNAUTHORIZED=false
+```
+
+Use `DATABASE_SSL=true` for Supabase direct database connections. For GitHub Actions or production deployments, store `DATABASE_PASSWORD`, `JWT_SECRET`, and `JWT_REFRESH_SECRET` as secrets. Non-sensitive host/name flags can be repository or environment variables.

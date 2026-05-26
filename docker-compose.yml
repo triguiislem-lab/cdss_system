@@ -22,13 +22,15 @@ services:
       NODE_ENV: production
       PORT: 3000
       API_PREFIX: api
-      DATABASE_TYPE: postgres
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-      DATABASE_USER: medcity
-      DATABASE_PASSWORD: medcity
-      DATABASE_NAME: medcity_connect
-      DATABASE_SYNC: "true"
+      DATABASE_TYPE: ${DATABASE_TYPE:-postgres}
+      DATABASE_HOST: ${DATABASE_HOST:-postgres}
+      DATABASE_PORT: ${DATABASE_PORT:-5432}
+      DATABASE_USER: ${DATABASE_USER:-medcity}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-medcity}
+      DATABASE_NAME: ${DATABASE_NAME:-medcity_connect}
+      DATABASE_SYNC: ${DATABASE_SYNC:-true}
+      DATABASE_SSL: ${DATABASE_SSL:-false}
+      DATABASE_SSL_REJECT_UNAUTHORIZED: ${DATABASE_SSL_REJECT_UNAUTHORIZED:-false}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-too}

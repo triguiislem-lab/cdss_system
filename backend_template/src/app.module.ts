@@ -28,6 +28,12 @@ import { UsersModule } from './users/users.module';
         const synchronize =
           config.get<string>('DATABASE_SYNC', 'true') === 'true';
         const databaseType = config.get<string>('DATABASE_TYPE', 'sqlite');
+        const databaseSsl =
+          config.get<string>('DATABASE_SSL', 'false') === 'true';
+        const rejectUnauthorized =
+          config.get<string>('DATABASE_SSL_REJECT_UNAUTHORIZED', 'false') ===
+          'true';
+        const ssl = databaseSsl ? { rejectUnauthorized } : undefined;
 
         if (databaseType === 'postgres') {
           return {
@@ -37,6 +43,8 @@ import { UsersModule } from './users/users.module';
             username: config.get<string>('DATABASE_USER', 'postgres'),
             password: config.get<string>('DATABASE_PASSWORD', 'postgres'),
             database: config.get<string>('DATABASE_NAME', 'medcity_connect'),
+            ssl,
+            extra: ssl ? { ssl } : undefined,
             autoLoadEntities: true,
             synchronize,
           };
