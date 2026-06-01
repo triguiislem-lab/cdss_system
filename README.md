@@ -12,7 +12,7 @@ Monorepo for the MedCity clinical decision support and automatic prescription as
 
 - [Backend architecture and contracts](docs/BACKEND_ARCHITECTURE.md)
 - [DevOps and Docker](DEVOPS.md)
-- CI/CD: GitHub Actions runs CI first, then Docker image publishing, then EC2 deployment when the previous stage succeeds on `main`.
+- CI/CD: GitHub Actions runs CI automatically. Docker publishing and EC2 deployment are manual confirmation workflows after CI is green.
 
 ## Local Docker
 
@@ -20,8 +20,18 @@ Monorepo for the MedCity clinical decision support and automatic prescription as
 docker compose up --build
 ```
 
+For Supabase-backed development, create a local `.env` from `.env.example`, fill the Supabase Postgres values, then seed the NestJS database:
+
+```bash
+npm --prefix backend_template run seed
+```
+
 Default ports:
 
 - Frontend: `http://localhost:5173`
 - NestJS API: `http://localhost:3000/api`
 - FastAPI CDSS: `http://localhost:8000`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3001`
+
+On EC2, set `COMPOSE_PROFILES=host-monitoring` in `.env` to add EC2 host and Docker container metrics through `node-exporter` and `cadvisor`.

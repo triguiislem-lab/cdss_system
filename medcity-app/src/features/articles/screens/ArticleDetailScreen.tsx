@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import { useRoute } from "wouter";
 import { useGetArticle } from "@/lib/api-client";
+import { getPublicCmsPost, type ApiCmsPost } from "@/lib/backend-api";
 import {
   ArrowLeft,
   ExternalLink,
@@ -22,13 +24,43 @@ export default function ArticleDetail() {
   const { t } = useI18n();
   const [, params] = useRoute("/article/:id");
   const id = params?.id ?? "";
+  const [cmsArticle, setCmsArticle] = useState<ApiCmsPost | null>(null);
+  const [cmsChecked, setCmsChecked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCmsChecked(false);
+    setCmsArticle(null);
+
+    if (!id) {
+      setCmsChecked(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    void getPublicCmsPost(id)
+      .then((post) => {
+        if (!cancelled) setCmsArticle(post);
+      })
+      .catch(() => {
+        if (!cancelled) setCmsArticle(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCmsChecked(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
   const { data: article, isLoading, isError } = useGetArticle(
     { id },
-    { query: { enabled: Boolean(id) } },
+    { query: { enabled: Boolean(id) && cmsChecked && !cmsArticle } },
   );
 
-  if (isLoading) {
+  if (!cmsChecked || (!cmsArticle && isLoading)) {
     return (
       <div className="container mx-auto py-12 px-4 max-w-5xl space-y-8">
         <Skeleton className="h-8 w-24" />
@@ -41,6 +73,10 @@ export default function ArticleDetail() {
         <Skeleton className="h-64 w-full" />
       </div>
     );
+  }
+
+  if (cmsArticle) {
+    return <CmsArticleDetail post={cmsArticle} />;
   }
 
   if (isError || !article) {
@@ -243,6 +279,87 @@ export default function ArticleDetail() {
           </CardContent>
         </Card>
       </aside>
+    </div>
+  );
+}
+
+function CmsArticleDetail({ post }: { post: ApiCmsPost }) {
+  const { t } = useI18n();
+  const publishedAt = post.publishedAt
+    ? new Date(post.publishedAt).toLocaleDateString("fr-TN", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : "";
+  const paragraphs = post.content
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="container mx-auto max-w-5xl px-4 py-8">
+      <button
+        onClick={() => window.history.back()}
+        className="mb-6 flex items-center text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+      >
+        <ArrowLeft className="mr-2 h-4 w-4" /> {t("article.backToResults")}
+      </button>
+
+      <article className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+        <div className={`h-56 bg-gradient-to-br ${post.coverColor ?? "from-blue-500 to-cyan-500"}`}>
+          {post.imageUrl && (
+            <img src={post.imageUrl} alt={post.title} className="h-full w-full object-cover" />
+          )}
+        </div>
+        <div className="p-6 md:p-8">
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <Badge className="bg-primary/10 text-primary border-primary/20">{post.category}</Badge>
+            {post.featured && (
+              <Badge className="bg-amber-100 text-amber-700 border-amber-200">
+                {t("blog.featuredBadge")}
+              </Badge>
+            )}
+          </div>
+
+          <h1 className="text-3xl font-bold leading-tight tracking-tight text-foreground md:text-4xl">
+            {post.title}
+          </h1>
+          <p className="mt-4 text-lg leading-relaxed text-muted-foreground">{post.excerpt}</p>
+
+          <div className="mt-6 flex flex-wrap gap-4 border-y border-border py-4 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <Users className="h-4 w-4" /> {post.author}
+            </span>
+            {publishedAt && (
+              <span className="flex items-center gap-1.5">
+                <BookOpen className="h-4 w-4" /> {publishedAt}
+              </span>
+            )}
+            <span className="flex items-center gap-1.5">
+              <FileText className="h-4 w-4" /> {post.readTime} {t("blog.minRead")}
+            </span>
+          </div>
+
+          <div className="prose prose-slate mt-8 max-w-none text-foreground/90">
+            {paragraphs.length > 0 ? (
+              paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)
+            ) : (
+              <p>{post.content}</p>
+            )}
+          </div>
+
+          {post.tags.length > 0 && (
+            <div className="mt-8 flex flex-wrap gap-2">
+              {post.tags.map((tag) => (
+                <Badge key={tag} variant="outline" className="text-xs">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      </article>
     </div>
   );
 }

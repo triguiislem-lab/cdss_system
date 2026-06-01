@@ -66,6 +66,18 @@ export class Consultation {
   @Column({ name: 'recording_duration_sec', nullable: true })
   recordingDurationSec?: number;
 
+  @Column({ name: 'audio_bucket_path', type: 'text', nullable: true })
+  audioBucketPath?: string;
+
+  @Column({ name: 'audio_processing_status', type: 'text', nullable: true })
+  audioProcessingStatus?: string;
+
+  @Column({ type: 'text', nullable: true })
+  transcript?: string;
+
+  @Column({ name: 'audio_processing_result', type: 'simple-json', nullable: true })
+  audioProcessingResult?: Record<string, unknown>;
+
   @OneToMany(() => ConsultationVitals, (vitals) => vitals.consultation)
   vitals: ConsultationVitals[];
 

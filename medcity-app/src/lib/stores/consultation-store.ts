@@ -14,6 +14,10 @@ export interface Consultation {
   notes: string;
   recordingUrl?: string; // object URL (in-memory; not persisted)
   recordingDurationSec?: number;
+  audioBucketPath?: string;
+  audioProcessingStatus?: string;
+  transcript?: string;
+  audioProcessingResult?: Record<string, unknown>;
   startedAt?: string;
   endedAt?: string;
   diagnosis?: string;

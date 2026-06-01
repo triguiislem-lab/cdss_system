@@ -1,14 +1,26 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Download, Search } from "lucide-react";
-import { auditEntries } from "@/lib/mock-data";
+import type { AuditEntry } from "@/lib/mock-data";
 import { statusMeta } from "@/lib/clinical-ui";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/i18n/I18nProvider";
+import { listAuditEntries } from "@/lib/backend-api";
 
 export default function AuditPage() {
   const { t } = useI18n();
+  const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [query, setQuery] = useState("");
   const { toast } = useToast();
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setAuditEntries(await listAuditEntries());
+      } catch {
+        setAuditEntries([]);
+      }
+    })();
+  }, []);
 
   const visibleEntries = useMemo(() => {
     const normalized = query.trim().toLowerCase();

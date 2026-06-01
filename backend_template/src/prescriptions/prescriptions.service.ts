@@ -10,7 +10,6 @@ import { Consultation } from '../consultations/consultation.entity';
 import { toPaginated } from '../common/dto/pagination.dto';
 import {
   AlertSeverity,
-  DispatchStatus,
   PharmacyTarget,
   PrescriptionStatus,
   UserRole,
@@ -251,9 +250,55 @@ export class PrescriptionsService {
       footerNumber: prescription.prescriptionNumber,
       printedAt,
     };
-    await this.snapshotsRepository.upsert(snapshot, ['prescriptionId']);
-    prescription.printedAt = printedAt;
-    await this.prescriptionsRepository.save(prescription);
+    await this.snapshotsRepository.query(
+      `
+      INSERT INTO prescription_print_snapshots (
+        prescription_id,
+        doctor_first_name,
+        doctor_last_name,
+        doctor_specialty,
+        doctor_cnam_code,
+        doctor_fiscal_number,
+        doctor_phone,
+        patient_first_name,
+        patient_last_name,
+        patient_birth_date,
+        patient_gender,
+        footer_number,
+        printed_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ON CONFLICT (prescription_id) DO UPDATE SET
+        doctor_first_name = EXCLUDED.doctor_first_name,
+        doctor_last_name = EXCLUDED.doctor_last_name,
+        doctor_specialty = EXCLUDED.doctor_specialty,
+        doctor_cnam_code = EXCLUDED.doctor_cnam_code,
+        doctor_fiscal_number = EXCLUDED.doctor_fiscal_number,
+        doctor_phone = EXCLUDED.doctor_phone,
+        patient_first_name = EXCLUDED.patient_first_name,
+        patient_last_name = EXCLUDED.patient_last_name,
+        patient_birth_date = EXCLUDED.patient_birth_date,
+        patient_gender = EXCLUDED.patient_gender,
+        footer_number = EXCLUDED.footer_number,
+        printed_at = EXCLUDED.printed_at
+      `,
+      [
+        snapshot.prescriptionId,
+        snapshot.doctorFirstName,
+        snapshot.doctorLastName,
+        snapshot.doctorSpecialty,
+        snapshot.doctorCnamCode,
+        snapshot.doctorFiscalNumber,
+        snapshot.doctorPhone,
+        snapshot.patientFirstName,
+        snapshot.patientLastName,
+        snapshot.patientBirthDate,
+        snapshot.patientGender,
+        snapshot.footerNumber,
+        snapshot.printedAt,
+      ],
+    );
+    await this.prescriptionsRepository.update(prescription.id, { printedAt });
     return this.getById(id);
   }
 

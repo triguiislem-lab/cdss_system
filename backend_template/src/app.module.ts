@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import { mkdirSync } from 'fs';
 import { dirname } from 'path';
+import { AudioProcessingModule } from './audio-processing/audio-processing.module';
 import { AuthModule } from './auth/auth.module';
 import { AuditModule } from './audit/audit.module';
 import { CdssModule } from './cdss/cdss.module';
@@ -13,6 +14,7 @@ import { HealthModule } from './health/health.module';
 import { InteractionsModule } from './interactions/interactions.module';
 import { MedicineContributionsModule } from './medicine-contributions/medicine-contributions.module';
 import { MedicinesModule } from './medicines/medicines.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
 import { PatientsModule } from './patients/patients.module';
 import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module';
@@ -77,6 +79,8 @@ import { UsersModule } from './users/users.module';
     InteractionsModule,
     AuditModule,
     CdssModule,
+    AudioProcessingModule,
+    MonitoringModule,
     CmsModule,
     TranslationModule,
   ],

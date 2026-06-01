@@ -6,8 +6,6 @@ import {
   getPatientFullName,
   getPatientGenderLabel,
   getPatientSearchText,
-  patients,
-  prescriptions,
   safetyAlerts as mockSafetyAlerts,
   type Medication,
   type Patient,
@@ -19,12 +17,13 @@ import { useToast } from "@/hooks/use-toast";
 import { PrescriptionMedicationRow } from "@/features/cdss/components/PrescriptionMedicationRow";
 import { useI18n } from "@/i18n/I18nProvider";
 import { mapCdssMedications, mapCdssSafetyAlerts, requestCdssDraft } from "@/lib/cdss-api";
+import { listPatients, rejectPrescription, savePrescription, validatePrescription } from "@/lib/backend-api";
 
 export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath?: string }) {
   const { t } = useI18n();
   const [location] = useLocation();
   const initialPatientId = new URLSearchParams(location.split("?")[1] ?? "").get("patientId");
-  const initialRx = prescriptions[0];
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientQuery, setPatientQuery] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
@@ -34,7 +33,21 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
   const [generated, setGenerated] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [caseStatus, setCaseStatus] = useState<"draft" | "pending_review" | "validated" | "rejected">("draft");
+  const [savedPrescriptionId, setSavedPrescriptionId] = useState<string | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setPatients(await listPatients());
+      } catch (error) {
+        toast({
+          title: "Patients indisponibles",
+          description: error instanceof Error ? error.message : "Impossible de charger le backend.",
+        });
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!initialPatientId || selectedPatient) return;
@@ -43,13 +56,13 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
       setSelectedPatient(patientFromUrl);
       setPatientQuery(getPatientFullName(patientFromUrl));
     }
-  }, [initialPatientId, selectedPatient]);
+  }, [initialPatientId, patients, selectedPatient]);
 
   const patientResults = useMemo(() => {
     const needle = patientQuery.trim().toLowerCase();
     if (!needle) return patients.slice(0, 6);
     return patients.filter((patient) => getPatientSearchText(patient).includes(needle)).slice(0, 8);
-  }, [patientQuery]);
+  }, [patientQuery, patients]);
 
   const generate = async () => {
     if (!selectedPatient) {
@@ -68,7 +81,7 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
         save: false,
       });
       const aiMeds = mapCdssMedications(result);
-      setMeds(aiMeds.length ? aiMeds : initialRx.medications.map((med) => ({ ...med, status: "ai_proposed" })));
+      setMeds(aiMeds);
       setAlerts(mapCdssSafetyAlerts(result));
       setGenerated(true);
       setCaseStatus("pending_review");
@@ -77,7 +90,7 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
         description: `${t("rx.proposalGeneratedDescription", { patient: getPatientFullName(selectedPatient) })}${result.ia?.trace_id ? ` Trace IA: ${result.ia.trace_id}` : ""}`,
       });
     } catch (error) {
-      setMeds(initialRx.medications.map((med) => ({ ...med, status: "ai_proposed" })));
+      setMeds([]);
       setAlerts(mockSafetyAlerts);
       setGenerated(true);
       setCaseStatus("pending_review");
@@ -97,6 +110,7 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
     setMeds([]);
     setAlerts([]);
     setCaseStatus("draft");
+    setSavedPrescriptionId(null);
   }
 
   const updateMed = (id: string, patch: Partial<Medication>) =>
@@ -131,7 +145,7 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
           <p className="text-sm text-muted-foreground mt-1">{t("rx.newSubtitle")}</p>
         </div>
         <div className="text-xs text-muted-foreground">
-          {t("rx.caseModel", { id: initialRx.id })}
+          {t("rx.caseModel", { id: savedPrescriptionId ?? "Nouveau" })}
         </div>
       </div>
 
@@ -146,10 +160,11 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
               onClick={() => {
                 setSelectedPatient(null);
                 setPatientQuery("");
-                setGenerated(false);
-                setMeds([]);
-                setAlerts([]);
-                setCaseStatus("draft");
+                    setGenerated(false);
+                    setMeds([]);
+                    setAlerts([]);
+                    setCaseStatus("draft");
+                    setSavedPrescriptionId(null);
               }}
               className="rounded-lg border border-input bg-card px-3 py-2 text-xs font-semibold hover:bg-muted"
             >
@@ -301,11 +316,28 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
                 </button>
                 <button
                   onClick={() => {
-                    setCaseStatus("draft");
-                    toast({
-                      title: t("rx.draftSavedTitle"),
-                      description: t("rx.draftSavedDescription"),
-                    });
+                    void (async () => {
+                      if (!selectedPatient) return;
+                      try {
+                        const saved = await savePrescription({
+                          patientId: selectedPatient.id,
+                          diagnosis,
+                          notes,
+                          medications: meds,
+                        });
+                        setSavedPrescriptionId(saved.id);
+                        setCaseStatus("draft");
+                        toast({
+                          title: t("rx.draftSavedTitle"),
+                          description: t("rx.draftSavedDescription"),
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Brouillon non enregistre",
+                          description: error instanceof Error ? error.message : "Impossible de joindre le backend.",
+                        });
+                      }
+                    })();
                   }}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-2 text-xs font-semibold hover:bg-muted transition-smooth"
                 >
@@ -313,13 +345,23 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
                 </button>
                 <button
                   onClick={() => {
-                    setCaseStatus("rejected");
-                    setGenerated(false);
-                    setAlerts([]);
-                    toast({
-                      title: t("rx.rejectedTitle"),
-                      description: t("rx.rejectedDescription"),
-                    });
+                    void (async () => {
+                      try {
+                        if (savedPrescriptionId) await rejectPrescription(savedPrescriptionId);
+                        setCaseStatus("rejected");
+                        setGenerated(false);
+                        setAlerts([]);
+                        toast({
+                          title: t("rx.rejectedTitle"),
+                          description: t("rx.rejectedDescription"),
+                        });
+                      } catch (error) {
+                        toast({
+                          title: "Rejet non enregistre",
+                          description: error instanceof Error ? error.message : "Impossible de joindre le backend.",
+                        });
+                      }
+                    })();
                   }}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-critical/40 text-critical bg-card px-3 py-2 text-xs font-semibold hover:bg-critical-soft transition-smooth"
                 >
@@ -329,12 +371,32 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
                   <button
                     disabled={hasMissingData || isRejected}
                     onClick={() => {
-                      setCaseStatus("validated");
-                      setMeds((current) => current.map((med) => ({ ...med, status: "validated" })));
-                      toast({
-                        title: t("rx.validatedTitle"),
-                        description: t("rx.validatedDescription"),
-                      });
+                      void (async () => {
+                        if (!selectedPatient) return;
+                        try {
+                          const saved = savedPrescriptionId
+                            ? await validatePrescription(savedPrescriptionId)
+                            : await savePrescription({
+                                patientId: selectedPatient.id,
+                                diagnosis,
+                                notes,
+                                medications: meds.map((med) => ({ ...med, status: "validated" })),
+                              });
+                          if (!savedPrescriptionId) await validatePrescription(saved.id);
+                          setSavedPrescriptionId(saved.id);
+                          setCaseStatus("validated");
+                          setMeds((current) => current.map((med) => ({ ...med, status: "validated" })));
+                          toast({
+                            title: t("rx.validatedTitle"),
+                            description: t("rx.validatedDescription"),
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Validation non enregistree",
+                            description: error instanceof Error ? error.message : "Impossible de joindre le backend.",
+                          });
+                        }
+                      })();
                     }}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-success px-4 py-2 text-xs font-semibold text-success-foreground shadow-card hover:bg-success/90 disabled:opacity-50 disabled:cursor-not-allowed transition-smooth"
                     title={hasMissingData ? t("rx.resolveMissingFirst") : isRejected ? t("rx.generateBeforeValidate") : ""}
@@ -342,7 +404,7 @@ export default function NewPrescription({ basePath = "/admin/cdss" }: { basePath
                     <ShieldCheck className="h-3.5 w-3.5" /> {t("rx.validate")}
                   </button>
                   <Link
-                    href={`${basePath}/prescription/${initialRx.id}/ordonnance?patientId=${encodeURIComponent(selectedPatient.id)}`}
+                    href={`${basePath}/prescription/${savedPrescriptionId ?? "new"}/ordonnance?patientId=${encodeURIComponent(selectedPatient.id)}`}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary-soft text-primary px-3 py-2 text-xs font-semibold hover:bg-primary-soft/70 transition-smooth"
                   >
                     <FileText className="h-3.5 w-3.5" /> {t("rx.generateDocument")}

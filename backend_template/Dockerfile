@@ -19,8 +19,14 @@ FROM node:22-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 python3-pip \
+  && python3 -m pip install --break-system-packages kaggle \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+COPY --from=build /app/kaggle-kernel ./kaggle-kernel
 COPY --from=build /app/package*.json ./
 
 EXPOSE 3000

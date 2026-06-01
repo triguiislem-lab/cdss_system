@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { Link } from "wouter";
 import { Badge } from "@/components/atoms/badge";
 import { ArrowRight, Calendar, Clock, Eye, Search, Star, User } from "lucide-react";
 import { useCms } from "@/contexts/CmsContext";
 import { useI18n } from "@/i18n/I18nProvider";
+import { LoadingState } from "@/components/molecules/LoadingState";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Actualité: "bg-sky-50 text-sky-700 border-sky-200",
@@ -19,7 +21,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 export default function Blog() {
   const { t } = useI18n();
-  const { posts } = useCms();
+  const { posts, loading } = useCms();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("__all");
 
@@ -103,7 +105,14 @@ export default function Blog() {
           </section>
         )}
 
-        {visible.length === 0 && (
+        {loading && posts.length === 0 && (
+          <LoadingState
+            title="Chargement des articles"
+            subtitle="Recuperation du contenu CMS public depuis NestJS..."
+          />
+        )}
+
+        {!loading && visible.length === 0 && (
           <div className="flex flex-col items-center gap-4 py-24 text-slate-400">
             <Search className="h-12 w-12 opacity-30" />
             <p className="text-lg font-semibold">{t("blog.emptyTitle")}</p>
@@ -128,43 +137,45 @@ function PostCard({ post, featured = false }: { post: ReturnType<typeof useCms>[
   const { t } = useI18n();
 
   return (
-    <article className={`group cursor-pointer overflow-hidden border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${featured ? "rounded-3xl" : "rounded-2xl"}`}>
-      <div className={`relative overflow-hidden ${featured ? "h-52" : "h-44"}`}>
-        {post.imageUrl ? (
-          <img src={post.imageUrl} alt={post.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        ) : (
-          <div className={`h-full w-full bg-gradient-to-br ${post.coverColor}`} />
-        )}
-        {featured && (
-          <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-xs font-bold text-white shadow">
-            <Star className="h-3 w-3 fill-white" /> {t("blog.featuredBadge")}
-          </div>
-        )}
-        <div className="absolute right-3 top-3">
-          <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${CATEGORY_COLORS[post.category] ?? "bg-white text-slate-600 border-slate-200"}`}>
-            {post.category}
-          </span>
-        </div>
-      </div>
-      <div className={featured ? "p-6" : "p-5"}>
-        <h3 className={`${featured ? "text-lg" : "text-base"} mb-2 font-bold leading-snug text-slate-900 transition-colors group-hover:text-primary line-clamp-2`}>
-          {post.title}
-        </h3>
-        <p className={`${featured ? "text-sm" : "text-xs"} mb-4 line-clamp-2 leading-relaxed text-slate-500`}>{post.excerpt}</p>
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="flex items-center gap-1 truncate"><User className="h-3 w-3" />{post.author}</span>
-            {post.publishedAt && <span className="hidden items-center gap-1 sm:flex"><Calendar className="h-3 w-3" />{post.publishedAt}</span>}
-          </div>
-          <div className="flex items-center gap-2">
-            {post.views > 0 && <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{post.views.toLocaleString("fr")}</span>}
-            <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{post.readTime} {t("blog.minRead")}</span>
+    <Link href={`/article/${post.slug}`} className="block" aria-label={`${t("blog.readMore")} ${post.title}`}>
+      <article className={`group cursor-pointer overflow-hidden border border-slate-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${featured ? "rounded-3xl" : "rounded-2xl"}`}>
+        <div className={`relative overflow-hidden ${featured ? "h-52" : "h-44"}`}>
+          {post.imageUrl ? (
+            <img src={post.imageUrl} alt={post.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          ) : (
+            <div className={`h-full w-full bg-gradient-to-br ${post.coverColor}`} />
+          )}
+          {featured && (
+            <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-xs font-bold text-white shadow">
+              <Star className="h-3 w-3 fill-white" /> {t("blog.featuredBadge")}
+            </div>
+          )}
+          <div className="absolute right-3 top-3">
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-bold ${CATEGORY_COLORS[post.category] ?? "bg-white text-slate-600 border-slate-200"}`}>
+              {post.category}
+            </span>
           </div>
         </div>
-        <div className="mt-4 flex items-center text-sm font-semibold text-primary">
-          {t("blog.readMore")} <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+        <div className={featured ? "p-6" : "p-5"}>
+          <h3 className={`${featured ? "text-lg" : "text-base"} mb-2 font-bold leading-snug text-slate-900 transition-colors group-hover:text-primary line-clamp-2`}>
+            {post.title}
+          </h3>
+          <p className={`${featured ? "text-sm" : "text-xs"} mb-4 line-clamp-2 leading-relaxed text-slate-500`}>{post.excerpt}</p>
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex items-center gap-1 truncate"><User className="h-3 w-3" />{post.author}</span>
+              {post.publishedAt && <span className="hidden items-center gap-1 sm:flex"><Calendar className="h-3 w-3" />{post.publishedAt}</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              {post.views > 0 && <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{post.views.toLocaleString("fr")}</span>}
+              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{post.readTime} {t("blog.minRead")}</span>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-sm font-semibold text-primary">
+            {t("blog.readMore")} <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+          </div>
         </div>
-      </div>
-    </article>
+      </article>
+    </Link>
   );
 }

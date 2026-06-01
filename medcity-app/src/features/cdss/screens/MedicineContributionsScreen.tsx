@@ -1,11 +1,12 @@
 ﻿import { Link } from "wouter";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, CheckCircle2, XCircle, Clock, FileEdit, FilePlus2, StickyNote, Pill, User, Calendar, AlertTriangle, ShieldCheck } from "lucide-react";
-import { tunisianMedicines, drugClasses, type DrugClass, type TunisianMedicine } from "@/lib/tunisia-medicines";
-import { useContributionsStore, type ContributionKind, type ContributionStatus, type MedicineContribution, editableFields } from "@/lib/stores/medicine-contributions-store";
+import type { DrugClass, TunisianMedicine } from "@/lib/tunisia-medicines";
+import { type ContributionKind, type ContributionStatus, type MedicineContribution, editableFields } from "@/lib/stores/medicine-contributions-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { CdssModal, DetailRow as Row, FormField as Field, FormLabel as Label, SearchablePicker } from "@/features/cdss/components/DialogPrimitives";
+import { createMedicineContribution, listMedicineClasses, listMedicineContributions, listMedicines, refuseMedicineContribution, validateMedicineContribution } from "@/lib/backend-api";
 
 
 const kindMeta: Record<ContributionKind, { label: string; icon: React.ComponentType<{ className?: string }>; cls: string }> = {
@@ -23,14 +24,20 @@ const statusMeta: Record<ContributionStatus, { label: string; icon: React.Compon
 function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
   const { user: authUser } = useAuth();
   const user = authUser ? { email: authUser.email, name: authUser.nom } : null;
-  const items = useContributionsStore((s) => s.items);
-  const validate = useContributionsStore((s) => s.validate);
-  const refuse = useContributionsStore((s) => s.refuse);
+  const [items, setItems] = useState<MedicineContribution[]>([]);
 
   const [tab, setTab] = useState<ContributionStatus | "all">("pending");
   const [openCreate, setOpenCreate] = useState(false);
   const [refuseTarget, setRefuseTarget] = useState<MedicineContribution | null>(null);
   const [viewTarget, setViewTarget] = useState<MedicineContribution | null>(null);
+
+  async function refresh() {
+    setItems(await listMedicineContributions());
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
 
   const filtered = useMemo(
     () => (tab === "all" ? items : items.filter((i) => i.status === tab)),
@@ -50,7 +57,10 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
       alert("Vous ne pouvez pas valider votre propre contribution. Un autre médecin doit la relire.");
       return;
     }
-    validate(c.id, { email: user.email, name: user.name });
+    void (async () => {
+      await validateMedicineContribution(c.id);
+      await refresh();
+    })();
   };
 
   return (
@@ -186,14 +196,17 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
         Voir aussi <Link href={`${basePath}/medicines`} className="font-semibold underline">base medicaments Tunisie</Link>.
       </div>
 
-      {openCreate && <CreateDialog onClose={() => setOpenCreate(false)} />}
+      {openCreate && <CreateDialog onClose={() => { setOpenCreate(false); void refresh(); }} />}
       {refuseTarget && (
         <RefuseDialog
           contribution={refuseTarget}
           onClose={() => setRefuseTarget(null)}
           onSubmit={(reason) => {
             if (!user) return;
-            refuse(refuseTarget.id, { email: user.email, name: user.name }, reason);
+            void (async () => {
+              await refuseMedicineContribution(refuseTarget.id, reason);
+              await refresh();
+            })();
             setRefuseTarget(null);
           }}
         />
@@ -208,11 +221,12 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
 function CreateDialog({ onClose }: { onClose: () => void }) {
   const { user: authUser } = useAuth();
   const user = authUser ? { email: authUser.email, name: authUser.nom } : null;
-  const add = useContributionsStore((s) => s.add);
   const [kind, setKind] = useState<ContributionKind>("correction");
+  const [medicines, setMedicines] = useState<TunisianMedicine[]>([]);
+  const [classes, setClasses] = useState<string[]>([]);
 
   // Correction / note fields
-  const [targetId, setTargetId] = useState<string>(tunisianMedicines[0].id);
+  const [targetId, setTargetId] = useState<string>("");
   const [medicineQuery, setMedicineQuery] = useState("");
   const [field, setField] = useState<string>("posologyAdult");
   const [newValue, setNewValue] = useState("");
@@ -241,7 +255,16 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
   const [nmLabs, setNmLabs] = useState("");
   const [nmCi, setNmCi] = useState("");
 
-  const targetMed = tunisianMedicines.find((m) => m.id === targetId);
+  useEffect(() => {
+    void (async () => {
+      const [apiMedicines, apiClasses] = await Promise.all([listMedicines(), listMedicineClasses()]);
+      setMedicines(apiMedicines);
+      setClasses(apiClasses);
+      if (!targetId && apiMedicines[0]) setTargetId(apiMedicines[0].id);
+    })();
+  }, []);
+
+  const targetMed = medicines.find((m) => m.id === targetId);
   const oldValue = useMemo(() => {
     if (!targetMed) return "";
     const v = targetMed[field as keyof TunisianMedicine];
@@ -264,26 +287,23 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
       rationale: rationale.trim(),
     };
     if (kind === "correction" && targetMed) {
-      add({
-        ...base,
+      void createMedicineContribution({
         kind: "correction",
         targetMedicineId: targetMed.id,
-        targetMedicineDci: targetMed.dci,
         field,
         oldValue,
         newValue: newValue.trim(),
+        rationale: base.rationale,
       });
     } else if (kind === "note" && targetMed) {
-      add({
-        ...base,
+      void createMedicineContribution({
         kind: "note",
         targetMedicineId: targetMed.id,
-        targetMedicineDci: targetMed.dci,
         note: note.trim(),
+        rationale: base.rationale,
       });
     } else if (kind === "new_medicine") {
-      add({
-        ...base,
+      void createMedicineContribution({
         kind: "new_medicine",
         newMedicine: {
           ...nm,
@@ -292,6 +312,7 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
           laboratories: nmLabs.split(",").map((s) => s.trim()).filter(Boolean),
           contraindications: nmCi.split(",").map((s) => s.trim()).filter(Boolean),
         },
+        rationale: base.rationale,
       });
     }
     onClose();
@@ -334,7 +355,7 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
             <Label>Médicament concerné</Label>
             <div className="mt-1">
               <SearchablePicker
-                items={tunisianMedicines}
+                items={medicines}
                 selectedId={targetId}
                 query={medicineQuery}
                 onQueryChange={setMedicineQuery}
@@ -389,7 +410,7 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
             <Field label="Code ATC *"><input value={nm.atcCode ?? ""} onChange={(e) => setNm({ ...nm, atcCode: e.target.value })} className={inputCls} /></Field>
             <Field label="Classe">
               <select value={nm.drugClass} onChange={(e) => setNm({ ...nm, drugClass: e.target.value as DrugClass })} className={inputCls}>
-                {drugClasses.map((c) => <option key={c} value={c}>{c}</option>)}
+                {classes.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
             <Field label="Remboursement CNAM">

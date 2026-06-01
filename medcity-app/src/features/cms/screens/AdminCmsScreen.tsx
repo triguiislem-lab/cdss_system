@@ -220,7 +220,7 @@ function ArticlesSection() {
 
   const totalViews = posts.reduce((sum, post) => sum + post.views, 0);
 
-  function savePost(form: PostForm, id?: number) {
+  function savePost(form: PostForm, id?: Post["id"]) {
     if (id) updatePost(id, form);
     else addPost(form);
     setEditing(null);
@@ -347,7 +347,7 @@ function ArticlesSection() {
   );
 }
 
-function PostModal({ post, onSave, onClose }: { post: Post | null; onSave: (form: PostForm, id?: number) => void; onClose: () => void }) {
+function PostModal({ post, onSave, onClose }: { post: Post | null; onSave: (form: PostForm, id?: Post["id"]) => void; onClose: () => void }) {
   const { t } = useI18n();
   const [form, setForm] = useState<PostForm>(
     post
@@ -621,7 +621,7 @@ function TestimonialsSection() {
   );
 }
 
-function TestimonialModal({ item, onClose, onSave }: { item: Testimonial | null; onClose: () => void; onSave: (data: Omit<Testimonial, "id">, id?: number) => void }) {
+function TestimonialModal({ item, onClose, onSave }: { item: Testimonial | null; onClose: () => void; onSave: (data: Omit<Testimonial, "id">, id?: Testimonial["id"]) => void }) {
   const { t } = useI18n();
   const [form, setForm] = useState<Omit<Testimonial, "id">>(item ? { name: item.name, role: item.role, text: item.text, rating: item.rating, active: item.active } : { name: "", role: "", text: "", rating: 5, active: true });
   return (
@@ -671,7 +671,7 @@ function SpecialtiesSection() {
   );
 }
 
-function SpecialtyModal({ item, onClose, onSave }: { item: Specialty | null; onClose: () => void; onSave: (data: Omit<Specialty, "id">, id?: number) => void }) {
+function SpecialtyModal({ item, onClose, onSave }: { item: Specialty | null; onClose: () => void; onSave: (data: Omit<Specialty, "id">, id?: Specialty["id"]) => void }) {
   const { t } = useI18n();
   const [form, setForm] = useState<Omit<Specialty, "id">>(item ? { name: item.name, description: item.description, iconName: item.iconName, color: item.color, bg: item.bg, query: item.query, active: item.active } : { name: "", description: "", iconName: "Stethoscope", color: "text-primary", bg: "bg-primary-soft", query: "", active: true });
   const Icon = ICON_MAP[form.iconName] ?? Stethoscope;
@@ -727,7 +727,7 @@ function PartnersSection() {
   );
 }
 
-function PartnerModal({ item, onClose, onSave }: { item: Partner | null; onClose: () => void; onSave: (data: Omit<Partner, "id">, id?: number) => void }) {
+function PartnerModal({ item, onClose, onSave }: { item: Partner | null; onClose: () => void; onSave: (data: Omit<Partner, "id">, id?: Partner["id"]) => void }) {
   const { t } = useI18n();
   const [form, setForm] = useState<Omit<Partner, "id">>(item ? { name: item.name, logoUrl: item.logoUrl, websiteUrl: item.websiteUrl, description: item.description, active: item.active } : { name: "", logoUrl: "", websiteUrl: "", description: "", active: true });
   return (
@@ -774,7 +774,7 @@ function FeaturesSection() {
   );
 }
 
-function FeatureModal({ item, onClose, onSave }: { item: WhyFeature | null; onClose: () => void; onSave: (data: Omit<WhyFeature, "id">, id?: number) => void }) {
+function FeatureModal({ item, onClose, onSave }: { item: WhyFeature | null; onClose: () => void; onSave: (data: Omit<WhyFeature, "id">, id?: WhyFeature["id"]) => void }) {
   const { t } = useI18n();
   const [form, setForm] = useState<Omit<WhyFeature, "id">>(item ? { iconName: item.iconName, gradient: item.gradient, title: item.title, text: item.text, active: item.active } : { iconName: "Lightbulb", gradient: "from-blue-600 to-blue-400", title: "", text: "", active: true });
   const Icon = ICON_MAP[form.iconName] ?? Lightbulb;

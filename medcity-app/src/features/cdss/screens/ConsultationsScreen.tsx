@@ -1,9 +1,21 @@
-﻿import { Link, useLocation } from "wouter";
-import { useState } from "react";
-import { CalendarClock, ChevronRight, Mic, Pencil, Plus, Search, Stethoscope, Trash2 } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { useEffect, useMemo, useState } from "react";
+import {
+  CalendarClock,
+  ChevronRight,
+  Mic,
+  Pencil,
+  Plus,
+  Search,
+  Stethoscope,
+  Trash2,
+} from "lucide-react";
+
 import { ConsultationFormDialog } from "@/features/cdss/components/ConsultationFormDialog";
-import { useConsultationStore, type ConsultationStatus } from "@/lib/stores/consultation-store";
 import { useI18n } from "@/i18n/I18nProvider";
+import { deleteConsultation, listConsultations } from "@/lib/backend-api";
+import type { Consultation, ConsultationStatus } from "@/lib/stores/consultation-store";
+import { CardSkeletonGrid } from "@/components/molecules/LoadingState";
 
 const statusMeta: Record<ConsultationStatus, { labelKey: string; cls: string }> = {
   scheduled: { labelKey: "consultations.status.scheduled", cls: "bg-info-soft text-info border-info/30" },
@@ -12,17 +24,30 @@ const statusMeta: Record<ConsultationStatus, { labelKey: string; cls: string }> 
   cancelled: { labelKey: "consultations.status.cancelled", cls: "bg-muted text-muted-foreground border-border" },
 };
 
-export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?: string }) {
+export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?: "/doctor" }) {
   const { t } = useI18n();
-  const consultations = useConsultationStore((state) => state.consultations);
-  const remove = useConsultationStore((state) => state.remove);
   const [, setLocation] = useLocation();
+  const [consultations, setConsultations] = useState<Consultation[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ConsultationStatus | "all">("all");
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
-  const filtered = consultations.filter((consultation) => {
+  async function refresh() {
+    setLoading(true);
+    try {
+      setConsultations(await listConsultations());
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
+  const filtered = useMemo(() => consultations.filter((consultation) => {
     if (filter !== "all" && consultation.status !== filter) return false;
     const needle = query.trim().toLowerCase();
     if (!needle) return true;
@@ -31,7 +56,13 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
       consultation.reason.toLowerCase().includes(needle) ||
       consultation.id.toLowerCase().includes(needle)
     );
-  });
+  }), [consultations, filter, query]);
+
+  async function handleDelete(id: string) {
+    await deleteConsultation(id);
+    setConfirmDelete(null);
+    await refresh();
+  }
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -59,7 +90,7 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
               className="flex-1 bg-transparent outline-none"
             />
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 overflow-x-auto">
             {(["all", "scheduled", "in_progress", "completed", "cancelled"] as const).map((status) => (
               <button
                 key={status}
@@ -74,7 +105,11 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
           </div>
         </div>
 
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="p-4">
+            <CardSkeletonGrid />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-sm text-muted-foreground">
             <Stethoscope className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
             {t("consultations.empty")}
@@ -128,7 +163,10 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
       {editing !== null && (
         <ConsultationFormDialog
           open
-          onClose={() => setEditing(null)}
+          onClose={() => {
+            setEditing(null);
+            void refresh();
+          }}
           editingId={editing === "new" ? undefined : editing}
         />
       )}
@@ -143,10 +181,7 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
                 {t("common.cancel")}
               </button>
               <button
-                onClick={() => {
-                  remove(confirmDelete);
-                  setConfirmDelete(null);
-                }}
+                onClick={() => void handleDelete(confirmDelete)}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-critical text-critical-foreground px-3 py-2 text-sm font-semibold hover:bg-critical/90"
               >
                 <Trash2 className="h-4 w-4" /> {t("common.delete")}
@@ -158,4 +193,3 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
     </div>
   );
 }
-

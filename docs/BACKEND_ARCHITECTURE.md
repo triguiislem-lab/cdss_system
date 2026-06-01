@@ -79,6 +79,23 @@ These endpoints are NestJS-facing wrappers around FastAPI CDSS.
 | `GET` | `/api/consultations/:id/vitals` | Get vitals |
 | `POST` | `/api/consultations/:id/vitals` | Add vitals |
 
+### Consultation Audio Processing
+
+These endpoints are consumed by the doctor consultation recording screen. NestJS stays the only public backend: it uploads the recording to Supabase Storage, prepares the Kaggle dataset/kernel, polls Kaggle, then stores the transcript/result on the consultation.
+
+Storage can run in either mode:
+
+- Supabase Storage REST API with `SUPABASE_SERVICE_ROLE_KEY`.
+- Supabase Storage S3 compatibility with `SUPABASE_S3_ENDPOINT`, `SUPABASE_S3_ACCESS_KEY_ID`, and `SUPABASE_S3_SECRET_ACCESS_KEY` as used by the audio Kaggle demo.
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `POST` | `/api/audio/create-upload-url` | Return the backend upload target metadata for a consultation recording |
+| `POST` | `/api/audio/upload?consultationId=&filename=` | Upload the raw audio body to Supabase Storage |
+| `POST` | `/api/audio/start-processing` | Download audio from Supabase, version the Kaggle dataset, and push the processor kernel |
+| `GET` | `/api/kaggle/status` | Check the configured Kaggle kernel status |
+| `POST` | `/api/kaggle/fetch-output` | Download Kaggle output and persist `result.json` / transcript |
+
 ### Prescriptions
 
 | Method | Endpoint | Purpose |
@@ -223,6 +240,10 @@ classDiagram
     datetime endedAt
     text recordingUrl
     number recordingDurationSec
+    text audioBucketPath
+    text audioProcessingStatus
+    text transcript
+    json audioProcessingResult
     datetime createdAt
     datetime updatedAt
   }
@@ -731,4 +752,3 @@ Recommended mapping if `LocalMedicineProduct` is added:
 3. Extend `CdssService.searchFormulary()` to optionally upsert returned products.
 4. Link `prescription_medications` to `localMedicineProductId` when a localized product is selected.
 5. Keep `medicines` as the human/admin summary catalog.
-

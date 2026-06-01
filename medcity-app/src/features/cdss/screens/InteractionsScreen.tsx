@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, X, Search, ExternalLink } from "lucide-react";
-import { interactions } from "@/lib/mock-data";
+import type { InteractionResult } from "@/lib/mock-data";
 import { severityMeta, severityOrder } from "@/lib/clinical-ui";
 import { useToast } from "@/hooks/use-toast";
+import { listInteractions } from "@/lib/backend-api";
 
 export default function InteractionChecker() {
   const [drugs, setDrugs] = useState<string[]>([
@@ -15,7 +16,18 @@ export default function InteractionChecker() {
     "Metoprolol",
   ]);
   const [input, setInput] = useState("");
+  const [interactions, setInteractions] = useState<InteractionResult[]>([]);
   const { toast } = useToast();
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        setInteractions(await listInteractions());
+      } catch {
+        setInteractions([]);
+      }
+    })();
+  }, []);
 
   const add = () => {
     const value = input.trim().slice(0, 80);

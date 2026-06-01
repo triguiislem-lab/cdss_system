@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { X, Send, User, Building2 } from "lucide-react";
-import { usePharmacyStore, type DispatchChannel, type DispatchTarget } from "@/lib/stores/pharmacy-store";
+import type { DispatchChannel, DispatchTarget } from "@/lib/stores/pharmacy-store";
 import { useI18n } from "@/i18n/I18nProvider";
+import { sendPrescriptionToTarget } from "@/lib/backend-api";
 
 interface Props {
   open: boolean;
@@ -22,7 +23,6 @@ const TUNISIAN_PHARMACIES = [
 
 export function SendPrescriptionDialog({ open, onClose, rxId, patientId, patientName, defaultTarget = "pharmacist" }: Props) {
   const { t } = useI18n();
-  const send = usePharmacyStore((s) => s.send);
   const [target, setTarget] = useState<DispatchTarget>(defaultTarget);
   const [recipient, setRecipient] = useState(defaultTarget === "pharmacist" ? TUNISIAN_PHARMACIES[0] : "");
   const [channel, setChannel] = useState<DispatchChannel>(defaultTarget === "pharmacist" ? "portal" : "email");
@@ -33,9 +33,17 @@ export function SendPrescriptionDialog({ open, onClose, rxId, patientId, patient
 
   const handleSubmit = () => {
     if (!recipient.trim()) return;
-    send({ rxId, patientId, patientName, target, recipient: recipient.trim(), channel, note: note.trim() || undefined });
-    setSent(true);
-    setTimeout(() => { setSent(false); onClose(); }, 1200);
+    void (async () => {
+      await sendPrescriptionToTarget({
+        prescriptionId: rxId,
+        target,
+        recipient: recipient.trim(),
+        channel,
+        note: note.trim() || undefined,
+      });
+      setSent(true);
+      setTimeout(() => { setSent(false); onClose(); }, 1200);
+    })();
   };
 
   return (

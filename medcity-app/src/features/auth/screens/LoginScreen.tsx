@@ -26,13 +26,15 @@ export default function LoginPage() {
     setLoading(true);
     
     setTimeout(() => {
-        const res = login(email, password);
+      void (async () => {
+        const res = await login(email, password);
         setLoading(false);
         if (res.ok) {
             setLocation(res.role === "admin" ? "/admin" : "/doctor");
         } else {
             setError(res.error || t("login.error"));
         }
+      })();
     }, 600);
   };
 

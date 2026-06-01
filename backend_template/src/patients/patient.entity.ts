@@ -47,6 +47,41 @@ export class Patient {
   @Column({ type: 'text', nullable: true })
   address?: string;
 
+  @Column({ name: 'weight_kg', type: 'decimal', nullable: true })
+  weightKg?: number;
+
+  @Column({ name: 'height_cm', type: 'decimal', nullable: true })
+  heightCm?: number;
+
+  @Column({ type: 'simple-json', nullable: true })
+  allergies?: string[];
+
+  @Column({ name: 'current_medications', type: 'simple-json', nullable: true })
+  currentMedications?: Array<{ name: string; dose?: string }>;
+
+  @Column({ type: 'simple-json', nullable: true })
+  comorbidities?: string[];
+
+  @Column({ type: 'simple-json', nullable: true })
+  renal?: { gfr?: number; status?: string };
+
+  @Column({ type: 'simple-json', nullable: true })
+  liver?: { status?: string; note?: string };
+
+  @Column({ name: 'vitals_snapshot', type: 'simple-json', nullable: true })
+  vitalsSnapshot?: {
+    hr?: number;
+    bp?: string;
+    temp?: number;
+    spo2?: number;
+  };
+
+  @Column({ type: 'simple-json', nullable: true })
+  flags?: string[];
+
+  @Column({ name: 'missing_data', type: 'simple-json', nullable: true })
+  missingData?: string[];
+
   @OneToMany(() => Consultation, (consultation) => consultation.patient)
   consultations: Consultation[];
 

@@ -23,19 +23,10 @@ import Login from "@/pages/login";
 import AdminDoctors from "@/pages/admin/doctors";
 import AdminDashboard from "@/pages/admin/index";
 import AdminCMS from "@/pages/admin/cms";
-import AdminCdssDashboard from "@/pages/admin/cdss/index";
-import CdssPatients from "@/pages/admin/cdss/patients";
 import AdminInteractionChecker from "@/pages/admin/cdss/interactions";
-import AdminNewPrescription from "@/pages/admin/cdss/prescription.new";
-import AdminReviewPrescriptions from "@/pages/admin/cdss/prescription.review";
 import AdminAuditPage from "@/pages/admin/cdss/audit";
-import AdminCdssSettings from "@/pages/admin/cdss/settings";
-import AdminConsultations from "@/pages/admin/cdss/consultations.index";
-import AdminConsultationDetail from "@/pages/admin/cdss/consultations.$consultationId";
-import AdminPharmacy from "@/pages/admin/cdss/pharmacy";
 import AdminMedicines from "@/pages/admin/cdss/medicines";
 import AdminMedicineContributions from "@/pages/admin/cdss/medicine-contributions";
-import AdminOrdonnance from "@/pages/admin/cdss/prescription.ordonnance";
 
 import DoctorDashboard from "@/pages/doctor/index";
 import DoctorPatients from "@/pages/doctor/patients";
@@ -43,15 +34,12 @@ import PatientDetail from "@/pages/doctor/patients.$patientId";
 import ConsultationDetail from "@/pages/doctor/consultations.$consultationId";
 import Consultations from "@/pages/doctor/consultations.index";
 import DoctorPrescriptions from "@/pages/doctor/prescriptions";
-import DoctorAgenda from "@/pages/doctor/agenda";
 import NewPrescription from "@/pages/doctor/prescription.new";
-import ReviewPrescriptions from "@/pages/doctor/prescription.review";
 import Ordonnance from "@/pages/doctor/prescription.$rxId.ordonnance";
 import Medicines from "@/pages/doctor/medicines";
 import MedicineContributions from "@/pages/doctor/medicine-contributions";
 import InteractionChecker from "@/pages/doctor/interactions";
 import DoctorContactAdmin from "@/pages/doctor/contact-admin";
-import CdssSettings from "@/pages/doctor/settings";
 import { DoctorLayout } from "@/components/templates/DoctorLayout";
 import PatientChartScreen from "@/features/cdss/screens/PatientChartScreen";
 
@@ -75,44 +63,14 @@ function Router() {
       <Route path="/admin">
         {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminDashboard /></AdminLayout></ProtectedRoute>}
       </Route>
-      <Route path="/admin/patients">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><CdssPatients /></AdminLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/admin/patients/:id">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><PatientChartScreen basePath="/admin" /></AdminLayout></ProtectedRoute>}
-      </Route>
       <Route path="/admin/doctors">
         {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminDoctors /></AdminLayout></ProtectedRoute>}
       </Route>
       <Route path="/admin/cms">
         {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminCMS /></AdminLayout></ProtectedRoute>}
       </Route>
-      <Route path="/admin/cdss">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminCdssDashboard /></AdminLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/admin/cdss/patients">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><CdssPatients /></AdminLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/admin/cdss/consultations">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminConsultations /></AdminLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/admin/cdss/consultations/:consultationId">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminConsultationDetail /></AdminLayout></ProtectedRoute>}
-      </Route>
       <Route path="/admin/cdss/interactions">
         {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminInteractionChecker /></AdminLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/admin/cdss/prescription/new">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminNewPrescription /></AdminLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/admin/cdss/prescription/review">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminReviewPrescriptions /></AdminLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/admin/cdss/prescription/:rxId/ordonnance">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminOrdonnance /></AdminLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/admin/cdss/pharmacy">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminPharmacy /></AdminLayout></ProtectedRoute>}
       </Route>
       <Route path="/admin/cdss/medicines">
         {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminMedicines /></AdminLayout></ProtectedRoute>}
@@ -122,9 +80,6 @@ function Router() {
       </Route>
       <Route path="/admin/cdss/audit">
         {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminAuditPage /></AdminLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/admin/cdss/settings">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminCdssSettings /></AdminLayout></ProtectedRoute>}
       </Route>
 
       <Route path="/doctor">
@@ -154,23 +109,14 @@ function Router() {
       <Route path="/doctor/prescription/new">
         {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><NewPrescription /></DoctorLayout></ProtectedRoute>}
       </Route>
-      <Route path="/doctor/prescription/review">
-        {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><ReviewPrescriptions /></DoctorLayout></ProtectedRoute>}
-      </Route>
       <Route path="/doctor/medicines">
         {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><Medicines /></DoctorLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/doctor/agenda">
-        {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><DoctorAgenda /></DoctorLayout></ProtectedRoute>}
       </Route>
       <Route path="/doctor/interactions">
         {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><InteractionChecker /></DoctorLayout></ProtectedRoute>}
       </Route>
       <Route path="/doctor/contact-admin">
         {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><DoctorContactAdmin /></DoctorLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/doctor/settings">
-        {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><CdssSettings /></DoctorLayout></ProtectedRoute>}
       </Route>
 
       <Route path="/">

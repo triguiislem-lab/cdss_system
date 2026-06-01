@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Save, UserPlus, X } from "lucide-react";
 import type { Patient } from "@/lib/mock-data";
-import { calculateAge } from "@/lib/mock-data";
-import { usePatientStore, type PatientInput } from "@/lib/stores/patient-store";
+import { createPatient, updatePatient, type PatientPayload } from "@/lib/backend-api";
 import { FormField as Field } from "@/features/cdss/components/DialogPrimitives";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   open: boolean;
@@ -64,15 +64,11 @@ function formFromPatient(patient?: Patient | null): PatientFormState {
   };
 }
 
-function toLegacySex(gender: PatientFormState["gender"]): Patient["sex"] {
-  return gender === "male" ? "M" : "F";
-}
-
 export function PatientFormDialog({ open, onClose, editing, onSaved }: Props) {
   const { t } = useI18n();
-  const addPatient = usePatientStore((state) => state.addPatient);
-  const updatePatient = usePatientStore((state) => state.updatePatient);
+  const { toast } = useToast();
   const [form, setForm] = useState<PatientFormState>(emptyForm);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setForm(formFromPatient(editing));
@@ -86,25 +82,14 @@ export function PatientFormDialog({ open, onClose, editing, onSaved }: Props) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
-  function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const firstName = form.firstName.trim();
     const lastName = form.lastName.trim();
     const phone1 = form.phone1.trim();
     if (!firstName || !lastName || !form.birthDate || !phone1) return;
 
-    const payload: PatientInput = {
-      ...(editing ?? {
-        allergies: [],
-        currentMedications: [],
-        comorbidities: [],
-        renal: { gfr: 90, status: "normal" },
-        liver: { status: "normal" },
-        vitals: { hr: 0, bp: "", temp: 0, spo2: 0 },
-        flags: [],
-        weightKg: 0,
-        heightCm: 0,
-      }),
+    const payload: PatientPayload = {
       firstName,
       lastName,
       birthDate: form.birthDate,
@@ -115,19 +100,33 @@ export function PatientFormDialog({ open, onClose, editing, onSaved }: Props) {
       profession: form.profession.trim() || undefined,
       internalCode: form.internalCode.trim() || undefined,
       address: form.address.trim() || undefined,
-      name: `${firstName} ${lastName}`,
-      age: calculateAge(form.birthDate) ?? editing?.age ?? 0,
-      sex: toLegacySex(form.gender),
+      allergies: editing?.allergies ?? [],
+      currentMedications: editing?.currentMedications ?? [],
+      comorbidities: editing?.comorbidities ?? [],
+      renal: editing?.renal ?? { gfr: 90, status: "normal" },
+      liver: editing?.liver ?? { status: "normal" },
+      vitalsSnapshot: editing?.vitals ?? { hr: 0, bp: "", temp: 0, spo2: 0 },
+      flags: editing?.flags ?? [],
+      missingData: editing?.missingData,
+      weightKg: editing?.weightKg ?? 0,
+      heightCm: editing?.heightCm ?? 0,
     };
 
-    if (editing) {
-      updatePatient(editing.id, payload);
-      onSaved?.({ ...editing, ...payload } as Patient);
-    } else {
-      const created = addPatient(payload);
-      onSaved?.(created);
+    setSaving(true);
+    try {
+      const saved = editing
+        ? await updatePatient(editing.id, payload)
+        : await createPatient(payload);
+      onSaved?.(saved);
+      onClose();
+    } catch (error) {
+      toast({
+        title: "Patient non enregistre",
+        description: error instanceof Error ? error.message : "Impossible de joindre le backend.",
+      });
+    } finally {
+      setSaving(false);
     }
-    onClose();
   }
 
   return (
@@ -193,7 +192,7 @@ export function PatientFormDialog({ open, onClose, editing, onSaved }: Props) {
           <button type="button" onClick={onClose} className="rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold transition-smooth hover:bg-muted">
             {t("common.cancel")}
           </button>
-          <button type="submit" className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-smooth hover:bg-primary/90">
+          <button type="submit" disabled={saving} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-smooth hover:bg-primary/90 disabled:opacity-60">
             <Save className="h-4 w-4" /> {t("common.save")}
           </button>
         </div>

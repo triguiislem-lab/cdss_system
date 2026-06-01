@@ -1,5 +1,5 @@
 import type { FormEvent } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CheckCircle2,
   Edit2,
@@ -15,6 +15,7 @@ import {
 import { MetricCard } from "@/components/molecules/MetricCard";
 import { CdssModal, FormField as Field } from "@/features/cdss/components/DialogPrimitives";
 import { useI18n } from "@/i18n/I18nProvider";
+import { createDoctor as createDoctorApi, deleteDoctor as deleteDoctorApi, listDoctors, updateDoctor as updateDoctorApi } from "@/lib/backend-api";
 
 type DoctorStatus = "actif" | "inactif";
 
@@ -29,21 +30,13 @@ type AdminDoctor = {
   hopital: string;
   ville: string;
   telephone: string;
+  password?: string;
   patients: number;
   prescriptions: number;
   rating: number;
   statut: DoctorStatus;
   disponible: boolean;
 };
-
-const INITIAL_DOCTORS: AdminDoctor[] = [
-  { id: "d1", nom: "Ahmed Ben Ali", specialite: "Cardiologie", hopital: "Clinique les Oliviers", ville: "Tunis", telephone: "+216 71 234 567", patients: 87, prescriptions: 143, rating: 4.8, statut: "actif", disponible: true },
-  { id: "d2", nom: "Rania Zouari", specialite: "Endocrinologie", hopital: "Clinique Hannibal", ville: "Tunis", telephone: "+216 55 345 678", patients: 64, prescriptions: 98, rating: 4.7, statut: "actif", disponible: true },
-  { id: "d3", nom: "Samar Ben Ali", specialite: "Chirurgie Esthetique", hopital: "Clinique Hannibal", ville: "Tunis", telephone: "+216 52 456 789", patients: 52, prescriptions: 71, rating: 4.9, statut: "actif", disponible: false },
-  { id: "d4", nom: "Hatem Nasri", specialite: "Neurologie", hopital: "CHU La Rabta", ville: "Tunis", telephone: "+216 71 567 890", patients: 73, prescriptions: 118, rating: 4.6, statut: "actif", disponible: true },
-  { id: "d5", nom: "Leila Sfar", specialite: "Pneumologie", hopital: "Clinique Avicenne", ville: "Sfax", telephone: "+216 74 678 901", patients: 59, prescriptions: 94, rating: 4.7, statut: "actif", disponible: true },
-  { id: "d6", nom: "Mehdi Bouaziz", specialite: "Orthopedie", hopital: "Polyclinique du Lac", ville: "Tunis", telephone: "+216 71 789 012", patients: 41, prescriptions: 63, rating: 4.5, statut: "inactif", disponible: false },
-];
 
 function emptyDoctor(): AdminDoctor {
   return {
@@ -57,6 +50,7 @@ function emptyDoctor(): AdminDoctor {
     hopital: "",
     ville: "",
     telephone: "",
+    password: "",
     patients: 0,
     prescriptions: 0,
     rating: 5,
@@ -72,10 +66,34 @@ function doctorDisplayName(doc: AdminDoctor) {
 
 export default function AdminDoctors() {
   const { t } = useI18n();
-  const [doctors, setDoctors] = useState<AdminDoctor[]>(INITIAL_DOCTORS);
+  const [doctors, setDoctors] = useState<AdminDoctor[]>([]);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<AdminDoctor | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminDoctor | null>(null);
+
+  async function refreshDoctors() {
+    const apiDoctors = await listDoctors(search);
+    setDoctors(apiDoctors.map((doctor) => ({
+      id: doctor.id,
+      prenom: doctor.firstName,
+      nom: doctor.lastName,
+      email: doctor.email,
+      matriculeFiscale: doctor.fiscalNumber,
+      specialite: doctor.specialty ?? "",
+      hopital: "MedCity",
+      ville: doctor.city ?? "",
+      telephone: doctor.phone,
+      patients: 0,
+      prescriptions: 0,
+      rating: 5,
+      statut: doctor.status === "inactive" ? "inactif" : "actif",
+      disponible: doctor.status !== "inactive",
+    })));
+  }
+
+  useEffect(() => {
+    void refreshDoctors();
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -95,17 +113,31 @@ export default function AdminDoctors() {
   ];
 
   function saveDoctor(nextDoctor: AdminDoctor) {
-    setDoctors((current) => {
-      const exists = current.some((doc) => doc.id === nextDoctor.id);
-      return exists ? current.map((doc) => (doc.id === nextDoctor.id ? nextDoctor : doc)) : [nextDoctor, ...current];
-    });
-    setEditing(null);
+    void (async () => {
+      const payload = {
+        firstName: nextDoctor.prenom || nextDoctor.nom.split(" ")[0] || "Doctor",
+        lastName: nextDoctor.prenom ? nextDoctor.nom : nextDoctor.nom.split(" ").slice(1).join(" ") || nextDoctor.nom,
+        email: nextDoctor.email || `${Date.now()}@medcity.tn`,
+        phone: nextDoctor.telephone,
+        fiscalNumber: nextDoctor.matriculeFiscale || `MF-${Date.now()}`,
+        specialty: nextDoctor.specialite,
+        city: nextDoctor.ville,
+      };
+      const exists = doctors.some((doc) => doc.id === nextDoctor.id);
+      if (exists) await updateDoctorApi(nextDoctor.id, payload);
+      else await createDoctorApi({ ...payload, password: nextDoctor.password ?? "" });
+      await refreshDoctors();
+      setEditing(null);
+    })();
   }
 
   function deleteDoctor() {
     if (!deleteTarget) return;
-    setDoctors((current) => current.filter((doc) => doc.id !== deleteTarget.id));
-    setDeleteTarget(null);
+    void (async () => {
+      await deleteDoctorApi(deleteTarget.id);
+      setDeleteTarget(null);
+      await refreshDoctors();
+    })();
   }
 
   return (
@@ -264,6 +296,7 @@ function DoctorModal({
 }) {
   const { t } = useI18n();
   const [form, setForm] = useState<AdminDoctor>(doctor);
+  const isNew = doctor.id.startsWith("d-");
 
   function update<K extends keyof AdminDoctor>(key: K, value: AdminDoctor[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -304,6 +337,11 @@ function DoctorModal({
         <Field label={t("adminDoctors.phone")}>
           <input required value={form.telephone} onChange={(event) => update("telephone", event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
         </Field>
+        {isNew && (
+          <Field label="Mot de passe initial">
+            <input required type="password" minLength={8} value={form.password ?? ""} onChange={(event) => update("password", event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+          </Field>
+        )}
         <Field label={t("adminDoctors.status")}>
           <select value={form.statut} onChange={(event) => update("statut", event.target.value as DoctorStatus)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
             <option value="actif">{t("adminDoctors.active")}</option>

@@ -42,6 +42,40 @@ export class DoctorsService {
     return toPaginated(data, total, page, limit);
   }
 
+  async findPublic(query: PaginationQueryDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const where = query.search
+      ? [
+          { status: DoctorStatus.Active, firstName: ILike(`%${query.search}%`) },
+          { status: DoctorStatus.Active, lastName: ILike(`%${query.search}%`) },
+          { status: DoctorStatus.Active, specialty: ILike(`%${query.search}%`) },
+          { status: DoctorStatus.Active, city: ILike(`%${query.search}%`) },
+        ]
+      : { status: DoctorStatus.Active };
+    const [data, total] = await this.doctorsRepository.findAndCount({
+      where,
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { createdAt: 'DESC' },
+    });
+    return toPaginated(
+      data.map((doctor) => ({
+        id: doctor.id,
+        firstName: doctor.firstName,
+        lastName: doctor.lastName,
+        phone: doctor.phone,
+        specialty: doctor.specialty,
+        city: doctor.city,
+        address: doctor.address,
+        status: doctor.status,
+      })),
+      total,
+      page,
+      limit,
+    );
+  }
+
   async getById(id: string) {
     const doctor = await this.doctorsRepository.findOne({
       where: { id },

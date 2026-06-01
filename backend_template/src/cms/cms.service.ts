@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { FindOptionsWhere, Repository } from 'typeorm';
 import { CmsStatus } from '../common/entities/enums';
 import {
   Partner,
@@ -182,7 +182,9 @@ export class CmsService {
     id: string,
     label: string,
   ) {
-    const item = await repository.findOne({ where: { id } as any });
+    const item = await repository.findOne({
+      where: { id } as FindOptionsWhere<T>,
+    });
     if (!item) {
       throw new NotFoundException(`${label} not found`);
     }

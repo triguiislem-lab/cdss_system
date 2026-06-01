@@ -7,6 +7,10 @@ dist/
 **/dist/
 build/
 **/build/
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
 
 # Python
 __pycache__/
@@ -25,6 +29,7 @@ venv/
 
 # Local data and generated runtime artifacts
 data/
+**/.test-data/
 **/data/audit/
 **/data/feedback/
 **/*.sqlite

@@ -1,9 +1,9 @@
-﻿import { useEffect, useState } from "react";
-import { usePatientStore } from "@/lib/stores/patient-store";
-import { useConsultationStore } from "@/lib/stores/consultation-store";
+import { useEffect, useState } from "react";
 import { FormField as Field, SearchablePicker } from "@/features/cdss/components/DialogPrimitives";
-import { getPatientFullName } from "@/lib/mock-data";
+import { getPatientFullName, type Patient } from "@/lib/mock-data";
 import { useI18n } from "@/i18n/I18nProvider";
+import { useAuth } from "@/contexts/AuthContext";
+import { createConsultation, getConsultation, listDoctors, listPatients, updateConsultation } from "@/lib/backend-api";
 
 interface Props {
   open: boolean;
@@ -13,51 +13,61 @@ interface Props {
 
 export function ConsultationFormDialog({ open, onClose, editingId }: Props) {
   const { t } = useI18n();
-  const patients = usePatientStore((s) => s.patients);
-  const add = useConsultationStore((s) => s.add);
-  const update = useConsultationStore((s) => s.update);
-  const existing = useConsultationStore((s) => (editingId ? s.consultations.find((c) => c.id === editingId) : undefined));
-
-  const [patientId, setPatientId] = useState(patients[0]?.id ?? "");
+  const { user } = useAuth();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [doctors, setDoctors] = useState<Array<{ id: string; firstName: string; lastName: string; specialty?: string }>>([]);
+  const [patientId, setPatientId] = useState("");
   const [patientQuery, setPatientQuery] = useState("");
   const [reason, setReason] = useState("");
-  const [doctor, setDoctor] = useState("Dr. Jordan Chen");
+  const [doctor, setDoctor] = useState(user?.role === "doctor" ? [user.prenom, user.nom].filter(Boolean).join(" ") : "MedCity");
+  const [doctorId, setDoctorId] = useState("");
   const [scheduledAt, setScheduledAt] = useState(() => new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16));
   const selectedPatient = patients.find((p) => p.id === patientId);
 
   useEffect(() => {
-    if (existing) {
+    if (!open) return;
+    void (async () => {
+      const [apiPatients, apiDoctors] = await Promise.all([
+        listPatients(),
+        user?.role === "admin" ? listDoctors() : Promise.resolve([]),
+      ]);
+      setPatients(apiPatients);
+      setDoctors(apiDoctors);
+      if (!editingId && apiPatients[0]) setPatientId(apiPatients[0].id);
+      if (!editingId && apiDoctors[0]) {
+        setDoctorId(apiDoctors[0].id);
+        setDoctor(`${apiDoctors[0].firstName} ${apiDoctors[0].lastName}`.trim());
+      }
+      if (!editingId) return;
+      const existing = await getConsultation(editingId);
       setPatientId(existing.patientId);
       setPatientQuery(`${existing.patientName} ${existing.patientId}`);
       setReason(existing.reason);
       setDoctor(existing.doctor);
       setScheduledAt(new Date(existing.scheduledAt).toISOString().slice(0, 16));
-    }
-  }, [existing]);
+    })();
+  }, [editingId, open, user?.role]);
 
   if (!open) return null;
 
-  const submit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const patient = patients.find((p) => p.id === patientId);
-    if (!patient) return;
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
     const iso = new Date(scheduledAt).toISOString();
-    if (existing) {
-      update(existing.id, { patientId, patientName: getPatientFullName(patient), reason, doctor, scheduledAt: iso });
-    } else {
-      add({
-        patientId, patientName: getPatientFullName(patient), doctor, reason,
-        scheduledAt: iso, status: "scheduled", notes: "",
-      });
-    }
-    onClose();
+    void (async () => {
+      if (editingId) {
+        await updateConsultation(editingId, { patientId, doctorId: doctorId || undefined, reason, scheduledAt: iso });
+      } else {
+        await createConsultation({ patientId, doctorId: doctorId || undefined, reason, scheduledAt: iso, notes: "" });
+      }
+      onClose();
+    })();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4">
       <form onSubmit={submit} className="w-full max-w-lg rounded-xl border border-border bg-card shadow-elevated p-5 space-y-4">
         <div>
-          <h3 className="font-semibold">{existing ? t("consultations.edit") : t("consultations.new")}</h3>
+          <h3 className="font-semibold">{editingId ? t("consultations.edit") : t("consultations.new")}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">{t("consultations.formHelp")}</p>
         </div>
 
@@ -90,25 +100,42 @@ export function ConsultationFormDialog({ open, onClose, editingId }: Props) {
         </Field>
 
         <Field label={t("common.reason")}>
-          <input required value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("consultations.reasonPlaceholder")} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+          <input required value={reason} onChange={(event) => setReason(event.target.value)} placeholder={t("consultations.reasonPlaceholder")} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
         </Field>
 
         <div className="grid grid-cols-2 gap-3">
           <Field label={t("common.doctor")}>
-            <input value={doctor} onChange={(e) => setDoctor(e.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+            {user?.role === "admin" ? (
+              <select
+                value={doctorId}
+                onChange={(event) => {
+                  const next = doctors.find((item) => item.id === event.target.value);
+                  setDoctorId(event.target.value);
+                  if (next) setDoctor(`${next.firstName} ${next.lastName}`.trim());
+                }}
+                className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                required
+              >
+                {doctors.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {`${item.firstName} ${item.lastName}`.trim()} {item.specialty ? `- ${item.specialty}` : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input value={doctor} disabled className="mt-1 w-full rounded-lg border border-input bg-muted px-3 py-2 text-sm text-muted-foreground" />
+            )}
           </Field>
           <Field label={t("common.dateTime")}>
-            <input type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+            <input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
           </Field>
         </div>
 
         <div className="flex justify-end gap-2 pt-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted">{t("common.cancel")}</button>
-          <button type="submit" className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">{existing ? t("common.save") : t("common.create")}</button>
+          <button type="submit" disabled={!patientId || (user?.role === "admin" && !doctorId)} className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60">{editingId ? t("common.save") : t("common.create")}</button>
         </div>
       </form>
     </div>
   );
 }
-
-

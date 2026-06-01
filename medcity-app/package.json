@@ -8,6 +8,10 @@
     "build": "node --preserve-symlinks --preserve-symlinks-main node_modules/vite/bin/vite.js build",
     "serve": "node --preserve-symlinks --preserve-symlinks-main node_modules/vite/bin/vite.js preview --host 0.0.0.0",
     "typecheck": "node --preserve-symlinks --preserve-symlinks-main node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:ui": "playwright test --ui",
+    "e2e:report": "playwright show-report",
     "backend:build": "npm --prefix backend_template run build",
     "backend:dev": "npm --prefix backend_template run start:dev",
     "backend:seed": "npm --prefix backend_template run seed",
@@ -71,6 +75,7 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^22.16.5",

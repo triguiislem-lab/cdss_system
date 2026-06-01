@@ -82,7 +82,7 @@ def readiness_status() -> dict:
         kaggle_working = Path("/kaggle/working")
         if kaggle_working.exists():
             return kaggle_working / "cdss_kuzu_backups"
-        return Path("/tmp/cdss_kuzu_backups")
+        return Path(__file__).resolve().parents[3] / ".runtime" / "cdss_kuzu_backups"
 
     def extract_kuzu_zip(zip_path: Path) -> Path | None:
         if not zip_path.exists() or zip_path.suffix.lower() != ".zip":
@@ -349,4 +349,3 @@ def readiness_status() -> dict:
         "process_id": qwen_cache.get("process_id"),
         "note": "/health = process alive; /readiness = clinically ready after warmup/resources.",
     }
-

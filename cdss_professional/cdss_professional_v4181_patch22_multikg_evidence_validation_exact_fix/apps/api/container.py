@@ -50,7 +50,7 @@ def _kuzu_extract_root() -> Path:
     kaggle_working = Path("/kaggle/working")
     if kaggle_working.exists():
         return kaggle_working / "cdss_kuzu_backups"
-    return Path("/tmp/cdss_kuzu_backups")
+    return Path(__file__).resolve().parents[2] / ".runtime" / "cdss_kuzu_backups"
 
 
 def _extract_kuzu_zip(zip_path: Path) -> Path | None:

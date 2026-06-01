@@ -269,9 +269,7 @@ export class CdssService {
 
   private async persistIaMetadata(prescriptionId: string, ia: IaDraftResponse) {
     await this.prescriptionsRepository.update(prescriptionId, {
-      status: ia.blocked
-        ? PrescriptionStatus.PendingReview
-        : PrescriptionStatus.PendingReview,
+      status: PrescriptionStatus.PendingReview,
       risk: this.mapRisk(ia),
       aiTraceId: ia.trace_id,
       aiStatus: ia.status,

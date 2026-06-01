@@ -1,11 +1,10 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import {
   Activity,
-  Bell,
   CalendarClock,
   ClipboardCheck,
   FilePlus2,
@@ -13,10 +12,8 @@ import {
   LayoutDashboard,
   LogOut,
   Mail,
-  MessageSquare,
   Pill,
   Search,
-  Settings,
   Stethoscope,
   Users,
 } from "lucide-react";
@@ -38,31 +35,6 @@ const WORKSPACE_NAV: NavItem[] = [
   { href: "/doctor/medicine-contributions", labelKey: "nav.contributions", icon: GitPullRequest },
   { href: "/doctor/interactions", labelKey: "nav.interactions", icon: Activity },
   { href: "/doctor/contact-admin", labelKey: "nav.contactAdmin", icon: Mail },
-  { href: "/doctor/settings", labelKey: "nav.settings", icon: Settings },
-];
-
-const NOTIFICATIONS = [
-  {
-    id: "msg-admin",
-    titleKey: "notifications.adminMessage.title",
-    bodyKey: "notifications.adminMessage.body",
-    timeKey: "notifications.adminMessage.time",
-    icon: MessageSquare,
-  },
-  {
-    id: "contribution-update",
-    titleKey: "notifications.contribution.title",
-    bodyKey: "notifications.contribution.body",
-    timeKey: "notifications.contribution.time",
-    icon: GitPullRequest,
-  },
-  {
-    id: "rx-document",
-    titleKey: "notifications.prescription.title",
-    bodyKey: "notifications.prescription.body",
-    timeKey: "notifications.prescription.time",
-    icon: ClipboardCheck,
-  },
 ];
 
 function SidebarSection({
@@ -151,7 +123,6 @@ export function DoctorLayout({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const initials =
     user?.nom
       .split(" ")
@@ -224,58 +195,14 @@ export function DoctorLayout({ children }: { children: ReactNode }) {
               /
             </kbd>
           </div>
-          <div className="relative ml-auto flex items-center gap-2">
-            <button
-              onClick={() => setNotificationsOpen((open) => !open)}
-              className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-card hover:bg-muted transition-smooth"
-              aria-label="Notifications"
-              aria-expanded={notificationsOpen}
+          <div className="ml-auto flex items-center gap-2">
+            <Link
+              href="/doctor/contact-admin"
+              className="inline-flex items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-xs font-semibold hover:bg-muted transition-smooth"
             >
-              <Bell className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 h-4 min-w-[16px] rounded-full bg-critical px-1 text-[10px] font-semibold text-critical-foreground flex items-center justify-center animate-pulse-critical">
-                {NOTIFICATIONS.length}
-              </span>
-            </button>
-            {notificationsOpen && (
-              <div className="absolute right-0 top-11 z-50 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-card shadow-elevated">
-                <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                  <div>
-                    <p className="text-sm font-semibold">{t("notifications.title")}</p>
-                    <p className="text-xs text-muted-foreground">{t("notifications.subtitle")}</p>
-                  </div>
-                  <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[11px] font-semibold text-primary">
-                    {NOTIFICATIONS.length} {t("notifications.new")}
-                  </span>
-                </div>
-                <div className="max-h-80 overflow-y-auto p-2">
-                  {NOTIFICATIONS.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => setNotificationsOpen(false)}
-                      className="flex w-full gap-3 rounded-lg px-3 py-3 text-left hover:bg-muted transition-smooth"
-                    >
-                      <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
-                        <item.icon className="h-4 w-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold">{t(item.titleKey)}</span>
-                        <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">{t(item.bodyKey)}</span>
-                        <span className="mt-1 block text-[11px] text-muted-foreground">{t(item.timeKey)}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                <div className="border-t border-border p-2">
-                  <Link
-                    href="/doctor/contact-admin"
-                    onClick={() => setNotificationsOpen(false)}
-                    className="flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90"
-                  >
-                    <Mail className="h-3.5 w-3.5" /> {t("nav.contactAdmin")}
-                  </Link>
-                </div>
-              </div>
-            )}
+              <Mail className="h-3.5 w-3.5" />
+              {t("nav.contactAdmin")}
+            </Link>
           </div>
         </header>
 

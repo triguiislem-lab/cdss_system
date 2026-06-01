@@ -20,6 +20,8 @@ Default exposed ports:
 - NestJS API: `http://localhost:3000/api`
 - FastAPI CDSS: `http://localhost:8000`
 - LibreTranslate: `http://localhost:5000`
+- Prometheus: `http://localhost:9090`
+- Grafana: `http://localhost:3001`
 
 The NestJS API calls the CDSS container through:
 
@@ -104,3 +106,61 @@ DATABASE_SSL_REJECT_UNAUTHORIZED=false
 ```
 
 Use `DATABASE_SSL=true` for Supabase direct database connections. For GitHub Actions or production deployments, store `DATABASE_PASSWORD`, `JWT_SECRET`, and `JWT_REFRESH_SECRET` as secrets. Non-sensitive host/name flags can be repository or environment variables.
+
+After configuring the variables, seed the first usable dataset and login accounts:
+
+```bash
+npm --prefix backend_template run seed
+```
+
+The seed creates demo admin/doctor users, several patients with CDSS clinical context, and starter medicines. The frontend then reads patients, prescription queues, audits, and interaction data through the NestJS API instead of static demo arrays.
+
+## Monitoring: Prometheus And Grafana
+
+The Docker stack includes Prometheus and Grafana:
+
+- Prometheus config: `monitoring/prometheus/prometheus.yml`
+- Grafana datasource provisioning: `monitoring/grafana/provisioning/datasources/prometheus.yml`
+- Grafana dashboard provisioning: `monitoring/grafana/provisioning/dashboards/dashboards.yml`
+- Default dashboard: `monitoring/grafana/dashboards/medcity-overview.json`
+
+Scraped endpoints:
+
+```text
+api:3000/api/metrics
+cdss:8000/metrics
+prometheus:9090/metrics
+node-exporter:9100/metrics     # EC2/Linux host profile
+cadvisor:8080/metrics          # EC2/Linux containers profile
+```
+
+Local URLs:
+
+```text
+Prometheus: http://localhost:9090
+Grafana:    http://localhost:3001
+```
+
+Set Grafana credentials in `.env`:
+
+```env
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=<strong-password>
+PROMETHEUS_PORT=9090
+GRAFANA_PORT=3001
+```
+
+The Grafana dashboard is provisioned automatically at startup under the `MedCity` folder. Prometheus and Grafana ports are bound to `127.0.0.1` by default; on EC2, keep them private and access them through SSH tunneling or a protected reverse proxy instead of exposing them directly to the internet.
+
+By default, Prometheus monitors the application services. To monitor the EC2 host itself, enable the Linux host-monitoring profile on the EC2 `.env`:
+
+```env
+COMPOSE_PROFILES=host-monitoring
+```
+
+This starts:
+
+- `node-exporter`: EC2 CPU, RAM, disk, filesystem, network, load.
+- `cadvisor`: Docker container CPU, memory, network, and filesystem usage.
+
+The additional `MedCity EC2 Host` Grafana dashboard is provisioned automatically. Keep this profile disabled on Windows local development because it uses Linux host mounts such as `/`, `/sys`, and `/var/lib/docker`.

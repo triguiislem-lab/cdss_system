@@ -5,22 +5,15 @@ import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import {
   Activity,
-  Bell,
-  Building2,
-  CalendarClock,
-  ClipboardCheck,
   FileText,
-  FilePlus2,
   GitPullRequest,
   LayoutDashboard,
   LogOut,
   Pill,
   ScrollText,
   Search,
-  Settings,
   Stethoscope,
   UserCheck,
-  Users,
 } from "lucide-react";
 
 type NavItem = {
@@ -32,16 +25,10 @@ type NavItem = {
 
 const WORKSPACE_NAV: NavItem[] = [
   { href: "/admin", labelKey: "nav.dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/patients", labelKey: "nav.patients", icon: Users },
-  { href: "/admin/cdss/consultations", labelKey: "nav.consultations", icon: CalendarClock },
-  { href: "/admin/cdss/prescription/new", labelKey: "nav.newPrescription", icon: FilePlus2 },
-  { href: "/admin/cdss/prescription/review", labelKey: "nav.prescriptionReview", icon: ClipboardCheck },
-  { href: "/admin/cdss/pharmacy", labelKey: "nav.pharmacy", icon: Building2 },
   { href: "/admin/cdss/medicines", labelKey: "nav.medicines", icon: Pill },
   { href: "/admin/cdss/medicine-contributions", labelKey: "nav.contributions", icon: GitPullRequest },
   { href: "/admin/cdss/interactions", labelKey: "nav.interactions", icon: Activity },
   { href: "/admin/cdss/audit", labelKey: "nav.audit", icon: ScrollText },
-  { href: "/admin/cdss/settings", labelKey: "nav.settings", icon: Settings },
 ];
 
 const PLATFORM_NAV: NavItem[] = [
@@ -208,17 +195,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               /
             </kbd>
           </div>
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              className="relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-input bg-card hover:bg-muted transition-smooth"
-              aria-label="Notifications"
-            >
-              <Bell className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 h-4 min-w-[16px] rounded-full bg-critical px-1 text-[10px] font-semibold text-critical-foreground flex items-center justify-center animate-pulse-critical">
-                2
-              </span>
-            </button>
-          </div>
+          <div className="ml-auto" />
         </header>
 
         <MobileNav location={location} />

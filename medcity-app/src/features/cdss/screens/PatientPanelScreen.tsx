@@ -1,25 +1,45 @@
 ﻿import { Link, useLocation } from "wouter";
 
-import { useMemo, useState } from "react";
-import { Search, AlertTriangle, FilePlus2, Plus, Pencil, Trash2, Eye, RotateCcw } from "lucide-react";
-import { usePatientStore } from "@/lib/stores/patient-store";
+import { useEffect, useMemo, useState } from "react";
+import { Search, AlertTriangle, FilePlus2, Plus, Pencil, Trash2, Eye, RefreshCw } from "lucide-react";
 import { PatientFormDialog } from "@/features/cdss/components/PatientFormDialog";
 import type { Patient } from "@/lib/mock-data";
 import { getPatientAge, getPatientFullName, getPatientGenderLabel, getPatientInitials, getPatientSearchText } from "@/lib/mock-data";
 import { useI18n } from "@/i18n/I18nProvider";
+import { deletePatient, listPatients } from "@/lib/backend-api";
+import { useToast } from "@/hooks/use-toast";
+import { CardSkeletonGrid } from "@/components/molecules/LoadingState";
 
 
 function PatientsPage() {
   const { t } = useI18n();
-  const patients = usePatientStore((s) => s.patients);
-  const deletePatient = usePatientStore((s) => s.deletePatient);
-  const resetSeed = usePatientStore((s) => s.resetSeed);
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
 
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Patient | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Patient | null>(null);
+
+  async function refreshPatients() {
+    setLoading(true);
+    try {
+      setPatients(await listPatients());
+    } catch (error) {
+      toast({
+        title: "Patients indisponibles",
+        description: error instanceof Error ? error.message : "Impossible de charger le backend.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void refreshPatients();
+  }, []);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -39,8 +59,8 @@ function PatientsPage() {
             <Search className="h-4 w-4 text-muted-foreground" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("patients.searchPlaceholder")} className="flex-1 bg-transparent outline-none" />
           </div>
-          <button onClick={resetSeed} title={t("patients.resetDemo")} className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted transition-smooth">
-            <RotateCcw className="h-4 w-4" />
+          <button onClick={() => void refreshPatients()} title="Rafraichir" className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted transition-smooth">
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
           <button onClick={() => { setEditing(null); setDialogOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-card hover:bg-primary/90 transition-smooth">
             <Plus className="h-4 w-4" /> {t("patients.new")}
@@ -48,7 +68,9 @@ function PatientsPage() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <CardSkeletonGrid />
+      ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <p className="text-sm text-muted-foreground">{t("patients.empty")}</p>
         </div>
@@ -111,7 +133,19 @@ function PatientsPage() {
         </div>
       )}
 
-      <PatientFormDialog open={dialogOpen} onClose={() => setDialogOpen(false)} editing={editing} />
+      <PatientFormDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        editing={editing}
+        onSaved={(saved) => {
+          setPatients((current) => {
+            const exists = current.some((patient) => patient.id === saved.id);
+            return exists
+              ? current.map((patient) => (patient.id === saved.id ? saved : patient))
+              : [saved, ...current];
+          });
+        }}
+      />
 
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 backdrop-blur-sm p-4" role="dialog" aria-modal="true">
@@ -122,7 +156,20 @@ function PatientsPage() {
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setConfirmDelete(null)} className="rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted">{t("common.cancel")}</button>
-              <button onClick={() => { deletePatient(confirmDelete.id); setConfirmDelete(null); }} className="inline-flex items-center gap-1.5 rounded-lg bg-critical text-critical-foreground px-3 py-2 text-sm font-semibold hover:bg-critical/90">
+              <button onClick={() => {
+                void (async () => {
+                  try {
+                    await deletePatient(confirmDelete.id);
+                    setPatients((current) => current.filter((p) => p.id !== confirmDelete.id));
+                    setConfirmDelete(null);
+                  } catch (error) {
+                    toast({
+                      title: "Suppression impossible",
+                      description: error instanceof Error ? error.message : "Impossible de joindre le backend.",
+                    });
+                  }
+                })();
+              }} className="inline-flex items-center gap-1.5 rounded-lg bg-critical text-critical-foreground px-3 py-2 text-sm font-semibold hover:bg-critical/90">
                 <Trash2 className="h-4 w-4" /> {t("common.delete")}
               </button>
             </div>

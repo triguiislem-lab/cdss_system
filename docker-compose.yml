@@ -41,6 +41,36 @@ services:
       TRANSLATION_SOURCE_LANG: fr
       TRANSLATION_TARGET_LANGS: en,ar
       TRANSLATION_TIMEOUT_MS: 15000
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_BUCKET: ${SUPABASE_BUCKET:-temp-consultation-audio}
+      SUPABASE_S3_ENDPOINT: ${SUPABASE_S3_ENDPOINT:-}
+      SUPABASE_S3_REGION: ${SUPABASE_S3_REGION:-us-east-1}
+      SUPABASE_S3_ACCESS_KEY_ID: ${SUPABASE_S3_ACCESS_KEY_ID:-}
+      SUPABASE_S3_SECRET_ACCESS_KEY: ${SUPABASE_S3_SECRET_ACCESS_KEY:-}
+      AUDIO_UPLOAD_LIMIT: ${AUDIO_UPLOAD_LIMIT:-100mb}
+      DELETE_SUPABASE_AFTER_KAGGLE: ${DELETE_SUPABASE_AFTER_KAGGLE:-false}
+      KAGGLE_USERNAME: ${KAGGLE_USERNAME:-}
+      KAGGLE_KEY: ${KAGGLE_KEY:-}
+      KAGGLE_DATASET_SLUG: ${KAGGLE_DATASET_SLUG:-cdss-temp-consultation-audio}
+      KAGGLE_DATASET_REF: ${KAGGLE_DATASET_REF:-}
+      KAGGLE_DATASET_TITLE: ${KAGGLE_DATASET_TITLE:-CDSS Temp Consultation Audio}
+      KAGGLE_DATASET_LICENSE: ${KAGGLE_DATASET_LICENSE:-CC0-1.0}
+      KAGGLE_DATASET_DESCRIPTION: ${KAGGLE_DATASET_DESCRIPTION:-Temporary consultation audio dataset for CDSS development.}
+      KAGGLE_SKIP_EXISTING_DATASETS: ${KAGGLE_SKIP_EXISTING_DATASETS:-false}
+      KAGGLE_DELETE_OLD_VERSIONS: ${KAGGLE_DELETE_OLD_VERSIONS:-false}
+      KAGGLE_KERNEL_REF: ${KAGGLE_KERNEL_REF:-}
+      KAGGLE_KERNEL_TITLE: ${KAGGLE_KERNEL_TITLE:-cdss-audio-processor}
+      KAGGLE_KERNEL_TYPE: ${KAGGLE_KERNEL_TYPE:-notebook}
+      KAGGLE_KERNEL_CODE_FILE: ${KAGGLE_KERNEL_CODE_FILE:-cdss-audio-processor.ipynb}
+      KAGGLE_ACCELERATOR: ${KAGGLE_ACCELERATOR:-}
+      KAGGLE_EXTRA_DATASET_SOURCES: ${KAGGLE_EXTRA_DATASET_SOURCES:-}
+      KAGGLE_MODEL_SOURCES: ${KAGGLE_MODEL_SOURCES:-}
+      KAGGLE_ENABLE_INTERNET: ${KAGGLE_ENABLE_INTERNET:-true}
+      KAGGLE_ENABLE_GPU: ${KAGGLE_ENABLE_GPU:-false}
+      KAGGLE_PERSIST_OUTPUTS_TO_DATASET: ${KAGGLE_PERSIST_OUTPUTS_TO_DATASET:-true}
+      KAGGLE_DATASET_READY_TIMEOUT_MS: ${KAGGLE_DATASET_READY_TIMEOUT_MS:-180000}
+      KAGGLE_DATASET_READY_INTERVAL_MS: ${KAGGLE_DATASET_READY_INTERVAL_MS:-10000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -115,7 +145,70 @@ services:
       - "127.0.0.1:${LIBRETRANSLATE_PORT:-5000}:5000"
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      api:
+        condition: service_healthy
+      cdss:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    command:
+      - --path.rootfs=/host
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    pid: host
+    volumes:
+      - /:/host:ro,rslave
+    profiles:
+      - host-monitoring
+    restart: unless-stopped
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.2
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
+    profiles:
+      - host-monitoring
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3001}:3000"
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   cdss-audit:
   cdss-feedback:
+  prometheus-data:
+  grafana-data:

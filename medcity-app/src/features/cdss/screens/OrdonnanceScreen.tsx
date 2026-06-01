@@ -1,18 +1,58 @@
-﻿import { Link, useParams } from "wouter";
-import { useState } from "react";
+import { Link, useParams } from "wouter";
+import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Building2, Printer, ShieldCheck, Stethoscope, User as UserIcon } from "lucide-react";
 import { SendPrescriptionDialog } from "@/features/cdss/components/SendPrescriptionDialog";
-import { getPatientAge, getPatientFullName, getPatientGenderLabel, prescriptions } from "@/lib/mock-data";
-import { usePatientStore } from "@/lib/stores/patient-store";
+import { getPatientAge, getPatientFullName, getPatientGenderLabel, type Medication, type Patient } from "@/lib/mock-data";
 import type { DispatchTarget } from "@/lib/stores/pharmacy-store";
+import { createPrintSnapshot, getOrdonnance, mapPatient } from "@/lib/backend-api";
+
+type OrdonnanceData = {
+  prescriptionNumber: string;
+  diagnosis?: string;
+  notes?: string;
+  doctor?: { firstName?: string; lastName?: string };
+  patient?: Patient;
+  medications: Medication[];
+};
 
 export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: string }) {
   const params = useParams<{ rxId: string }>();
-  const patientId = new URLSearchParams(window.location.search).get("patientId");
-  const rx = prescriptions.find((prescription) => prescription.id === params.rxId);
-  const fallbackPatientId = patientId ?? rx?.patientId;
-  const patient = usePatientStore((state) => state.patients.find((entry) => entry.id === fallbackPatientId));
+  const [rx, setRx] = useState<OrdonnanceData | null>(null);
+  const [patient, setPatient] = useState<Patient | null>(null);
   const [sendOpen, setSendOpen] = useState<DispatchTarget | null>(null);
+
+  useEffect(() => {
+    if (!params.rxId || params.rxId === "new") return;
+    void (async () => {
+      await createPrintSnapshot(params.rxId);
+      const data = await getOrdonnance(params.rxId);
+      const mappedPatient = data.patient ? mapPatient(data.patient) : null;
+      setPatient(mappedPatient);
+      setRx({
+        prescriptionNumber: data.prescriptionNumber,
+        diagnosis: data.diagnosis,
+        notes: data.notes,
+        doctor: data.doctor,
+        patient: mappedPatient ?? undefined,
+        medications: data.medications.map((med) => ({
+          id: med.id,
+          name: med.medicineName,
+          dose: med.dosage,
+          route: med.route ?? "",
+          frequency: med.frequency,
+          duration: med.duration ?? "",
+          indication: med.indication ?? "",
+          confidence: med.confidence ?? 0,
+          status: med.status ?? "validated",
+        })),
+      });
+    })();
+  }, [params.rxId]);
+
+  const doctorName = useMemo(() => {
+    const name = [rx?.doctor?.firstName, rx?.doctor?.lastName].filter(Boolean).join(" ").trim();
+    return name ? `Dr. ${name}` : "MedCity";
+  }, [rx]);
 
   if (!rx || !patient) {
     return (
@@ -55,12 +95,12 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
               </span>
               <div>
                 <div className="text-lg font-bold">MedCity - Ordonnance numerique</div>
-                <div className="text-xs text-muted-foreground">Digital prescription - {rx.id}</div>
+                <div className="text-xs text-muted-foreground">Digital prescription - {rx.prescriptionNumber}</div>
               </div>
             </div>
             <div className="text-right text-xs text-muted-foreground">
               <div>Date: <span className="text-foreground font-semibold">{today}</span></div>
-              <div className="mt-0.5">Prescriber: <span className="text-foreground font-semibold">{rx.doctor}</span></div>
+              <div className="mt-0.5">Prescriber: <span className="text-foreground font-semibold">{doctorName}</span></div>
             </div>
           </header>
 
@@ -68,12 +108,8 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Patient</div>
               <div className="mt-1 font-semibold">{getPatientFullName(patient)}</div>
-              <div className="text-xs text-muted-foreground">
-                {patient.id} - {getPatientAge(patient)} ans - {getPatientGenderLabel(patient)}
-              </div>
-              {patient.allergies.length > 0 && (
-                <div className="mt-2 text-xs"><span className="font-semibold text-critical">Allergies:</span> {patient.allergies.join(", ")}</div>
-              )}
+              <div className="text-xs text-muted-foreground">{patient.id} - {getPatientAge(patient)} ans - {getPatientGenderLabel(patient)}</div>
+              {patient.allergies.length > 0 && <div className="mt-2 text-xs"><span className="font-semibold text-critical">Allergies:</span> {patient.allergies.join(", ")}</div>}
             </div>
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Diagnosis / indication</div>
@@ -119,7 +155,7 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
         <SendPrescriptionDialog
           open
           onClose={() => setSendOpen(null)}
-          rxId={rx.id}
+          rxId={params.rxId}
           patientId={patient.id}
           patientName={getPatientFullName(patient)}
           defaultTarget={sendOpen}
@@ -137,4 +173,3 @@ function Cell({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-

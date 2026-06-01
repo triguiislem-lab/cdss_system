@@ -22,7 +22,7 @@ import {
 import { PharmacyService } from './pharmacy.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.Admin)
+@Roles(UserRole.Admin, UserRole.Doctor)
 @Controller('pharmacy/dispatches')
 export class PharmacyController {
   constructor(private readonly pharmacyService: PharmacyService) {}

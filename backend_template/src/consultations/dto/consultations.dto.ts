@@ -4,6 +4,7 @@ import {
   IsEnum,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -55,6 +56,22 @@ export class UpdateConsultationDto extends PartialType(CreateConsultationDto) {
   @IsOptional()
   @IsInt()
   recordingDurationSec?: number;
+
+  @IsOptional()
+  @IsString()
+  audioBucketPath?: string;
+
+  @IsOptional()
+  @IsString()
+  audioProcessingStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  transcript?: string;
+
+  @IsOptional()
+  @IsObject()
+  audioProcessingResult?: Record<string, unknown>;
 }
 
 export class CreateVitalsDto {

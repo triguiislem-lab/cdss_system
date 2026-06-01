@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import {
   Search, ArrowRight, Brain, Bone, Wind, Syringe, Heart,
-  Star, MessageSquare, Calendar, FileText, CheckCircle2, Users, BookOpen,
+  Star, MessageSquare, Calendar, FileText, Users,
   Network, LayoutDashboard, Lightbulb, TrendingUp, Shield, Stethoscope,
   Pill, MapPin, Lock, X, ChevronRight, AlertTriangle, Zap,
   Eye, Activity, Baby, BookMarked, Globe, CheckCircle, type LucideIcon,
@@ -14,6 +14,7 @@ import { Badge } from "@/components/atoms/badge";
 import { useCms } from "@/contexts/CmsContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { tunisianMedicines, type TunisianMedicine } from "@/lib/tunisia-medicines";
+import { LoadingState } from "@/components/molecules/LoadingState";
 
 type SearchMode = "medecins" | "medicaments";
 
@@ -52,21 +53,6 @@ type SpecialtyItem = {
   color: string;
   bg: string;
   query: string;
-};
-
-type PricingPlan = {
-  nameKey: string;
-  priceKey: string;
-  periodKey?: string;
-  descriptionKey: string;
-  highlight: boolean;
-  badgeKey?: string;
-  iconBg: string;
-  iconColor: string;
-  icon: LucideIcon;
-  features: Array<{ labelKey: string; included: boolean }>;
-  ctaKey: string;
-  ctaStyle: string;
 };
 
 const HOME_DOCTORS: HomeDoctor[] = [
@@ -372,73 +358,6 @@ const PARTNERS = [
   },
 ];
 
-const PRICING_PLANS: PricingPlan[] = [
-  {
-    nameKey: "home.pricing.web.name",
-    priceKey: "home.pricing.web.price",
-    descriptionKey: "home.pricing.web.description",
-    highlight: false,
-    iconBg: "bg-slate-100",
-    iconColor: "text-slate-600",
-    icon: BookOpen,
-    features: [
-      { labelKey: "home.pricing.feature.pubmed", included: true },
-      { labelKey: "home.pricing.feature.doctorPreview", included: true },
-      { labelKey: "home.pricing.feature.basicMedicines", included: true },
-      { labelKey: "home.pricing.feature.fiveSearches", included: true },
-      { labelKey: "home.pricing.feature.export", included: false },
-      { labelKey: "home.pricing.feature.dosageInteractions", included: false },
-      { labelKey: "home.pricing.feature.apiAccess", included: false },
-    ],
-    ctaKey: "home.pricing.web.cta",
-    ctaStyle: "border-2 border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50",
-  },
-  {
-    nameKey: "home.pricing.pro.name",
-    priceKey: "home.pricing.pro.price",
-    periodKey: "home.pricing.period.month",
-    descriptionKey: "home.pricing.pro.description",
-    highlight: true,
-    badgeKey: "home.pricing.pro.badge",
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
-    icon: FileText,
-    features: [
-      { labelKey: "home.pricing.feature.allWeb", included: true },
-      { labelKey: "home.pricing.feature.unlimitedSearch", included: true },
-      { labelKey: "home.pricing.feature.fullDosageInteractions", included: true },
-      { labelKey: "home.pricing.feature.fullDoctorProfiles", included: true },
-      { labelKey: "home.pricing.feature.unlimitedExport", included: true },
-      { labelKey: "home.pricing.feature.historyFavorites", included: true },
-      { labelKey: "home.pricing.feature.apiAccess", included: false },
-    ],
-    ctaKey: "home.pricing.pro.cta",
-    ctaStyle: "bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-200",
-  },
-  {
-    nameKey: "home.pricing.api.name",
-    priceKey: "home.pricing.api.price",
-    periodKey: "home.pricing.period.month",
-    descriptionKey: "home.pricing.api.description",
-    highlight: false,
-    badgeKey: "home.pricing.api.badge",
-    iconBg: "bg-violet-100",
-    iconColor: "text-violet-600",
-    icon: Zap,
-    features: [
-      { labelKey: "home.pricing.feature.allPro", included: true },
-      { labelKey: "home.pricing.feature.personalApiKey", included: true },
-      { labelKey: "home.pricing.feature.apiRequests", included: true },
-      { labelKey: "home.pricing.feature.endpoints", included: true },
-      { labelKey: "home.pricing.feature.webhooks", included: true },
-      { labelKey: "home.pricing.feature.techDocs", included: true },
-      { labelKey: "home.pricing.feature.prioritySupport", included: true },
-    ],
-    ctaKey: "home.pricing.api.cta",
-    ctaStyle: "border-2 border-violet-200 text-violet-700 hover:border-violet-300 hover:bg-violet-50",
-  },
-];
-
 const SEARCH_PLACEHOLDERS: Record<SearchMode, string> = {
   medecins: "Nom du médecin, spécialité, ville...",
   medicaments: "Nom du médicament, DCI, classe thérapeutique...",
@@ -473,7 +392,7 @@ const HOME_ICON_MAP: Record<string, LucideIcon> = {
 
 export default function Home() {
   const { t } = useI18n();
-  const { specialties, testimonials, partners, whyFeatures } = useCms();
+  const { specialties, testimonials, partners, whyFeatures, loading: cmsLoading } = useCms();
   const [, setLocation] = useLocation();
   const [searchMode, setSearchMode] = useState<SearchMode>("medecins");
   const [searchQuery, setSearchQuery] = useState("");
@@ -761,6 +680,17 @@ export default function Home() {
         </div>
       </section>
 
+      {cmsLoading && !cmsWhyFeatures.length && (
+        <section className="bg-slate-50 px-4 py-8">
+          <div className="container mx-auto max-w-3xl">
+            <LoadingState
+              title="Chargement du contenu public"
+              subtitle="Synchronisation des sections CMS depuis NestJS..."
+            />
+          </div>
+        </section>
+      )}
+
       <section className="py-24 bg-white overflow-hidden">
         <div className="container mx-auto px-6 max-w-7xl">
           <div className="flex flex-col lg:flex-row items-center gap-16 xl:gap-24">
@@ -868,73 +798,6 @@ export default function Home() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="py-24 bg-white overflow-hidden">
-        <div className="container mx-auto px-6 max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-slate-900 mb-5">
-              {t("home.pricing.titlePrefix")}{" "}
-              <span className="text-transparent bg-clip-text" style={{ backgroundImage: "linear-gradient(135deg, #1565c0, #1e90ff)" }}>
-                {t("home.pricing.titleHighlight")}
-              </span>
-            </h2>
-            <p className="text-slate-500 text-lg max-w-2xl mx-auto leading-relaxed">
-              {t("home.pricing.subtitle")}
-            </p>
-            <div className="mt-6 mx-auto w-16 h-1 rounded-full" style={{ background: "linear-gradient(90deg, #1565c0, #1e90ff)" }} />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-            {PRICING_PLANS.map((plan) => (
-              <div
-                key={plan.nameKey}
-                className={`relative flex flex-col rounded-3xl border transition-all duration-300 hover:-translate-y-1 ${
-                  plan.highlight
-                    ? "border-blue-200 shadow-2xl shadow-blue-100 bg-white"
-                    : "border-slate-100 shadow-sm bg-white hover:shadow-md"
-                }`}
-              >
-                {plan.badgeKey && (
-                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                    <span className={`text-xs font-bold px-4 py-1.5 rounded-full text-white shadow-md ${plan.highlight ? "bg-gradient-to-r from-blue-600 to-blue-500" : "bg-violet-600"}`}>
-                      {t(plan.badgeKey)}
-                    </span>
-                  </div>
-                )}
-
-                <div className="p-8 pb-6 flex-1">
-                  <div className={`w-12 h-12 rounded-2xl ${plan.iconBg} flex items-center justify-center mb-5`}>
-                    <plan.icon className={`h-6 w-6 ${plan.iconColor}`} />
-                  </div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">{t(plan.nameKey)}</p>
-                  <div className="flex items-end gap-1 mb-3">
-                    <span className="text-4xl font-extrabold text-slate-900">{t(plan.priceKey)}</span>
-                    {plan.periodKey && <span className="text-slate-400 text-sm mb-1">{t(plan.periodKey)}</span>}
-                  </div>
-                  <p className="text-slate-500 text-sm leading-relaxed mb-6">{t(plan.descriptionKey)}</p>
-
-                  <ul className="space-y-3">
-                    {plan.features.map((feature) => (
-                      <li key={feature.labelKey} className={`flex items-start gap-3 text-sm ${feature.included ? "text-slate-700" : "text-slate-300"}`}>
-                        <span className={`shrink-0 w-5 h-5 rounded-full flex items-center justify-center mt-0.5 text-xs font-bold ${feature.included ? "bg-green-100 text-green-600" : "bg-slate-100 text-slate-300"}`}>
-                          {feature.included ? "✓" : "×"}
-                        </span>
-                        {t(feature.labelKey)}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="px-8 pb-8">
-                  <button className={`w-full h-12 rounded-xl font-semibold text-sm transition-all duration-200 ${plan.ctaStyle}`}>
-                    {t(plan.ctaKey)}
-                  </button>
-                </div>
-              </div>
             ))}
           </div>
         </div>

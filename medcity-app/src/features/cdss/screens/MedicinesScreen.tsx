@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, Pill, Building2, FileText, AlertTriangle, Baby, Activity, ChevronRight, X } from "lucide-react";
-import { tunisianMedicines, drugClasses, type TunisianMedicine, type DrugClass } from "@/lib/tunisia-medicines";
+import type { TunisianMedicine, DrugClass } from "@/lib/tunisia-medicines";
 import { useI18n } from "@/i18n/I18nProvider";
+import { listMedicineClasses, listMedicines } from "@/lib/backend-api";
 
 const pregMeta: Record<TunisianMedicine["pregnancy"], string> = {
   Autorisé: "bg-success-soft text-success border-success/30",
@@ -14,10 +15,23 @@ function MedicinesPage() {
   const [q, setQ] = useState("");
   const [klass, setKlass] = useState<DrugClass | "all">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [medicines, setMedicines] = useState<TunisianMedicine[]>([]);
+  const [drugClasses, setDrugClasses] = useState<string[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      const [apiMedicines, apiClasses] = await Promise.all([
+        listMedicines(),
+        listMedicineClasses(),
+      ]);
+      setMedicines(apiMedicines);
+      setDrugClasses(apiClasses);
+    })();
+  }, []);
 
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return tunisianMedicines.filter((m) => {
+    return medicines.filter((m) => {
       if (klass !== "all" && m.drugClass !== klass) return false;
       if (!s) return true;
       return (
@@ -27,15 +41,15 @@ function MedicinesPage() {
         m.indication.toLowerCase().includes(s)
       );
     });
-  }, [q, klass]);
+  }, [q, klass, medicines]);
 
-  const selected = tunisianMedicines.find((m) => m.id === selectedId) ?? null;
+  const selected = medicines.find((m) => m.id === selectedId) ?? null;
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">{t("medicines.title")}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t("medicines.subtitle", { count: tunisianMedicines.length })}</p>
+        <p className="text-sm text-muted-foreground mt-1">{t("medicines.subtitle", { count: medicines.length })}</p>
       </div>
 
       <div className="rounded-xl border border-border bg-card shadow-card">
@@ -78,8 +92,15 @@ function MedicinesPage() {
       </div>
 
       {selected && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-sm p-0 sm:p-4" role="dialog" aria-modal="true" onClick={() => setSelectedId(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full sm:max-w-2xl rounded-t-xl sm:rounded-xl border border-border bg-card shadow-elevated max-h-[92vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-foreground/40 backdrop-blur-sm p-0 sm:p-4"
+          role="dialog"
+          aria-modal="true"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedId(null);
+          }}
+        >
+          <div className="w-full sm:max-w-2xl rounded-t-xl sm:rounded-xl border border-border bg-card shadow-elevated max-h-[92vh] overflow-y-auto">
             <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-4 border-b border-border bg-card">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">

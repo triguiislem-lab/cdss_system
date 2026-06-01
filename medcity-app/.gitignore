@@ -1,5 +1,7 @@
 node_modules/
 dist/
+playwright-report/
+test-results/
 backend_template/node_modules/
 backend_template/dist/
 backend_template/data/

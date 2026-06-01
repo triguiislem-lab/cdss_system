@@ -1,13 +1,27 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { ArrowRight, Filter } from "lucide-react";
-import { getPatientAge, getPatientFullName, patients, prescriptions } from "@/lib/mock-data";
+import { getPatientAge, getPatientFullName, type Patient, type PrescriptionCase } from "@/lib/mock-data";
 import { riskMeta, statusMeta } from "@/lib/clinical-ui";
 import { useI18n } from "@/i18n/I18nProvider";
+import { listPatients, listPrescriptions } from "@/lib/backend-api";
 
 export default function PrescriptionReview({ basePath = "/admin/cdss" }: { basePath?: string }) {
   const { t } = useI18n();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [prescriptions, setPrescriptions] = useState<PrescriptionCase[]>([]);
   const [showHighRiskOnly, setShowHighRiskOnly] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const [apiPatients, apiPrescriptions] = await Promise.all([
+        listPatients(),
+        listPrescriptions(),
+      ]);
+      setPatients(apiPatients);
+      setPrescriptions(apiPrescriptions);
+    })();
+  }, []);
   const visiblePrescriptions = useMemo(
     () => prescriptions.filter((entry) => (showHighRiskOnly ? entry.risk === "high" : true)),
     [showHighRiskOnly],
@@ -36,7 +50,7 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
 
       <div className="grid gap-4 lg:grid-cols-2">
         {visiblePrescriptions.map((entry) => {
-          const patient = patients.find((item) => item.id === entry.patientId)!;
+          const patient = patients.find((item) => item.id === entry.patientId);
           const status = statusMeta[entry.status];
           const risk = riskMeta[entry.risk];
           return (
@@ -45,7 +59,7 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
                 <div>
                   <div className="text-xs text-muted-foreground font-mono">{entry.id} · {entry.lastUpdate}</div>
                   <div className="font-semibold mt-0.5">
-                    {getPatientFullName(patient)} <span className="text-muted-foreground font-normal">({getPatientAge(patient)} {t("patients.ageUnit")})</span>
+                    {patient ? getPatientFullName(patient) : entry.patientId} {patient && <span className="text-muted-foreground font-normal">({getPatientAge(patient)} {t("patients.ageUnit")})</span>}
                   </div>
                   <div className="text-sm text-muted-foreground mt-1">{entry.diagnosis}</div>
                 </div>
