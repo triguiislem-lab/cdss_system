@@ -4,7 +4,7 @@ import {
   Search, ArrowRight, Brain, Bone, Wind, Syringe, Heart,
   Star, MessageSquare, Calendar, FileText, Users,
   Network, LayoutDashboard, Lightbulb, TrendingUp, Shield, Stethoscope,
-  Pill, MapPin, Lock, X, ChevronRight, AlertTriangle, Zap,
+  Pill, MapPin, X, ChevronRight, AlertTriangle, Zap,
   Eye, Activity, Baby, BookMarked, Globe, CheckCircle, type LucideIcon,
 } from "lucide-react";
 import { Input } from "@/components/atoms/input";
@@ -13,29 +13,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/car
 import { Badge } from "@/components/atoms/badge";
 import { useCms } from "@/contexts/CmsContext";
 import { useI18n } from "@/i18n/I18nProvider";
-import { tunisianMedicines, type TunisianMedicine } from "@/lib/tunisia-medicines";
+import { listPublicDoctors, listPublicMedicines, type ApiPublicDoctor } from "@/lib/backend-api";
+import type { TunisianMedicine } from "@/lib/tunisia-medicines";
 import { LoadingState } from "@/components/molecules/LoadingState";
 
 type SearchMode = "medecins" | "medicaments";
-
-type HomeDoctor = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  specialty: string;
-  city: string;
-  available: boolean;
-  rating: number;
-  reviews: number;
-  experience: number;
-  address: string;
-  phone: string;
-  languages: string[];
-  bio: string;
-  fee: string;
-  nextSlot: string;
-  acts: string[];
-};
 
 type FeatureItem = {
   id: string;
@@ -54,189 +36,6 @@ type SpecialtyItem = {
   bg: string;
   query: string;
 };
-
-const HOME_DOCTORS: HomeDoctor[] = [
-  {
-    id: "d1",
-    firstName: "Ahmed",
-    lastName: "Ben Ali",
-    specialty: "Médecine Générale",
-    city: "Tunis",
-    available: true,
-    rating: 4.9,
-    reviews: 187,
-    experience: 12,
-    address: "12 Rue de la Liberté, Tunis 1001",
-    phone: "+216 71 123 456",
-    languages: ["Arabe", "Français", "Anglais"],
-    bio: "Médecin généraliste expérimenté, spécialisé dans la prise en charge des maladies chroniques, le suivi des patients diabétiques et hypertendus.",
-    fee: "30 DT",
-    nextSlot: "Aujourd'hui 14h30",
-    acts: ["Consultation générale", "Suivi maladies chroniques", "Téléconsultation", "Certificats médicaux"],
-  },
-  {
-    id: "d2",
-    firstName: "Samar",
-    lastName: "Ben Ali",
-    specialty: "Chirurgie Plastique",
-    city: "Tunis",
-    available: false,
-    rating: 4.8,
-    reviews: 94,
-    experience: 15,
-    address: "5 Avenue Bourguiba, Tunis 1000",
-    phone: "+216 71 234 567",
-    languages: ["Arabe", "Français"],
-    bio: "Chirurgienne plasticienne et reconstructrice avec 15 ans d'expérience, formée en France. Spécialisée en rhinoplastie, lifting et chirurgie reconstructrice.",
-    fee: "80 DT",
-    nextSlot: "Lundi 09h00",
-    acts: ["Rhinoplastie", "Lifting facial", "Chirurgie des paupières", "Cicatrices"],
-  },
-  {
-    id: "d3",
-    firstName: "Khaled",
-    lastName: "Mansour",
-    specialty: "Médecine Générale",
-    city: "Sfax",
-    available: true,
-    rating: 4.7,
-    reviews: 213,
-    experience: 9,
-    address: "18 Rue Habib Thameur, Sfax 3000",
-    phone: "+216 74 345 678",
-    languages: ["Arabe", "Français"],
-    bio: "Médecin généraliste à Sfax avec une approche centrée sur le patient. Prise en charge globale, préventive et curative.",
-    fee: "25 DT",
-    nextSlot: "Aujourd'hui 16h00",
-    acts: ["Consultation générale", "Vaccination", "Bilan de santé", "Urgences légères"],
-  },
-  {
-    id: "d4",
-    firstName: "Fatima",
-    lastName: "Zahra",
-    specialty: "Neurologie",
-    city: "Tunis",
-    available: true,
-    rating: 4.9,
-    reviews: 156,
-    experience: 18,
-    address: "3 Rue Ibn Khaldoun, Tunis 1002",
-    phone: "+216 71 456 789",
-    languages: ["Arabe", "Français", "Anglais"],
-    bio: "Neurologue référente, spécialisée dans les céphalées, la migraine, la SEP et les maladies neurodégénératives.",
-    fee: "60 DT",
-    nextSlot: "Demain 10h00",
-    acts: ["Consultation neurologique", "EEG", "EMG", "Suivi SEP", "Céphalées"],
-  },
-  {
-    id: "d5",
-    firstName: "Rania",
-    lastName: "Zouari",
-    specialty: "Cardiologie",
-    city: "Sousse",
-    available: false,
-    rating: 4.8,
-    reviews: 121,
-    experience: 14,
-    address: "22 Boulevard de la Corniche, Sousse 4000",
-    phone: "+216 73 567 890",
-    languages: ["Arabe", "Français"],
-    bio: "Cardiologue interventionnelle spécialisée en échocardiographie et cardiologie du sport.",
-    fee: "70 DT",
-    nextSlot: "Mercredi 11h00",
-    acts: ["Consultation cardiologique", "ECG", "Échocardiographie", "Test d'effort"],
-  },
-  {
-    id: "d6",
-    firstName: "Mohamed",
-    lastName: "Bouazizi",
-    specialty: "Dermatologie",
-    city: "Monastir",
-    available: true,
-    rating: 4.6,
-    reviews: 88,
-    experience: 8,
-    address: "7 Rue de la République, Monastir 5000",
-    phone: "+216 73 678 901",
-    languages: ["Arabe", "Français"],
-    bio: "Dermatologue et vénéréologue, spécialisé en dermatologie esthétique, acné et pathologies cutanées chroniques.",
-    fee: "45 DT",
-    nextSlot: "Aujourd'hui 15h00",
-    acts: ["Consultation dermatologique", "Traitement acné", "Dermoscopie", "Injections esthétiques"],
-  },
-  {
-    id: "d7",
-    firstName: "Leila",
-    lastName: "Hamdi",
-    specialty: "Pédiatrie",
-    city: "Ariana",
-    available: true,
-    rating: 4.9,
-    reviews: 302,
-    experience: 20,
-    address: "9 Cité El Menzah, Ariana 2080",
-    phone: "+216 71 789 012",
-    languages: ["Arabe", "Français", "Anglais"],
-    bio: "Pédiatre avec 20 ans d'expérience, spécialisée dans le développement de l'enfant, les vaccinations et les maladies pédiatriques.",
-    fee: "40 DT",
-    nextSlot: "Aujourd'hui 17h00",
-    acts: ["Consultation pédiatrique", "Suivi croissance", "Vaccination", "Néonatologie"],
-  },
-  {
-    id: "d8",
-    firstName: "Yassine",
-    lastName: "Koubaa",
-    specialty: "Orthopédie",
-    city: "Sfax",
-    available: true,
-    rating: 4.7,
-    reviews: 145,
-    experience: 11,
-    address: "14 Avenue Farhat Hached, Sfax 3001",
-    phone: "+216 74 890 123",
-    languages: ["Arabe", "Français"],
-    bio: "Chirurgien orthopédiste spécialisé dans la chirurgie du genou, de la hanche et du rachis.",
-    fee: "55 DT",
-    nextSlot: "Demain 14h00",
-    acts: ["Consultation orthopédique", "Arthroscopie", "Prothèse de genou", "Traumatologie"],
-  },
-  {
-    id: "d9",
-    firstName: "Nour",
-    lastName: "Ben Amor",
-    specialty: "Pneumologie",
-    city: "Tunis",
-    available: false,
-    rating: 4.8,
-    reviews: 73,
-    experience: 7,
-    address: "2 Rue de Carthage, Tunis 1001",
-    phone: "+216 71 901 234",
-    languages: ["Arabe", "Français"],
-    bio: "Pneumologue spécialisée dans la prise en charge de l'asthme, la BPCO et les troubles du sommeil.",
-    fee: "50 DT",
-    nextSlot: "Jeudi 09h30",
-    acts: ["Consultation pneumologique", "Spirométrie", "Bilan sommeil", "Bronchoscopie"],
-  },
-  {
-    id: "d10",
-    firstName: "Tarek",
-    lastName: "Selmi",
-    specialty: "Ophtalmologie",
-    city: "Tunis",
-    available: true,
-    rating: 4.9,
-    reviews: 198,
-    experience: 16,
-    address: "11 Rue Alain Savary, Tunis 1002",
-    phone: "+216 71 012 345",
-    languages: ["Arabe", "Français", "Anglais"],
-    bio: "Ophtalmologue spécialisé en chirurgie réfractive, cataracte et glaucome.",
-    fee: "65 DT",
-    nextSlot: "Aujourd'hui 11h00",
-    acts: ["Consultation ophtalmologique", "Chirurgie LASIK", "Cataracte", "Fond d'oeil"],
-  },
-];
 
 const WHY_FEATURES: FeatureItem[] = [
   {
@@ -398,7 +197,10 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedMedicine, setSelectedMedicine] = useState<TunisianMedicine | null>(null);
-  const [selectedDoctor, setSelectedDoctor] = useState<HomeDoctor | null>(null);
+  const [selectedDoctor, setSelectedDoctor] = useState<ApiPublicDoctor | null>(null);
+  const [doctorResults, setDoctorResults] = useState<ApiPublicDoctor[]>([]);
+  const [medicineResults, setMedicineResults] = useState<TunisianMedicine[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const cmsWhyFeatures = whyFeatures.filter((item) => item.active).map((item) => ({
@@ -414,31 +216,6 @@ export default function Home() {
   const cmsTestimonials = testimonials.filter((item) => item.active);
   const cmsPartners = partners.filter((item) => item.active);
 
-  const doctorResults = HOME_DOCTORS.filter((doctor) => {
-    const q = searchQuery.trim().toLowerCase();
-    if (q.length < 2) return false;
-    return [
-      `${doctor.firstName} ${doctor.lastName}`,
-      doctor.specialty,
-      doctor.city,
-      doctor.address,
-    ].some((value) => value.toLowerCase().includes(q));
-  }).slice(0, 5);
-
-  const medicineResults = tunisianMedicines.filter((medicine) => {
-    const q = searchQuery.trim().toLowerCase();
-    if (q.length < 2) return false;
-    return [
-      medicine.dci,
-      medicine.atcCode,
-      medicine.drugClass,
-      medicine.indication,
-      ...medicine.brands,
-      ...medicine.forms,
-      ...medicine.laboratories,
-    ].some((value) => value.toLowerCase().includes(q));
-  }).slice(0, 5);
-
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -448,6 +225,44 @@ export default function Home() {
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, []);
+
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setDoctorResults([]);
+      setMedicineResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSearchLoading(true);
+    const timeout = window.setTimeout(() => {
+      const request =
+        searchMode === "medecins"
+          ? listPublicDoctors(q).then((rows) => {
+              if (!cancelled) setDoctorResults(rows.slice(0, 5));
+            })
+          : listPublicMedicines(q, 5).then((rows) => {
+              if (!cancelled) setMedicineResults(rows);
+            });
+
+      void request
+        .catch(() => {
+          if (cancelled) return;
+          if (searchMode === "medecins") setDoctorResults([]);
+          else setMedicineResults([]);
+        })
+        .finally(() => {
+          if (!cancelled) setSearchLoading(false);
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+    };
+  }, [searchMode, searchQuery]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -507,6 +322,8 @@ export default function Home() {
                     onClick={() => {
                       setSearchMode(tab.id);
                       setSearchQuery("");
+                      setDoctorResults([]);
+                      setMedicineResults([]);
                       setShowSuggestions(false);
                     }}
                     className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
@@ -555,7 +372,11 @@ export default function Home() {
 
               {searchMode === "medecins" && showSuggestions && searchQuery.length > 1 && (
                 <div className="absolute top-full mt-2 w-full bg-background border rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                  {doctorResults.length > 0 ? (
+                  {searchLoading ? (
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      {t("common.loading")}
+                    </div>
+                  ) : doctorResults.length > 0 ? (
                     <>
                       <div className="px-4 py-2 bg-muted/40 border-b text-xs text-muted-foreground font-semibold uppercase tracking-widest">
                         {t("home.search.doctorsFound", { count: doctorResults.length })}
@@ -575,19 +396,15 @@ export default function Home() {
                           </span>
                           <span className="flex-1 min-w-0">
                             <span className="block font-semibold text-foreground text-sm">Dr. {doctor.firstName} {doctor.lastName}</span>
-                            <span className="block text-xs text-muted-foreground">{doctor.specialty} - {t("doctorsDirectory.experience", { years: doctor.experience })}</span>
+                            <span className="block text-xs text-muted-foreground">{doctor.specialty || "Specialite non renseignee"}</span>
                             <span className="mt-1 flex flex-wrap items-center gap-3 text-xs">
-                              <span className="flex items-center gap-1 text-amber-500 font-medium">
-                                <Star className="h-3 w-3 fill-amber-400" /> {doctor.rating}
-                                <span className="text-muted-foreground font-normal">{t("doctorsDirectory.reviews", { count: doctor.reviews })}</span>
-                              </span>
                               <span className="flex items-center gap-1 text-muted-foreground">
-                                <MapPin className="h-3 w-3" /> {doctor.city}
+                                <MapPin className="h-3 w-3" /> {doctor.city || "Ville non renseignee"}
                               </span>
+                              {doctor.address && (
+                                <span className="truncate text-muted-foreground">{doctor.address}</span>
+                              )}
                             </span>
-                          </span>
-                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${doctor.available ? "bg-green-50 text-green-600" : "bg-slate-100 text-slate-400"}`}>
-                            {doctor.available ? t("home.search.available") : t("home.search.unavailable")}
                           </span>
                         </button>
                       ))}
@@ -607,7 +424,11 @@ export default function Home() {
 
               {searchMode === "medicaments" && showSuggestions && searchQuery.length > 1 && (
                 <div className="absolute top-full mt-2 w-full bg-background border rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-                  {medicineResults.length > 0 ? (
+                  {searchLoading ? (
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      {t("common.loading")}
+                    </div>
+                  ) : medicineResults.length > 0 ? (
                     <>
                       <div className="px-4 py-2 bg-muted/40 border-b text-xs text-muted-foreground font-semibold uppercase tracking-widest">
                         {t("home.search.medicinesFound", { count: medicineResults.length })}
@@ -626,12 +447,12 @@ export default function Home() {
                             <Pill className="h-5 w-5 text-white" />
                           </span>
                           <span className="flex-1 min-w-0">
-                            <span className="block font-semibold text-foreground text-sm">{medicine.dci}</span>
-                            <span className="block text-xs text-muted-foreground">{medicine.brands.join(", ")}</span>
+                            <span className="block font-semibold text-foreground text-sm">{medicineTitle(medicine)}</span>
+                            <span className="block text-xs text-muted-foreground">{formatInline([medicine.dci, medicine.dosage, medicine.form, medicine.presentation])}</span>
                             <span className="mt-1 flex flex-wrap gap-2 text-xs">
                               <span className="rounded-full bg-cyan-50 text-cyan-700 px-2 py-0.5">{medicine.drugClass}</span>
-                              <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5">{medicine.atcCode}</span>
-                              <span className="rounded-full bg-green-50 text-green-700 px-2 py-0.5">CNAM {medicine.reimbursement}</span>
+                              {medicine.amm && <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5">AMM {medicine.amm}</span>}
+                              <span className="rounded-full bg-green-50 text-green-700 px-2 py-0.5">{priceRangeLabel(medicine) || medicine.reimbursementCategory || medicine.reimbursement}</span>
                             </span>
                           </span>
                           <ArrowRight className="h-4 w-4 text-muted-foreground" />
@@ -852,69 +673,41 @@ export default function Home() {
                   {selectedDoctor.firstName[0]}{selectedDoctor.lastName[0]}
                 </div>
                 <div>
-                  <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">{selectedDoctor.specialty}</p>
+                  <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">{selectedDoctor.specialty || "Specialite non renseignee"}</p>
                   <h2 className="text-2xl font-extrabold text-white">Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}</h2>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="flex items-center gap-1 text-amber-300 text-sm font-semibold">
-                      <Star className="h-4 w-4 fill-amber-300" /> {selectedDoctor.rating}
-                      <span className="text-white/50 font-normal">{t("doctorsDirectory.reviews", { count: selectedDoctor.reviews })}</span>
-                    </span>
-                    <span className="text-white/40">-</span>
-                    <span className="text-white/70 text-sm">{t("doctorsDirectory.experience", { years: selectedDoctor.experience })}</span>
-                  </div>
+                  <p className="mt-2 text-sm text-white/70">{formatInline([selectedDoctor.city, selectedDoctor.address])}</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-4">
-                <span className={`text-xs font-bold px-3 py-1 rounded-full ${selectedDoctor.available ? "bg-green-400/20 text-green-300 border border-green-400/30" : "bg-white/10 text-white/50 border border-white/20"}`}>
-                  {selectedDoctor.available ? `● ${t("home.search.available")}` : `● ${t("home.search.unavailable")}`}
+                <span className="text-xs font-bold px-3 py-1 rounded-full bg-green-400/20 text-green-300 border border-green-400/30">
+                  Profil actif
                 </span>
-                {selectedDoctor.available && (
-                  <span className="text-xs text-white/60 bg-white/10 px-3 py-1 rounded-full border border-white/20">
-                    {t("home.doctorModal.nextSlot", { slot: selectedDoctor.nextSlot })}
-                  </span>
-                )}
               </div>
             </div>
 
             <div className="px-7 py-6 space-y-6">
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{t("home.doctorModal.presentation")}</p>
-                <p className="text-sm text-slate-600 leading-relaxed">{selectedDoctor.bio}</p>
+                <p className="text-sm text-slate-600 leading-relaxed">
+                  Profil professionnel issu de la base MedCity Connect.
+                </p>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   { icon: MapPin, label: t("home.doctorModal.address"), value: selectedDoctor.address },
-                  { icon: FileText, label: t("home.doctorModal.fees"), value: t("home.doctorModal.feeValue", { fee: selectedDoctor.fee }) },
-                  { icon: MessageSquare, label: t("home.doctorModal.languages"), value: selectedDoctor.languages.join(", ") },
-                  { icon: Users, label: t("home.doctorModal.patientReviews"), value: t("home.doctorModal.reviewValue", { count: selectedDoctor.reviews, rating: selectedDoctor.rating }) },
+                  { icon: MapPin, label: "Ville", value: selectedDoctor.city },
+                  { icon: FileText, label: "Specialite", value: selectedDoctor.specialty },
+                  { icon: FileText, label: "Telephone", value: selectedDoctor.phone },
                 ].map(({ icon: Icon, label, value }) => (
                   <div key={label} className="bg-slate-50 rounded-2xl p-4">
                     <div className="flex items-center gap-2 mb-1.5">
                       <Icon className="h-4 w-4 text-primary" />
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{label}</p>
                     </div>
-                    <p className="text-sm text-slate-700 font-medium">{value}</p>
+                    <p className="text-sm text-slate-700 font-medium">{value || "Non renseigne"}</p>
                   </div>
                 ))}
-              </div>
-
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">{t("home.doctorModal.acts")}</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedDoctor.acts.map((act) => (
-                    <span key={act} className="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl text-xs font-medium">{act}</span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <Button className="flex-1 h-12 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold shadow-lg text-sm">
-                  <Calendar className="h-4 w-4 mr-2" /> {t("home.doctorModal.book")}
-                </Button>
-                <Button variant="outline" className="h-12 px-5 rounded-xl border-slate-200 text-slate-600 text-sm font-semibold">
-                  <FileText className="h-4 w-4 mr-2" /> {t("home.doctorModal.contact")}
-                </Button>
               </div>
             </div>
           </div>
@@ -938,11 +731,27 @@ export default function Home() {
                     <Pill className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-extrabold text-slate-900">{selectedMedicine.dci}</h2>
-                    <p className="text-xs text-slate-400">{selectedMedicine.brands.join(", ")}</p>
+                    <h2 className="text-xl font-extrabold text-slate-900">{medicineTitle(selectedMedicine)}</h2>
+                    <p className="text-xs text-slate-400">
+                      {formatInline([
+                        selectedMedicine.dci,
+                        selectedMedicine.amm ? `AMM ${selectedMedicine.amm}` : undefined,
+                      ]) || "Donnees TN Med"}
+                    </p>
                   </div>
                 </div>
-                <Badge className="mt-1 bg-blue-50 text-blue-700 border-blue-100 text-xs">{selectedMedicine.drugClass}</Badge>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {selectedMedicine.drugClass && (
+                    <Badge className="bg-blue-50 text-blue-700 border-blue-100 text-xs">
+                      {selectedMedicine.drugClass}
+                    </Badge>
+                  )}
+                  {selectedMedicine.therapeuticSubclass && (
+                    <Badge className="bg-cyan-50 text-cyan-700 border-cyan-100 text-xs">
+                      {selectedMedicine.therapeuticSubclass}
+                    </Badge>
+                  )}
+                </div>
               </div>
               <button onClick={() => setSelectedMedicine(null)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors" aria-label={t("common.close")}>
                 <X className="h-4 w-4 text-slate-500" />
@@ -950,83 +759,86 @@ export default function Home() {
             </div>
 
             <div className="px-7 py-6 space-y-6">
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">{t("home.medicineModal.forms")}</p>
-                <div className="flex flex-wrap gap-2">
-                  {selectedMedicine.forms.map((form) => (
-                    <span key={form} className="px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium">{form}</span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { label: "AMM", value: selectedMedicine.amm },
+                  { label: "Statut", value: selectedMedicine.genericStatus },
+                  { label: "VEIC", value: selectedMedicine.veicStatus },
+                  { label: "Prix public", value: priceRangeLabel(selectedMedicine) },
+                  {
+                    label: "Remboursement",
+                    value: formatInline([
+                      selectedMedicine.reimbursementCategory,
+                      percentLabel(selectedMedicine.reimbursementRatePercent) || selectedMedicine.reimbursement,
+                    ]),
+                  },
+                  { label: "Tarif ref.", value: moneyLabel(selectedMedicine.referenceTariffTnd) },
+                ].map(({ label, value }) => (
+                  <div key={label} className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{label}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800">{value || "Non renseigne"}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-2xl border border-slate-100 bg-white p-5">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Presentation</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                  {[
+                    { label: "Dosage", value: selectedMedicine.dosage },
+                    { label: "Forme", value: selectedMedicine.form },
+                    { label: "Conditionnement", value: selectedMedicine.presentation },
+                    { label: "Laboratoire", value: labsLabel(selectedMedicine) },
+                    { label: "Emballage", value: selectedMedicine.primaryPackaging },
+                    { label: "Conservation", value: conservationLabel(selectedMedicine) },
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-xs font-semibold text-slate-400">{label}</p>
+                      <p className="font-medium text-slate-700">{value || "Non renseigne"}</p>
+                    </div>
                   ))}
                 </div>
               </div>
 
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">{t("home.medicineModal.indication")}</p>
-                <p className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800">{selectedMedicine.indication}</p>
+                <p className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800">
+                  {selectedMedicine.indication || "Non renseigne"}
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">ATC</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">{selectedMedicine.atcCode}</p>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">CNAM</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">{selectedMedicine.reimbursement}</p>
-                </div>
-                <div className="rounded-2xl bg-slate-50 p-4">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{t("home.medicineModal.approxPrice")}</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-800">{selectedMedicine.priceTndApprox} TND</p>
-                </div>
-              </div>
-
-              <div className="relative rounded-2xl overflow-hidden border border-amber-200">
-                <div className="blur-sm select-none pointer-events-none p-6 space-y-4 bg-slate-50">
-                  <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="contents">
+                  <div className="rounded-2xl bg-slate-50 p-4">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{t("home.medicineModal.adultDosage")}</p>
-                    <p className="text-sm text-slate-700">{selectedMedicine.posologyAdult}</p>
+                    <p className="text-sm text-slate-700">{selectedMedicine.posologyAdult || "Non renseigne"}</p>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{t("home.medicineModal.contraindications")}</p>
+                  <div className="rounded-2xl bg-red-50 p-4">
+                    <p className="text-xs font-bold text-red-400 uppercase tracking-widest mb-2">{t("home.medicineModal.contraindications")}</p>
                     {selectedMedicine.contraindications.map((contraindication) => (
                       <p key={contraindication} className="text-sm text-red-700">• {contraindication}</p>
                     ))}
+                    {selectedMedicine.contraindications.length === 0 && (
+                      <p className="text-sm text-red-700">Non renseigne</p>
+                    )}
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{t("home.medicineModal.monitoring")}</p>
-                    <p className="text-sm text-slate-700">{t("home.medicineModal.monitoringText")}</p>
-                  </div>
-                </div>
-
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-white/10 via-white/80 to-white/95 p-6 text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center mb-4">
-                    <Lock className="h-6 w-6 text-amber-500" />
-                  </div>
-                  <h3 className="text-lg font-extrabold text-slate-900 mb-1">{t("home.medicineModal.lockedTitle")}</h3>
-                  <p className="text-sm text-slate-500 max-w-xs mb-5">
-                    {t("home.medicineModal.lockedText")}
-                  </p>
-                  <div className="flex flex-wrap gap-3 justify-center mb-5">
-                    {[
-                      { icon: Zap, label: t("home.medicineModal.fullDosage") },
-                      { icon: AlertTriangle, label: t("home.medicineModal.contraindications") },
-                      { icon: Shield, label: t("home.medicineModal.interactions") },
-                    ].map(({ icon: Icon, label }) => (
-                      <span key={label} className="flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">
-                        <Icon className="h-3 w-3 text-amber-500" /> {label}
-                      </span>
-                    ))}
-                  </div>
-                  <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold px-8 py-3 rounded-xl shadow-lg text-sm h-auto">
-                    {t("home.medicineModal.accessPro")}
-                  </Button>
-                  <p className="text-xs text-slate-400 mt-3">{t("home.medicineModal.proPrice")}</p>
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
                 {selectedMedicine.renalAdjust && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-semibold"><Shield className="h-3 w-3" /> {t("home.medicineModal.renalAdjust")}</span>}
                 {selectedMedicine.hepaticAdjust && <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 text-orange-700 px-3 py-1 text-xs font-semibold"><AlertTriangle className="h-3 w-3" /> {t("home.medicineModal.hepaticAdjust")}</span>}
-                <span className="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground px-3 py-1 text-xs font-semibold">{selectedMedicine.pregnancy}</span>
+                {selectedMedicine.pregnancy && <span className="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground px-3 py-1 text-xs font-semibold">{selectedMedicine.pregnancy}</span>}
+                {selectedMedicine.sourceSystems?.map((source) => (
+                  <span key={source} className="inline-flex items-center gap-1 rounded-full bg-cyan-50 text-cyan-700 px-3 py-1 text-xs font-semibold">
+                    {source}
+                  </span>
+                ))}
+                {selectedMedicine.sourceReference && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-semibold">
+                    Ref. {selectedMedicine.sourceReference}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1034,4 +846,41 @@ export default function Home() {
       )}
     </div>
   );
+}
+
+function medicineTitle(medicine: TunisianMedicine) {
+  return medicine.localProductName || medicine.brands[0] || medicine.dci;
+}
+
+function formatInline(values: Array<string | undefined>) {
+  return values.filter((value): value is string => Boolean(value?.trim())).join(" - ");
+}
+
+function labsLabel(medicine: TunisianMedicine) {
+  return medicine.laboratories.filter((lab) => lab.trim().length > 0).join(" - ");
+}
+
+function priceRangeLabel(medicine: TunisianMedicine) {
+  const min = medicine.publicPriceMinTnd;
+  const max = medicine.publicPriceMaxTnd;
+  if (min !== undefined && max !== undefined) {
+    if (min === max) return moneyLabel(min);
+    return `${moneyLabel(min)} - ${moneyLabel(max)}`;
+  }
+  return moneyLabel(min ?? max ?? medicine.priceTndApprox);
+}
+
+function moneyLabel(value?: number) {
+  if (value === undefined || value <= 0) return "";
+  return `${value.toFixed(3)} TND`;
+}
+
+function percentLabel(value?: number) {
+  if (value === undefined) return "";
+  return `${value.toFixed(value % 1 === 0 ? 0 : 2)}%`;
+}
+
+function conservationLabel(medicine: TunisianMedicine) {
+  if (!medicine.conservationDurationMonths) return "";
+  return `${medicine.conservationDurationMonths} mois`;
 }

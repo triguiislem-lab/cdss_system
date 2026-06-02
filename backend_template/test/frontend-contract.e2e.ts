@@ -369,6 +369,14 @@ async function verifyPublicContract(baseUrl: string) {
   assertPaginated(publicDoctors);
   assert.equal(publicDoctors.data[0]?.status, DoctorStatus.Active);
   assert.equal(publicDoctors.data[0]?.specialty, 'Medecine generale');
+
+  const publicMedicines = await request<Paginated<Medicine>>(
+    baseUrl,
+    '/api/public/medicines?limit=10&search=Paracetamol',
+  );
+  assertPaginated(publicMedicines);
+  assert.equal(publicMedicines.data[0]?.dci, 'Paracetamol');
+  assert.equal(publicMedicines.data[0]?.drugClass, 'Analgesique');
 }
 
 async function verifyDoctorContract(baseUrl: string, accessToken: string) {

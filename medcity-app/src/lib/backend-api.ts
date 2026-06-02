@@ -449,6 +449,13 @@ export async function listMedicineClasses() {
   return apiRequest<string[]>("/api/medicines/classes");
 }
 
+export async function listPublicMedicines(search?: string, limit = 5) {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (search?.trim()) params.set("search", search.trim());
+  const result = await apiRequest<Paginated<ApiMedicine>>(`/api/public/medicines?${params}`, { auth: false });
+  return result.data.map(mapMedicine);
+}
+
 export async function getOrdonnance(id: string) {
   return apiRequest<{
     prescriptionNumber: string;
