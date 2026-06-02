@@ -266,7 +266,7 @@ async function loadSafetyInfo(sqlite: sqlite3.Database) {
 
   for (const row of posologyRows) {
     const amm = text(row.amm);
-    const recommendation = compact(text(row.recommandation), 500);
+    const recommendation = cleanClinicalText(text(row.recommandation));
     if (!amm || !recommendation) continue;
     const info = ensure(amm);
     if (!info.posologyAdult) info.posologyAdult = recommendation;
@@ -275,10 +275,13 @@ async function loadSafetyInfo(sqlite: sqlite3.Database) {
   for (const row of contraindicationRows) {
     const amm = text(row.amm);
     if (!amm) continue;
+    const recommendation = cleanClinicalText(text(row.recommandation));
+    const condition = cleanClinicalText(text(row.condition_ou_facteur));
+    const action = cleanClinicalText(text(row.action_recommandee));
     const label =
-      text(row.condition_ou_facteur) ||
-      compact(text(row.recommandation), 160) ||
-      text(row.action_recommandee);
+      recommendation ||
+      condition ||
+      action;
     if (!label) continue;
     const info = ensure(amm);
     if (!info.contraindications.includes(label)) {
@@ -309,10 +312,6 @@ async function loadSafetyInfo(sqlite: sqlite3.Database) {
         ? PregnancyStatus.Contraindicated
         : PregnancyStatus.Precaution;
     }
-  }
-
-  for (const info of map.values()) {
-    info.contraindications = info.contraindications.slice(0, 6);
   }
 
   return map;
@@ -445,13 +444,6 @@ function cleanClinicalText(value: string) {
     .join('')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function compact(value: string, maxLength: number) {
-  const cleaned = cleanClinicalText(value);
-  return cleaned.length > maxLength
-    ? `${cleaned.slice(0, maxLength - 3)}...`
-    : cleaned;
 }
 
 void run().catch((error: unknown) => {
