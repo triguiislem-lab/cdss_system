@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { config as loadEnv } from 'dotenv';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import sqlite3 from 'sqlite3';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { AuditEntry } from '../audit/audit-entry.entity';
@@ -59,7 +60,11 @@ async function run() {
   );
   const importLimit = numberFrom(process.env.TN_MED_IMPORT_LIMIT);
 
-  const sqlite = new sqlite3.Database(sqlitePath, sqlite3.OPEN_READONLY);
+  const sqliteUri = `${pathToFileURL(sqlitePath).href}?mode=ro&immutable=1`;
+  const sqlite = new sqlite3.Database(
+    sqliteUri,
+    sqlite3.OPEN_READONLY | sqlite3.OPEN_URI,
+  );
   const dataSource = new DataSource(dataSourceOptions());
 
   try {
