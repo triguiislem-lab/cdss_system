@@ -323,6 +323,25 @@ export async function mockMedcityApi(page: Page) {
   await page.route(/\/api\/public\/home$/, (route) => fulfillJson(route, cmsHome));
   await page.route(/\/api\/public\/posts\/[^/]+$/, (route) => fulfillJson(route, cmsHome.posts[0]));
   await page.route(/\/api\/public\/doctors(?:\?.*)?$/, (route) => fulfillJson(route, paginated(doctors)));
+  await page.route(/\/api\/public\/contact-messages$/, (route) => fulfillJson(route, {
+    id: "contact-message-1",
+    name: "Dr. Test",
+    email: "doctor@example.com",
+    subject: "Question",
+    message: "Bonjour MedCity.",
+    source: "public_contact",
+    status: "new",
+    createdAt: "2026-05-30T09:00:00.000Z",
+    updatedAt: "2026-05-30T09:00:00.000Z",
+  }, 201));
+  await page.route(/\/api\/public\/newsletter-subscriptions$/, (route) => fulfillJson(route, {
+    id: "newsletter-1",
+    email: "doctor@example.com",
+    source: "footer_newsletter",
+    status: "active",
+    createdAt: "2026-05-30T09:00:00.000Z",
+    updatedAt: "2026-05-30T09:00:00.000Z",
+  }, 201));
 
   await page.route(/\/api\/auth\/login$/, (route) => {
     const role = parseLoginRole(route);

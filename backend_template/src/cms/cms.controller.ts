@@ -19,6 +19,7 @@ import {
   CreateSpecialtyDto,
   CreateTestimonialDto,
   CreateWhyFeatureDto,
+  UpdateContactMessageStatusDto,
   UpdatePartnerDto,
   UpdatePostDto,
   UpdateSpecialtyDto,
@@ -138,5 +139,23 @@ export class CmsController {
   @Delete('why-features/:id')
   removeWhyFeature(@Param('id') id: string) {
     return this.cmsService.removeWhyFeature(id);
+  }
+
+  @Get('contact-messages')
+  contactMessages() {
+    return this.cmsService.listContactMessages();
+  }
+
+  @Patch('contact-messages/:id/status')
+  updateContactMessageStatus(
+    @Param('id') id: string,
+    @Body() dto: UpdateContactMessageStatusDto,
+  ) {
+    return this.cmsService.updateContactMessageStatus(id, dto.status);
+  }
+
+  @Get('newsletter-subscriptions')
+  newsletterSubscriptions() {
+    return this.cmsService.listNewsletterSubscriptions();
   }
 }

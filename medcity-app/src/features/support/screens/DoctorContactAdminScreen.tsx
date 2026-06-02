@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from "react";
-import { Mail, MessageSquare, Send, ShieldCheck } from "lucide-react";
+import { Loader2, Mail, MessageSquare, Send, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/i18n/I18nProvider";
+import { createContactMessage } from "@/lib/backend-api";
 
 const ADMIN_EMAIL = "admin@medcity.tn";
 const CATEGORY_KEYS = [
@@ -20,27 +21,46 @@ export default function DoctorContactAdmin() {
   const [subject, setSubject] = useState("");
   const [category, setCategory] = useState<string>(CATEGORY_KEYS[0]);
   const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
   const [sentMessages, setSentMessages] = useState<Array<{ subject: string; category: string; message: string; at: string }>>([]);
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!subject.trim() || !message.trim()) return;
 
-    setSentMessages((current) => [
-      {
+    setSending(true);
+    try {
+      await createContactMessage({
+        name: user?.nom ?? t("login.doctor"),
+        email: user?.email ?? ADMIN_EMAIL,
         subject,
-        category,
-        message,
-        at: new Date().toLocaleString("fr-FR"),
-      },
-      ...current,
-    ]);
-    setSubject("");
-    setMessage("");
-    toast({
-      title: t("contactAdmin.toastTitle"),
-      description: t("contactAdmin.toastDescription"),
-    });
+        message: `${t("common.category")}: ${t(category)}\n\n${message}`,
+        source: "doctor_admin_contact",
+      });
+      setSentMessages((current) => [
+        {
+          subject,
+          category,
+          message,
+          at: new Date().toLocaleString("fr-FR"),
+        },
+        ...current,
+      ]);
+      setSubject("");
+      setMessage("");
+      toast({
+        title: t("contactAdmin.toastTitle"),
+        description: t("contactAdmin.toastDescription"),
+      });
+    } catch (error) {
+      toast({
+        title: t("contactAdmin.errorTitle"),
+        description: error instanceof Error ? error.message : t("contactAdmin.errorDescription"),
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
+    }
   }
 
   const mailto = `mailto:${ADMIN_EMAIL}?subject=${encodeURIComponent(subject || t("contactAdmin.mailSubject"))}&body=${encodeURIComponent(
@@ -105,10 +125,11 @@ export default function DoctorContactAdmin() {
               </a>
               <button
                 type="submit"
-                disabled={!subject.trim() || !message.trim()}
+                disabled={!subject.trim() || !message.trim() || sending}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-smooth"
               >
-                <Send className="h-4 w-4" /> {t("contactAdmin.send")}
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                {sending ? t("contactAdmin.sending") : t("contactAdmin.send")}
               </button>
             </div>
           </form>

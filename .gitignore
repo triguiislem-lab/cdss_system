@@ -19,6 +19,7 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.scannerwork/
 .venv/
 venv/
 
@@ -37,6 +38,7 @@ data/
 **/*.db
 **/*.log
 *.zip
+cdss-audio-kaggle-demo/
 
 # OS / IDE
 .DS_Store

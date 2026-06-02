@@ -4,6 +4,7 @@ import { AuditEntry } from '../audit/audit-entry.entity';
 import { Consultation } from '../consultations/consultation.entity';
 import { DoctorsModule } from '../doctors/doctors.module';
 import { Patient } from '../patients/patient.entity';
+import { PharmacyDispatch } from '../pharmacy/pharmacy-dispatch.entity';
 import { PharmacyModule } from '../pharmacy/pharmacy.module';
 import { PrescriptionMedication } from './prescription-medication.entity';
 import { PrescriptionPrintSnapshot } from './prescription-print-snapshot.entity';
@@ -22,6 +23,7 @@ import { SafetyAlert } from './safety-alert.entity';
       Patient,
       Consultation,
       AuditEntry,
+      PharmacyDispatch,
     ]),
     DoctorsModule,
     PharmacyModule,

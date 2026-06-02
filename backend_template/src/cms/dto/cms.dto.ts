@@ -3,14 +3,18 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsEmail,
   IsEnum,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
+  Length,
   Max,
   Min,
 } from 'class-validator';
 import { CmsStatus } from '../../common/entities/enums';
+import { ContactMessageStatus } from '../cms.entities';
 
 export class CreatePostDto {
   @IsString()
@@ -175,3 +179,41 @@ export class CreateWhyFeatureDto {
 }
 
 export class UpdateWhyFeatureDto extends PartialType(CreateWhyFeatureDto) {}
+
+export class CreateContactMessageDto {
+  @IsString()
+  @Length(2, 120)
+  name: string;
+
+  @IsEmail()
+  email: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 160)
+  subject?: string;
+
+  @IsString()
+  @Length(5, 4000)
+  message: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 80)
+  source?: string;
+}
+
+export class UpdateContactMessageStatusDto {
+  @IsIn(Object.values(ContactMessageStatus))
+  status: ContactMessageStatus;
+}
+
+export class CreateNewsletterSubscriptionDto {
+  @IsEmail()
+  email: string;
+
+  @IsOptional()
+  @IsString()
+  @Length(1, 80)
+  source?: string;
+}

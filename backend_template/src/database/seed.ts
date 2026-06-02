@@ -30,6 +30,8 @@ import { MedicineContribution } from '../medicine-contributions/medicine-contrib
 import { InteractionResult } from '../interactions/interaction-result.entity';
 import { AuditEntry } from '../audit/audit-entry.entity';
 import {
+  ContactMessage,
+  NewsletterSubscription,
   Partner,
   Post,
   Specialty,
@@ -61,6 +63,8 @@ async function run() {
     Partner,
     Specialty,
     WhyFeature,
+    ContactMessage,
+    NewsletterSubscription,
   ];
   const synchronize = config.get<string>('DATABASE_SYNC', 'true') === 'true';
   const databaseType = config.get<string>('DATABASE_TYPE', 'sqlite');

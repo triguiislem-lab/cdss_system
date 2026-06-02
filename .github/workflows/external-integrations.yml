@@ -1,0 +1,92 @@
+name: External Integrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Integration target to test
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - resend
+          - audio
+      audio_mode:
+        description: Audio mode. start-processing pushes Supabase audio to Kaggle; full also waits and fetches output.
+        required: true
+        default: upload-status
+        type: choice
+        options:
+          - upload-status
+          - start-processing
+          - full
+      test_email:
+        description: Destination email for the Resend test
+        required: true
+        default: triguiislem1@gmail.com
+
+permissions:
+  contents: read
+
+jobs:
+  external-integrations:
+    name: Real Resend / Supabase / Kaggle
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend_template
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend_template/package-lock.json
+
+      - name: Setup Python for Kaggle CLI
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Kaggle CLI
+        run: python -m pip install kaggle
+
+      - name: Install backend dependencies
+        run: npm ci
+
+      - name: Run external integration tests
+        env:
+          RUN_EXTERNAL_INTEGRATION_TESTS: "true"
+          EXTERNAL_TEST_TARGET: ${{ inputs.target }}
+          EXTERNAL_AUDIO_MODE: ${{ inputs.audio_mode }}
+          EXTERNAL_TEST_EMAIL: ${{ inputs.test_email }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM: ${{ secrets.RESEND_FROM }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_BUCKET: ${{ secrets.SUPABASE_BUCKET }}
+          SUPABASE_S3_ENDPOINT: ${{ secrets.SUPABASE_S3_ENDPOINT }}
+          SUPABASE_S3_REGION: ${{ secrets.SUPABASE_S3_REGION }}
+          SUPABASE_S3_ACCESS_KEY_ID: ${{ secrets.SUPABASE_S3_ACCESS_KEY_ID }}
+          SUPABASE_S3_SECRET_ACCESS_KEY: ${{ secrets.SUPABASE_S3_SECRET_ACCESS_KEY }}
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          KAGGLE_DATASET_SLUG: ${{ secrets.KAGGLE_DATASET_SLUG }}
+          KAGGLE_DATASET_REF: ${{ secrets.KAGGLE_DATASET_REF }}
+          KAGGLE_DATASET_TITLE: ${{ secrets.KAGGLE_DATASET_TITLE }}
+          KAGGLE_KERNEL_REF: ${{ secrets.KAGGLE_KERNEL_REF }}
+          KAGGLE_KERNEL_TITLE: ${{ secrets.KAGGLE_KERNEL_TITLE }}
+          KAGGLE_KERNEL_CODE_FILE: ${{ secrets.KAGGLE_KERNEL_CODE_FILE }}
+          KAGGLE_ENABLE_INTERNET: ${{ secrets.KAGGLE_ENABLE_INTERNET }}
+          KAGGLE_ENABLE_GPU: ${{ secrets.KAGGLE_ENABLE_GPU }}
+          KAGGLE_PERSIST_OUTPUTS_TO_DATASET: ${{ secrets.KAGGLE_PERSIST_OUTPUTS_TO_DATASET }}
+          KAGGLE_DATASET_READY_TIMEOUT_MS: ${{ secrets.KAGGLE_DATASET_READY_TIMEOUT_MS }}
+          KAGGLE_DATASET_READY_INTERVAL_MS: ${{ secrets.KAGGLE_DATASET_READY_INTERVAL_MS }}
+          EXTERNAL_KAGGLE_WAIT_TIMEOUT_MS: ${{ secrets.EXTERNAL_KAGGLE_WAIT_TIMEOUT_MS }}
+          EXTERNAL_KAGGLE_WAIT_INTERVAL_MS: ${{ secrets.EXTERNAL_KAGGLE_WAIT_INTERVAL_MS }}
+        run: npm run test:external-integrations

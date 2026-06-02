@@ -1,26 +1,34 @@
-export type DrugClass =
-  | "Antibiotique"
-  | "Antalgique"
-  | "Anti-inflammatoire"
-  | "Antihypertenseur"
-  | "Antidiabétique"
-  | "Anticoagulant"
-  | "Antiépileptique"
-  | "Antiasthmatique"
-  | "Cardiologie"
-  | "Gastro-entérologie"
-  | "Psychiatrie"
-  | "Hormonothérapie";
+export type DrugClass = string;
 
 export interface TunisianMedicine {
   id: string;
+  sourceMedicineId?: string;
+  sourceKey?: string;
+  localProductName?: string;
   dci: string; // International Nonproprietary Name
   brands: string[]; // commercial names available in Tunisia
   atcCode: string;
   drugClass: DrugClass;
+  therapeuticSubclass?: string;
   forms: string[]; // pharmaceutical forms / dosages
   laboratories: string[]; // local manufacturers/distributors
+  dosage?: string;
+  form?: string;
+  presentation?: string;
+  amm?: string;
+  ammDate?: string;
+  genericStatus?: string;
+  tableau?: string;
+  veicStatus?: string;
+  conservationDurationMonths?: string;
+  primaryPackaging?: string;
+  packagingSpecification?: string;
   reimbursement: "100%" | "85%" | "40%" | "0%";
+  reimbursementCategory?: string;
+  reimbursementRatePercent?: number;
+  referenceTariffTnd?: number;
+  publicPriceMinTnd?: number;
+  publicPriceMaxTnd?: number;
   indication: string;
   contraindications: string[];
   posologyAdult: string;
@@ -28,6 +36,11 @@ export interface TunisianMedicine {
   renalAdjust: boolean;
   hepaticAdjust: boolean;
   priceTndApprox: number; // average box price in TND
+  detailUrl?: string;
+  rcpUrl?: string;
+  noticeUrl?: string;
+  sourceReference?: string;
+  sourceSystems?: string[];
 }
 
 export const drugClasses: DrugClass[] = [

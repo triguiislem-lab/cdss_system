@@ -31,15 +31,16 @@ export class PatientsService {
     const qb = this.patientsRepository.createQueryBuilder('patient');
 
     if (query.search) {
+      const search = `%${query.search.toLowerCase()}%`;
       qb.andWhere(
         new Brackets((where) => {
           where
-            .where('patient.firstName ILIKE :search')
-            .orWhere('patient.lastName ILIKE :search')
-            .orWhere('patient.phone1 ILIKE :search')
-            .orWhere('patient.internalCode ILIKE :search');
+            .where('LOWER(patient.firstName) LIKE :search')
+            .orWhere('LOWER(patient.lastName) LIKE :search')
+            .orWhere('LOWER(patient.phone1) LIKE :search')
+            .orWhere('LOWER(patient.internalCode) LIKE :search');
         }),
-      ).setParameter('search', `%${query.search}%`);
+      ).setParameter('search', search);
     }
     if (query.gender) {
       qb.andWhere('patient.gender = :gender', { gender: query.gender });

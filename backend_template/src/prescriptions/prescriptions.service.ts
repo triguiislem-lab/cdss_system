@@ -15,6 +15,7 @@ import {
   UserRole,
 } from '../common/entities/enums';
 import { DoctorsService } from '../doctors/doctors.service';
+import { PharmacyDispatch } from '../pharmacy/pharmacy-dispatch.entity';
 import { Patient } from '../patients/patient.entity';
 import { PharmacyService } from '../pharmacy/pharmacy.service';
 import { User } from '../users/user.entity';
@@ -41,6 +42,8 @@ export class PrescriptionsService {
     private readonly snapshotsRepository: Repository<PrescriptionPrintSnapshot>,
     @InjectRepository(SafetyAlert)
     private readonly alertsRepository: Repository<SafetyAlert>,
+    @InjectRepository(PharmacyDispatch)
+    private readonly dispatchesRepository: Repository<PharmacyDispatch>,
     @InjectRepository(Patient)
     private readonly patientsRepository: Repository<Patient>,
     @InjectRepository(Consultation)
@@ -61,8 +64,8 @@ export class PrescriptionsService {
       .leftJoinAndSelect('prescription.medications', 'medications');
 
     if (query.search) {
-      qb.andWhere('prescription.prescriptionNumber ILIKE :search', {
-        search: `%${query.search}%`,
+      qb.andWhere('LOWER(prescription.prescriptionNumber) LIKE :search', {
+        search: `%${query.search.toLowerCase()}%`,
       });
     }
     if (query.status) {
@@ -167,6 +170,11 @@ export class PrescriptionsService {
 
   async remove(id: string) {
     const prescription = await this.getById(id);
+    await this.auditRepository.delete({ prescriptionId: id });
+    await this.dispatchesRepository.delete({ prescriptionId: id });
+    await this.snapshotsRepository.delete({ prescriptionId: id });
+    await this.alertsRepository.delete({ prescriptionId: id });
+    await this.medicationsRepository.delete({ prescriptionId: id });
     await this.prescriptionsRepository.remove(prescription);
     return { ok: true };
   }
@@ -250,53 +258,11 @@ export class PrescriptionsService {
       footerNumber: prescription.prescriptionNumber,
       printedAt,
     };
-    await this.snapshotsRepository.query(
-      `
-      INSERT INTO prescription_print_snapshots (
-        prescription_id,
-        doctor_first_name,
-        doctor_last_name,
-        doctor_specialty,
-        doctor_cnam_code,
-        doctor_fiscal_number,
-        doctor_phone,
-        patient_first_name,
-        patient_last_name,
-        patient_birth_date,
-        patient_gender,
-        footer_number,
-        printed_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-      ON CONFLICT (prescription_id) DO UPDATE SET
-        doctor_first_name = EXCLUDED.doctor_first_name,
-        doctor_last_name = EXCLUDED.doctor_last_name,
-        doctor_specialty = EXCLUDED.doctor_specialty,
-        doctor_cnam_code = EXCLUDED.doctor_cnam_code,
-        doctor_fiscal_number = EXCLUDED.doctor_fiscal_number,
-        doctor_phone = EXCLUDED.doctor_phone,
-        patient_first_name = EXCLUDED.patient_first_name,
-        patient_last_name = EXCLUDED.patient_last_name,
-        patient_birth_date = EXCLUDED.patient_birth_date,
-        patient_gender = EXCLUDED.patient_gender,
-        footer_number = EXCLUDED.footer_number,
-        printed_at = EXCLUDED.printed_at
-      `,
-      [
-        snapshot.prescriptionId,
-        snapshot.doctorFirstName,
-        snapshot.doctorLastName,
-        snapshot.doctorSpecialty,
-        snapshot.doctorCnamCode,
-        snapshot.doctorFiscalNumber,
-        snapshot.doctorPhone,
-        snapshot.patientFirstName,
-        snapshot.patientLastName,
-        snapshot.patientBirthDate,
-        snapshot.patientGender,
-        snapshot.footerNumber,
-        snapshot.printedAt,
-      ],
+    const existing = await this.snapshotsRepository.findOne({
+      where: { prescriptionId: prescription.id },
+    });
+    await this.snapshotsRepository.save(
+      existing ? Object.assign(existing, snapshot) : this.snapshotsRepository.create(snapshot),
     );
     await this.prescriptionsRepository.update(prescription.id, { printedAt });
     return this.getById(id);

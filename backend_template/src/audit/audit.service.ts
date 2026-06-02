@@ -28,9 +28,10 @@ export class AuditService {
       qb.andWhere('audit.timestamp <= :to', { to: query.to });
     }
     if (query.search) {
-      qb.andWhere('audit.patientName ILIKE :search OR audit.doctorName ILIKE :search', {
-        search: `%${query.search}%`,
-      });
+      qb.andWhere(
+        'LOWER(audit.patientName) LIKE :search OR LOWER(audit.doctorName) LIKE :search',
+        { search: `%${query.search.toLowerCase()}%` },
+      );
     }
     if (query.doctorId) {
       qb.andWhere('prescription.doctorId = :doctorId', {

@@ -83,6 +83,13 @@ type ApiMedicine = Omit<TunisianMedicine, "pregnancy" | "drugClass"> & {
   pregnancy: "Autorise" | "Precaution" | "Contre-indique" | TunisianMedicine["pregnancy"];
 };
 
+type MedicineListOptions = {
+  search?: string;
+  page?: number;
+  limit?: number;
+  drugClass?: string;
+};
+
 type ApiConsultation = {
   id: string;
   patientId: string;
@@ -213,6 +220,27 @@ export type ApiCmsWhyFeature = {
   title: string;
   text: string;
   active: boolean;
+};
+
+export type ApiContactMessage = {
+  id: string;
+  name: string;
+  email: string;
+  subject?: string;
+  message: string;
+  source: string;
+  status: "new" | "read" | "resolved";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ApiNewsletterSubscription = {
+  id: string;
+  email: string;
+  source: string;
+  status: "active" | "unsubscribed";
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type KaggleAudioResultJson = Record<string, unknown> & {
@@ -405,9 +433,14 @@ export async function listInteractions() {
   return result.data;
 }
 
-export async function listMedicines(search?: string) {
-  const params = new URLSearchParams({ limit: "100" });
-  if (search?.trim()) params.set("search", search.trim());
+export async function listMedicines(options: string | MedicineListOptions = {}) {
+  const resolved = typeof options === "string" ? { search: options } : options;
+  const params = new URLSearchParams({
+    page: String(resolved.page ?? 1),
+    limit: String(resolved.limit ?? 100),
+  });
+  if (resolved.search?.trim()) params.set("search", resolved.search.trim());
+  if (resolved.drugClass?.trim()) params.set("drugClass", resolved.drugClass.trim());
   const result = await apiRequest<Paginated<ApiMedicine>>(`/api/medicines?${params}`);
   return result.data.map(mapMedicine);
 }
@@ -772,6 +805,28 @@ export async function getPublicCmsHome() {
   }>("/api/public/home", { auth: false });
 }
 
+export async function createContactMessage(input: {
+  name: string;
+  email: string;
+  subject?: string;
+  message: string;
+  source?: string;
+}) {
+  return apiRequest<ApiContactMessage>("/api/public/contact-messages", {
+    method: "POST",
+    body: JSON.stringify(input),
+    auth: false,
+  });
+}
+
+export async function subscribeNewsletter(email: string, source = "footer") {
+  return apiRequest<ApiNewsletterSubscription>("/api/public/newsletter-subscriptions", {
+    method: "POST",
+    body: JSON.stringify({ email, source }),
+    auth: false,
+  });
+}
+
 export async function createCmsWhyFeature(input: Omit<ApiCmsWhyFeature, "id">) {
   return apiRequest<ApiCmsWhyFeature>("/api/cms/why-features", { method: "POST", body: JSON.stringify(input) });
 }
@@ -858,6 +913,10 @@ function mapMedicine(medicine: ApiMedicine): TunisianMedicine {
     drugClass: medicine.drugClass as TunisianMedicine["drugClass"],
     pregnancy: mapPregnancy(medicine.pregnancy),
     priceTndApprox: Number(medicine.priceTndApprox ?? 0),
+    reimbursementRatePercent: optionalNumber(medicine.reimbursementRatePercent),
+    referenceTariffTnd: optionalNumber(medicine.referenceTariffTnd),
+    publicPriceMinTnd: optionalNumber(medicine.publicPriceMinTnd),
+    publicPriceMaxTnd: optionalNumber(medicine.publicPriceMaxTnd),
   };
 }
 
@@ -1019,6 +1078,12 @@ function inferRisk(alerts?: SafetyAlert[]): RiskLevel {
   if (alerts?.some((alert) => alert.severity === "critical" || alert.severity === "major")) return "high";
   if (alerts?.some((alert) => alert.severity === "moderate")) return "medium";
   return "low";
+}
+
+function optionalNumber(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function mapPregnancy(value: ApiMedicine["pregnancy"]): TunisianMedicine["pregnancy"] {

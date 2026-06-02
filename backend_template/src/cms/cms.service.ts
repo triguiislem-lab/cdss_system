@@ -2,13 +2,22 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { CmsStatus } from '../common/entities/enums';
+import { EmailService } from '../email/email.service';
 import {
+  ContactMessage,
+  ContactMessageStatus,
+  NewsletterSubscription,
+  NewsletterSubscriptionStatus,
   Partner,
   Post,
   Specialty,
   Testimonial,
   WhyFeature,
 } from './cms.entities';
+import {
+  CreateContactMessageDto,
+  CreateNewsletterSubscriptionDto,
+} from './dto/cms.dto';
 
 type CmsRepository<T extends { id: string }> = Repository<T>;
 type CmsWrite = object;
@@ -24,6 +33,11 @@ export class CmsService {
     private readonly specialties: Repository<Specialty>,
     @InjectRepository(WhyFeature)
     private readonly whyFeatures: Repository<WhyFeature>,
+    @InjectRepository(ContactMessage)
+    private readonly contactMessages: Repository<ContactMessage>,
+    @InjectRepository(NewsletterSubscription)
+    private readonly newsletterSubscriptions: Repository<NewsletterSubscription>,
+    private readonly emailService: EmailService,
   ) {}
 
   listPosts() {
@@ -129,6 +143,63 @@ export class CmsService {
 
   removeWhyFeature(id: string) {
     return this.remove(this.whyFeatures, id, 'Why feature');
+  }
+
+  listContactMessages() {
+    return this.contactMessages.find({ order: { createdAt: 'DESC' } });
+  }
+
+  async createContactMessage(data: CreateContactMessageDto) {
+    const message = await this.contactMessages.save(
+      this.contactMessages.create({
+        name: data.name.trim(),
+        email: data.email.trim().toLowerCase(),
+        subject: data.subject?.trim() || undefined,
+        message: data.message.trim(),
+        source: data.source?.trim() || 'public_contact',
+        status: ContactMessageStatus.New,
+      }),
+    );
+    void this.emailService.sendContactMessageNotification(message);
+    return message;
+  }
+
+  async updateContactMessageStatus(
+    id: string,
+    status: ContactMessageStatus,
+  ) {
+    return this.update(this.contactMessages, id, { status }, 'Contact message');
+  }
+
+  listNewsletterSubscriptions() {
+    return this.newsletterSubscriptions.find({
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async createNewsletterSubscription(data: CreateNewsletterSubscriptionDto) {
+    const email = data.email.trim().toLowerCase();
+    const existing = await this.newsletterSubscriptions.findOne({
+      where: { email },
+    });
+
+    if (existing) {
+      existing.status = NewsletterSubscriptionStatus.Active;
+      existing.source = data.source?.trim() || existing.source || 'footer';
+      const subscription = await this.newsletterSubscriptions.save(existing);
+      void this.emailService.sendNewsletterSubscriptionEmails(subscription);
+      return subscription;
+    }
+
+    const subscription = await this.newsletterSubscriptions.save(
+      this.newsletterSubscriptions.create({
+        email,
+        source: data.source?.trim() || 'footer',
+        status: NewsletterSubscriptionStatus.Active,
+      }),
+    );
+    void this.emailService.sendNewsletterSubscriptionEmails(subscription);
+    return subscription;
   }
 
   async publicHome() {

@@ -82,6 +82,12 @@ jobs:
       - name: Frontend/NestJS contract
         run: npm run contract:frontend
 
+      - name: API CRUD tests
+        run: npm run test:api-crud
+
+      - name: Clinical/Admin endpoint tests
+        run: npm run test:clinical-crud
+
   cdss:
     name: FastAPI CDSS
     runs-on: ubuntu-latest

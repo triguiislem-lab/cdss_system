@@ -1,9 +1,29 @@
+import { useState, type FormEvent } from "react";
 import { Link } from "wouter";
-import { Phone, Facebook, Instagram, MapPin, Mail, CheckCircle2 } from "lucide-react";
+import { Phone, Facebook, Instagram, MapPin, Mail, CheckCircle2, Loader2 } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
+import { subscribeNewsletter } from "@/lib/backend-api";
 
 export function Footer() {
   const { t } = useI18n();
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
+
+  async function handleNewsletterSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatus("idle");
+    setSubmitting(true);
+    try {
+      await subscribeNewsletter(email, "footer_newsletter");
+      setEmail("");
+      setStatus("success");
+    } catch {
+      setStatus("error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <footer>
@@ -34,22 +54,36 @@ export function Footer() {
             {t("footer.newsletter.text")}
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-3 max-w-xl">
+          <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-3 max-w-xl">
             <div className="relative flex-1">
               <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="email"
                 placeholder={t("footer.newsletter.emailPlaceholder")}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 className="h-12 w-full pl-10 pr-4 rounded-xl text-sm bg-white border-0 focus:outline-none focus:ring-2 focus:ring-cyan-400/60 placeholder:text-slate-400 text-slate-800 shadow-lg"
+                required
               />
             </div>
             <button
-              className="h-12 px-8 rounded-xl text-sm font-bold text-white whitespace-nowrap transition-all hover:scale-105 active:scale-95 shadow-xl"
+              type="submit"
+              className="h-12 px-8 rounded-xl text-sm font-bold text-white whitespace-nowrap transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:scale-100 shadow-xl"
               style={{ background: "linear-gradient(135deg, #06b6d4, #0891b2)" }}
+              disabled={submitting}
             >
-              {t("footer.newsletter.cta")}
+              <span className="inline-flex items-center gap-2">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {submitting ? t("footer.newsletter.submitting") : t("footer.newsletter.cta")}
+              </span>
             </button>
-          </div>
+          </form>
+
+          {status !== "idle" ? (
+            <p className={`mt-3 text-sm ${status === "success" ? "text-cyan-100" : "text-red-100"}`}>
+              {status === "success" ? t("footer.newsletter.success") : t("footer.newsletter.error")}
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap gap-5 mt-5">
             {["footer.newsletter.benefit1", "footer.newsletter.benefit2", "footer.newsletter.benefit3"].map((item) => (

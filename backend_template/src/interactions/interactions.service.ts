@@ -17,10 +17,11 @@ export class InteractionsService {
     const limit = query.limit ?? 20;
     const qb = this.interactionsRepository.createQueryBuilder('interaction');
     if (query.search) {
-      qb.where('interaction.drugA ILIKE :search', {
-        search: `%${query.search}%`,
-      }).orWhere('interaction.drugB ILIKE :search', {
-        search: `%${query.search}%`,
+      const search = `%${query.search.toLowerCase()}%`;
+      qb.where('LOWER(interaction.drugA) LIKE :search', {
+        search,
+      }).orWhere('LOWER(interaction.drugB) LIKE :search', {
+        search,
       });
     }
     const [data, total] = await qb

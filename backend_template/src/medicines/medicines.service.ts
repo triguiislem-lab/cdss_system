@@ -22,14 +22,22 @@ export class MedicinesService {
     const qb = this.medicinesRepository.createQueryBuilder('medicine');
 
     if (query.search) {
+      const search = `%${query.search.toLowerCase()}%`;
       qb.andWhere(
         new Brackets((where) => {
           where
-            .where('medicine.dci ILIKE :search')
-            .orWhere('medicine.drugClass ILIKE :search')
-            .orWhere('medicine.brands::text ILIKE :search');
+            .where('LOWER(medicine.dci) LIKE :search')
+            .orWhere('LOWER(medicine.localProductName) LIKE :search')
+            .orWhere('LOWER(medicine.drugClass) LIKE :search')
+            .orWhere('LOWER(medicine.therapeuticSubclass) LIKE :search')
+            .orWhere('LOWER(medicine.dosage) LIKE :search')
+            .orWhere('LOWER(medicine.form) LIKE :search')
+            .orWhere('LOWER(medicine.presentation) LIKE :search')
+            .orWhere('LOWER(medicine.amm) LIKE :search')
+            .orWhere('LOWER(medicine.genericStatus) LIKE :search')
+            .orWhere('LOWER(medicine.brands) LIKE :search');
         }),
-      ).setParameter('search', `%${query.search}%`);
+      ).setParameter('search', search);
     }
     if (query.drugClass) {
       qb.andWhere('medicine.drugClass = :drugClass', {
@@ -53,7 +61,8 @@ export class MedicinesService {
     }
 
     const [data, total] = await qb
-      .orderBy('medicine.dci', 'ASC')
+      .orderBy('medicine.localProductName', 'ASC')
+      .addOrderBy('medicine.dci', 'ASC')
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
@@ -66,8 +75,18 @@ export class MedicinesService {
     }
     return this.medicinesRepository
       .createQueryBuilder('medicine')
-      .where('medicine.dci ILIKE :q', { q: `%${q}%` })
-      .orWhere('medicine.brands::text ILIKE :q', { q: `%${q}%` })
+      .where('LOWER(medicine.dci) LIKE :q', { q: `%${q.toLowerCase()}%` })
+      .orWhere('LOWER(medicine.localProductName) LIKE :q', {
+        q: `%${q.toLowerCase()}%`,
+      })
+      .orWhere('LOWER(medicine.brands) LIKE :q', { q: `%${q.toLowerCase()}%` })
+      .orWhere('LOWER(medicine.amm) LIKE :q', { q: `%${q.toLowerCase()}%` })
+      .orWhere('LOWER(medicine.presentation) LIKE :q', {
+        q: `%${q.toLowerCase()}%`,
+      })
+      .orWhere('LOWER(medicine.dosage) LIKE :q', {
+        q: `%${q.toLowerCase()}%`,
+      })
       .orderBy('medicine.dci', 'ASC')
       .take(20)
       .getMany();

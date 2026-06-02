@@ -13,7 +13,12 @@
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "lint:check": "eslint \"{src,test}/**/*.ts\"",
     "contract:frontend": "ts-node -r tsconfig-paths/register test/frontend-contract.e2e.ts",
-    "seed": "ts-node -r tsconfig-paths/register src/database/seed.ts"
+    "test:api-crud": "ts-node -r tsconfig-paths/register test/api-crud.e2e.ts",
+    "test:clinical-crud": "ts-node -r tsconfig-paths/register test/clinical-crud.e2e.ts",
+    "test:external-integrations": "ts-node -r tsconfig-paths/register test/external-integrations.e2e.ts",
+    "seed": "ts-node -r tsconfig-paths/register src/database/seed.ts",
+    "import:tn-med": "ts-node -r tsconfig-paths/register src/database/import-tn-med.ts",
+    "import:tn-med:prod": "node dist/database/import-tn-med.js"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",

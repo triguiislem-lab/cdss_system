@@ -48,8 +48,8 @@ export class MedicineContributionsService {
       qb.andWhere('contribution.kind = :kind', { kind: query.kind });
     }
     if (query.search) {
-      qb.andWhere('contribution.authorName ILIKE :search', {
-        search: `%${query.search}%`,
+      qb.andWhere('LOWER(contribution.authorName) LIKE :search', {
+        search: `%${query.search.toLowerCase()}%`,
       });
     }
 

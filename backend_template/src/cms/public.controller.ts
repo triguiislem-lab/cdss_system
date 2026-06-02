@@ -1,5 +1,9 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { CmsService } from './cms.service';
+import {
+  CreateContactMessageDto,
+  CreateNewsletterSubscriptionDto,
+} from './dto/cms.dto';
 
 @Controller('public')
 export class PublicController {
@@ -33,5 +37,15 @@ export class PublicController {
   @Get('specialties')
   specialties() {
     return this.cmsService.publicSpecialties();
+  }
+
+  @Post('contact-messages')
+  createContactMessage(@Body() dto: CreateContactMessageDto) {
+    return this.cmsService.createContactMessage(dto);
+  }
+
+  @Post('newsletter-subscriptions')
+  createNewsletterSubscription(@Body() dto: CreateNewsletterSubscriptionDto) {
+    return this.cmsService.createNewsletterSubscription(dto);
   }
 }

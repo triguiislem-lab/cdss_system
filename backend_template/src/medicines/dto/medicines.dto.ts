@@ -14,6 +14,18 @@ import {
 } from '../../common/entities/enums';
 
 export class CreateMedicineDto {
+  @IsOptional()
+  @IsString()
+  sourceMedicineId?: string;
+
+  @IsOptional()
+  @IsString()
+  sourceKey?: string;
+
+  @IsOptional()
+  @IsString()
+  localProductName?: string;
+
   @IsString()
   dci: string;
 
@@ -27,6 +39,10 @@ export class CreateMedicineDto {
   @IsString()
   drugClass: string;
 
+  @IsOptional()
+  @IsString()
+  therapeuticSubclass?: string;
+
   @IsArray()
   @IsString({ each: true })
   forms: string[];
@@ -35,8 +51,72 @@ export class CreateMedicineDto {
   @IsString({ each: true })
   laboratories: string[];
 
+  @IsOptional()
+  @IsString()
+  dosage?: string;
+
+  @IsOptional()
+  @IsString()
+  form?: string;
+
+  @IsOptional()
+  @IsString()
+  presentation?: string;
+
+  @IsOptional()
+  @IsString()
+  amm?: string;
+
+  @IsOptional()
+  @IsString()
+  ammDate?: string;
+
+  @IsOptional()
+  @IsString()
+  genericStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  tableau?: string;
+
+  @IsOptional()
+  @IsString()
+  veicStatus?: string;
+
+  @IsOptional()
+  @IsString()
+  conservationDurationMonths?: string;
+
+  @IsOptional()
+  @IsString()
+  primaryPackaging?: string;
+
+  @IsOptional()
+  @IsString()
+  packagingSpecification?: string;
+
   @IsEnum(ReimbursementRate)
   reimbursement: ReimbursementRate;
+
+  @IsOptional()
+  @IsString()
+  reimbursementCategory?: string;
+
+  @IsOptional()
+  @IsNumber()
+  reimbursementRatePercent?: number;
+
+  @IsOptional()
+  @IsNumber()
+  referenceTariffTnd?: number;
+
+  @IsOptional()
+  @IsNumber()
+  publicPriceMinTnd?: number;
+
+  @IsOptional()
+  @IsNumber()
+  publicPriceMaxTnd?: number;
 
   @IsString()
   indication: string;
@@ -62,6 +142,27 @@ export class CreateMedicineDto {
   @IsOptional()
   @IsNumber()
   priceTndApprox?: number;
+
+  @IsOptional()
+  @IsString()
+  detailUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  rcpUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  noticeUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  sourceReference?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  sourceSystems?: string[];
 }
 
 export class UpdateMedicineDto extends PartialType(CreateMedicineDto) {}

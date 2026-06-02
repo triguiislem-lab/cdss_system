@@ -32,14 +32,15 @@ export class PharmacyService {
       .leftJoinAndSelect('dispatch.patient', 'patient');
 
     if (query.search) {
+      const search = `%${query.search.toLowerCase()}%`;
       qb.andWhere(
         new Brackets((where) => {
           where
-            .where('dispatch.patientName ILIKE :search')
-            .orWhere('dispatch.recipient ILIKE :search')
-            .orWhere('prescription.prescriptionNumber ILIKE :search');
+            .where('LOWER(dispatch.patientName) LIKE :search')
+            .orWhere('LOWER(dispatch.recipient) LIKE :search')
+            .orWhere('LOWER(prescription.prescriptionNumber) LIKE :search');
         }),
-      ).setParameter('search', `%${query.search}%`);
+      ).setParameter('search', search);
     }
     if (query.status) {
       qb.andWhere('dispatch.status = :status', { status: query.status });

@@ -7,6 +7,17 @@ import {
 } from 'typeorm';
 import { CmsStatus } from '../common/entities/enums';
 
+export enum ContactMessageStatus {
+  New = 'new',
+  Read = 'read',
+  Resolved = 'resolved',
+}
+
+export enum NewsletterSubscriptionStatus {
+  Active = 'active',
+  Unsubscribed = 'unsubscribed',
+}
+
 @Entity('posts')
 export class Post {
   @PrimaryGeneratedColumn('uuid')
@@ -179,6 +190,57 @@ export class WhyFeature {
 
   @Column({ default: true })
   active: boolean;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}
+
+@Entity('contact_messages')
+export class ContactMessage {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  name: string;
+
+  @Column()
+  email: string;
+
+  @Column({ nullable: true })
+  subject?: string;
+
+  @Column({ type: 'text' })
+  message: string;
+
+  @Column({ default: 'public_contact' })
+  source: string;
+
+  @Column({ default: ContactMessageStatus.New })
+  status: ContactMessageStatus;
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+}
+
+@Entity('newsletter_subscriptions')
+export class NewsletterSubscription {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column({ unique: true })
+  email: string;
+
+  @Column({ default: 'footer' })
+  source: string;
+
+  @Column({ default: NewsletterSubscriptionStatus.Active })
+  status: NewsletterSubscriptionStatus;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

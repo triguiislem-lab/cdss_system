@@ -1,19 +1,37 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { Badge } from "@/components/atoms/badge";
 import { Button } from "@/components/atoms/button";
 import { Input } from "@/components/atoms/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/card";
-import { Phone, Mail, MapPin, Facebook, Instagram, Clock, Send } from "lucide-react";
+import { Phone, Mail, MapPin, Facebook, Instagram, Clock, Loader2, Send } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
+import { createContactMessage } from "@/lib/backend-api";
 
 export default function Contact() {
   const { t } = useI18n();
   const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
   const [sent, setSent] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setSent(true);
+    setError("");
+    setSubmitting(true);
+    try {
+      await createContactMessage({
+        name: form.name,
+        email: form.email,
+        subject: form.subject.trim() || undefined,
+        message: form.message,
+        source: "public_contact",
+      });
+      setSent(true);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : t("contact.error"));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -97,7 +115,7 @@ export default function Contact() {
                     <Button
                       variant="outline"
                       className="mt-4"
-                      onClick={() => { setSent(false); setForm({ name: "", email: "", subject: "", message: "" }); }}
+                      onClick={() => { setSent(false); setError(""); setForm({ name: "", email: "", subject: "", message: "" }); }}
                     >
                       {t("contact.sendAnother")}
                     </Button>
@@ -143,9 +161,14 @@ export default function Contact() {
                         required
                       />
                     </div>
-                    <Button type="submit" size="lg" className="w-full bg-accent hover:bg-accent/90 text-white">
-                      <Send className="h-4 w-4 mr-2" />
-                      {t("contact.submit")}
+                    {error ? (
+                      <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                        {error}
+                      </p>
+                    ) : null}
+                    <Button type="submit" size="lg" className="w-full bg-accent hover:bg-accent/90 text-white" disabled={submitting}>
+                      {submitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
+                      {submitting ? t("contact.submitting") : t("contact.submit")}
                     </Button>
                   </form>
                 )}

@@ -29,6 +29,60 @@ The frontend should call **NestJS only**. FastAPI is an internal clinical runtim
 
 Global prefix: `/api`
 
+### Automated API CRUD Tests
+
+The NestJS backend includes an isolated API CRUD test script:
+
+```bash
+npm --prefix backend_template run test:api-crud
+npm --prefix backend_template run test:clinical-crud
+```
+
+These scripts boot the NestJS app against temporary SQLite databases and validate the main endpoint contracts without opening the frontend.
+
+`test:api-crud` covers:
+
+- Auth guard/login flow.
+- Patient create/list/read/update/delete.
+- Consultation create/update/status transitions/vitals/delete.
+- Admin CMS CRUD for posts, testimonials, partners, specialties, and why-features.
+- Public contact/newsletter submission plus admin retrieval/status update.
+
+`test:clinical-crud` covers:
+
+- Doctor admin CRUD/status and doctor self-profile update.
+- Medicine admin CRUD, list/filter/search/classes.
+- Prescription create/update medication lines/safety check/validate/reject/print snapshot/ordonnance/delete.
+- Pharmacy dispatch creation from prescription and manual dispatch update/status/delete.
+- Medicine contributions create/list/validate/refuse/delete, including new-medicine validation.
+- Interactions list/search/check.
+- CDSS adapter routes against a fake local CDSS server.
+- Translation routes against a fake local LibreTranslate server.
+- Audio upload target validation smoke tests.
+- Prometheus metrics endpoint.
+
+The CI backend job runs both scripts after the frontend/backend contract test.
+
+External integrations have a separate opt-in test script:
+
+```bash
+# Real Resend email + real Supabase/Kaggle smoke
+$env:RUN_EXTERNAL_INTEGRATION_TESTS="true"
+$env:EXTERNAL_TEST_TARGET="all" # all | resend | audio
+$env:EXTERNAL_AUDIO_MODE="upload-status" # upload-status | start-processing | full
+$env:EXTERNAL_TEST_EMAIL="triguiislem1@gmail.com"
+npm --prefix backend_template run test:external-integrations
+```
+
+External modes:
+
+- `resend`: sends a real email through Resend and asserts Resend returns an email id.
+- `audio` with `upload-status`: uploads a generated WAV file to real Supabase Storage, then checks real Kaggle kernel status.
+- `audio` with `start-processing`: also downloads the Supabase object, versions the Kaggle dataset, and pushes the Kaggle kernel.
+- `audio` with `full`: also waits for Kaggle completion and fetches `result.json`.
+
+These tests are intentionally not part of push/PR CI. They require real secrets and can be run from the manual `External Integrations` GitHub Actions workflow.
+
 ### Auth
 
 | Method | Endpoint | Purpose |
@@ -139,10 +193,25 @@ Storage can run in either mode:
 | Pharmacy | `/api/pharmacy/dispatches`, `/api/pharmacy/dispatches/:id/status` |
 | Medicine contributions | `/api/medicine-contributions`, `/api/medicine-contributions/:id/validate`, `/api/medicine-contributions/:id/refuse` |
 | Audit | `/api/audit`, `/api/audit/prescriptions/:prescriptionId`, `/api/audit/:id` |
-| CMS | `/api/cms/posts`, `/api/cms/testimonials`, `/api/cms/partners`, `/api/cms/specialties`, `/api/cms/why-features` |
-| Public CMS | `/api/public/home`, `/api/public/posts`, `/api/public/testimonials`, `/api/public/partners`, `/api/public/specialties` |
+| CMS | `/api/cms/posts`, `/api/cms/testimonials`, `/api/cms/partners`, `/api/cms/specialties`, `/api/cms/why-features`, `/api/cms/contact-messages`, `/api/cms/newsletter-subscriptions` |
+| Public CMS | `/api/public/home`, `/api/public/posts`, `/api/public/testimonials`, `/api/public/partners`, `/api/public/specialties`, `/api/public/contact-messages`, `/api/public/newsletter-subscriptions` |
 | Translation | `/api/translations/languages`, `/api/translations/translate`, `/api/translations/translate-fields` |
 | Health | `/api/health` |
+
+### Email Delivery
+
+Contact and newsletter submissions are persisted first, then sent through Resend as non-blocking notifications. If Resend is not configured or fails, the saved database record remains available through the admin CMS endpoints.
+
+Required environment variables:
+
+| Variable | Purpose |
+|---|---|
+| `EMAIL_ENABLED` | Enables/disables outbound email |
+| `RESEND_API_KEY` | Resend API key |
+| `RESEND_FROM` | Sender identity, for example `MedCity Connect <onboarding@resend.dev>` for tests or a verified domain sender in production |
+| `CONTACT_NOTIFICATION_TO` | Admin/contact mailbox for public and doctor contact messages |
+| `NEWSLETTER_NOTIFICATION_TO` | Admin/contact mailbox notified on new newsletter subscriptions |
+| `NEWSLETTER_CONFIRMATION_ENABLED` | Sends confirmation email to the subscriber when `true` |
 
 ## FastAPI CDSS Endpoints
 
@@ -451,6 +520,32 @@ classDiagram
 
 This is the missing table if NestJS must persist CDSS-localized product candidates.
 
+### CMS And Public Engagement
+
+```mermaid
+classDiagram
+  class ContactMessage {
+    uuid id
+    string name
+    string email
+    string subject
+    text message
+    string source
+    ContactMessageStatus status
+    datetime createdAt
+    datetime updatedAt
+  }
+
+  class NewsletterSubscription {
+    uuid id
+    string email
+    string source
+    NewsletterSubscriptionStatus status
+    datetime createdAt
+    datetime updatedAt
+  }
+```
+
 ### Pharmacy, Audit, Interactions
 
 ```mermaid
@@ -694,9 +789,9 @@ FastAPI draft response to NestJS persistence:
 | `draft_plan.medications[].rationale + safety_considerations` | `prescription_medications.instructions` |
 | `safety.findings[]` | `safety_alerts[]` |
 
-### Medicine/Formulary Mapping Gap
+### Medicine/Formulary Mapping
 
-Current NestJS `medicines` table:
+NestJS `medicines` started as a DCI summary:
 
 ```text
 One DCI summary -> many brands/forms/labs stored as arrays.
@@ -710,25 +805,67 @@ One local product candidate -> one active ingredient, strength, form, AMM, lab, 
 
 Therefore, **NestJS medicines and FastAPI LocalProductEvidence are not equivalent**.
 
-Recommended mapping if `LocalMedicineProduct` is added:
+The current implementation keeps `/api/medicines` stable, but enriches `medicines`
+with Tunisian product-level fields from TN Med:
 
-| FastAPI `LocalProductEvidence` | Recommended NestJS `LocalMedicineProduct` |
+| TN Med / FastAPI product concept | NestJS `Medicine` field |
 |---|---|
-| `product_name` | `localProductName` |
-| `active_ingredient` | `activeIngredient` |
-| `strength` | `strength` |
-| `dosage_form` | `dosageForm` |
-| `market` | `market` |
-| `metadata.amm` | `amm` |
-| `metadata.lab` | `lab` |
-| `metadata.price` | `price` |
-| `metadata.classification` | `classification` |
-| `metadata.source_system` | `sourceSystem` |
-| `metadata.evidence_status` | `evidenceStatus` |
-| `metadata.is_combination` | `isCombination` |
-| `metadata.ingredient_count` | `ingredientCount` |
-| `metadata.localization_eligible` | `localizationEligible` |
-| full `metadata` | `metadata` |
+| `id_medicament` | `sourceMedicineId` |
+| `cle_medicament` | `sourceKey` |
+| `nom_medicament` / product name | `localProductName`, `brands[0]` |
+| `dci_raw` / active ingredient | `dci` |
+| `dosage` | `dosage` |
+| `forme` | `form` |
+| `presentation` | `presentation` |
+| `laboratoire` | `laboratories[]` |
+| `amm` | `amm` |
+| `date_amm` | `ammDate` |
+| `classe_therapeutique` | `drugClass` |
+| `sous_classe_therapeutique` | `therapeuticSubclass` |
+| `statut_gp` | `genericStatus` |
+| `veic_status` | `veicStatus` |
+| price fields | `publicPriceMinTnd`, `publicPriceMaxTnd`, `priceTndApprox` |
+| reimbursement fields | `reimbursement`, `reimbursementCategory`, `reimbursementRatePercent`, `referenceTariffTnd` |
+| `indications_raw` | `indication` |
+| RCP/notice URLs | `rcpUrl`, `noticeUrl`, `detailUrl` |
+| `sources_presentes` | `sourceSystems[]` |
+
+### TN Med Kaggle Import
+
+Dataset on EC2:
+
+```text
+/opt/cdss_system/data/tn-med-db-v1/database/TN_Med.db
+```
+
+The dataset was downloaded from Kaggle:
+
+```text
+islemtrigui6/tn-med-db-v1
+```
+
+Import script:
+
+```bash
+cd backend_template
+npm run import:tn-med
+```
+
+Docker production import after deployment:
+
+```bash
+docker compose exec api npm run import:tn-med:prod
+```
+
+Required variables:
+
+```text
+TN_MED_SQLITE_PATH=/app/data/tn-med-db-v1/database/TN_Med.db
+TN_MED_IMPORT_LIMIT=
+```
+
+`TN_MED_IMPORT_LIMIT` is optional and useful for quick smoke imports. Leave it
+empty to import the full 6093-row medicines catalog.
 
 ## Current Alignment Status
 
@@ -738,17 +875,13 @@ Recommended mapping if `LocalMedicineProduct` is added:
 | Draft prescription mapping | Implemented | FastAPI draft maps to NestJS prescription and medication rows |
 | Safety finding mapping | Implemented | FastAPI safety maps to NestJS `safety_alerts` |
 | Trace/audit reference | Implemented | FastAPI `trace_id` stored on NestJS prescription |
-| Medicine summary table | Implemented but not CDSS-equivalent | Current table is UI/admin catalog |
-| Product-level local formulary table | Missing | Needed for full alignment with FastAPI `LocalProductEvidence` |
-| Full CDSS asset synchronization into NestJS DB | Missing | NestJS currently queries FastAPI instead of storing its formulary |
+| Medicine product catalog | Implemented | `medicines` now stores TN Med product-level fields |
+| TN Med SQLite import | Implemented | `npm run import:tn-med` imports Kaggle SQLite into NestJS DB |
+| Full CDSS asset synchronization into NestJS DB | Partial | TN Med product catalog is imported; NestJS still queries FastAPI for CDSS reasoning |
 
 ## Recommended Next Implementation
 
-1. Add `local_medicine_products` table in NestJS.
-2. Add DTOs and controller endpoints:
-   - `GET /api/local-medicine-products`
-   - `GET /api/local-medicine-products/search`
-   - `POST /api/local-medicine-products/sync-from-cdss`
-3. Extend `CdssService.searchFormulary()` to optionally upsert returned products.
-4. Link `prescription_medications` to `localMedicineProductId` when a localized product is selected.
-5. Keep `medicines` as the human/admin summary catalog.
+1. Link `prescription_medications.medicineId` to the selected TN Med product when a doctor chooses a local product.
+2. Add a dedicated product picker in prescription creation that searches `/api/medicines?search=...`.
+3. Add optional import of detailed TN Med safety rules into separate review tables if clinicians need rule-level browsing.
+4. Keep FastAPI responsible for prescription reasoning and evidence validation.
