@@ -27,6 +27,7 @@ venv/
 .env
 .env.*
 !.env.example
+*.pem
 
 # Local data and generated runtime artifacts
 data/
