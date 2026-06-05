@@ -1,18 +1,21 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   CheckCircle2,
   Edit2,
   FilePlus2,
   FileText,
   MapPin,
   Phone,
+  RefreshCw,
   Search,
   Star,
   Trash2,
   Users,
 } from "lucide-react";
 import { MetricCard } from "@/components/molecules/MetricCard";
+import { LoadingState } from "@/components/molecules/LoadingState";
 import { CdssModal, FormField as Field } from "@/features/cdss/components/DialogPrimitives";
 import { useI18n } from "@/i18n/I18nProvider";
 import { createDoctor as createDoctorApi, deleteDoctor as deleteDoctorApi, listDoctors, updateDoctor as updateDoctorApi } from "@/lib/backend-api";
@@ -70,25 +73,36 @@ export default function AdminDoctors() {
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<AdminDoctor | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminDoctor | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   async function refreshDoctors() {
-    const apiDoctors = await listDoctors(search);
-    setDoctors(apiDoctors.map((doctor) => ({
-      id: doctor.id,
-      prenom: doctor.firstName,
-      nom: doctor.lastName,
-      email: doctor.email,
-      matriculeFiscale: doctor.fiscalNumber,
-      specialite: doctor.specialty ?? "",
-      hopital: "MedCity",
-      ville: doctor.city ?? "",
-      telephone: doctor.phone,
-      patients: 0,
-      prescriptions: 0,
-      rating: 5,
-      statut: doctor.status === "inactive" ? "inactif" : "actif",
-      disponible: doctor.status !== "inactive",
-    })));
+    setLoading(true);
+    setError(null);
+    try {
+      const apiDoctors = await listDoctors(search);
+      setDoctors(apiDoctors.map((doctor) => ({
+        id: doctor.id,
+        prenom: doctor.firstName,
+        nom: doctor.lastName,
+        email: doctor.email,
+        matriculeFiscale: doctor.fiscalNumber,
+        specialite: doctor.specialty ?? "",
+        hopital: "MedCity",
+        ville: doctor.city ?? "",
+        telephone: doctor.phone,
+        patients: 0,
+        prescriptions: 0,
+        rating: 5,
+        statut: doctor.status === "inactive" ? "inactif" : "actif",
+        disponible: doctor.status !== "inactive",
+      })));
+    } catch (loadError) {
+      setDoctors([]);
+      setError(loadError instanceof Error ? loadError.message : "Impossible de charger les medecins.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -149,6 +163,7 @@ export default function AdminDoctors() {
         </div>
         <button
           onClick={() => setEditing(emptyDoctor())}
+          disabled={loading}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-card hover:bg-primary/90 transition-smooth"
         >
           <FilePlus2 className="h-4 w-4" /> {t("adminDoctors.new")}
@@ -172,9 +187,34 @@ export default function AdminDoctors() {
               className="flex-1 bg-transparent outline-none"
             />
           </div>
+          <button
+            type="button"
+            onClick={() => void refreshDoctors()}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-smooth"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            {t("common.refresh")}
+          </button>
         </div>
 
-        {filtered.length === 0 ? (
+        {error && (
+          <div className="m-4 rounded-lg border border-critical/30 bg-critical-soft px-4 py-3 text-sm text-critical flex flex-wrap items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              {error}
+            </span>
+            <button type="button" onClick={() => void refreshDoctors()} className="rounded-md border border-critical/30 bg-card px-3 py-1.5 text-xs font-semibold hover:bg-critical-soft">
+              {t("common.retry")}
+            </button>
+          </div>
+        )}
+
+        {loading ? (
+          <div className="p-4">
+            <LoadingState title="Chargement des medecins" subtitle="Recuperation des profils docteurs depuis le backend..." />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-sm text-muted-foreground">{t("adminDoctors.empty")}</div>
         ) : (
           <ul className="grid gap-0 divide-y divide-border">

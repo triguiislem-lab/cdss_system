@@ -87,6 +87,7 @@ export function getPatientSearchText(patient: Patient): string {
 
 export interface Medication {
   id: string;
+  medicineId?: string;
   name: string;
   dose: string;
   route: string;

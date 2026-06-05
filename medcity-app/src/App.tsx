@@ -35,6 +35,7 @@ import ConsultationDetail from "@/pages/doctor/consultations.$consultationId";
 import Consultations from "@/pages/doctor/consultations.index";
 import DoctorPrescriptions from "@/pages/doctor/prescriptions";
 import NewPrescription from "@/pages/doctor/prescription.new";
+import ReviewPrescription from "@/pages/doctor/prescription.$rxId.review";
 import Ordonnance from "@/pages/doctor/prescription.$rxId.ordonnance";
 import Medicines from "@/pages/doctor/medicines";
 import MedicineContributions from "@/pages/doctor/medicine-contributions";
@@ -99,6 +100,9 @@ function Router() {
       </Route>
       <Route path="/doctor/prescription/:rxId/ordonnance">
         {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><Ordonnance /></DoctorLayout></ProtectedRoute>}
+      </Route>
+      <Route path="/doctor/prescription/:rxId/review">
+        {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><ReviewPrescription /></DoctorLayout></ProtectedRoute>}
       </Route>
       <Route path="/doctor/medicine-contributions">
         {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><MedicineContributions /></DoctorLayout></ProtectedRoute>}

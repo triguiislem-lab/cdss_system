@@ -26,7 +26,9 @@ Default exposed ports:
 The NestJS API calls the CDSS container through:
 
 ```env
-CDSS_API_BASE_URL=http://cdss:8000/v1
+CDSS_EXECUTION_MODE=direct
+CDSS_API_BASE_URL=http://cdss:8000
+CDSS_API_TIMEOUT_MS=1800000
 ```
 
 The default Docker compose CDSS configuration uses stub/demo backends so the stack can boot without large model and knowledge-base assets. For clinical/runtime validation, mount the real CDSS assets and replace the CDSS environment values.
@@ -37,7 +39,7 @@ Root-level GitHub Actions live in `.github/workflows`:
 
 - `ci.yml`: runs on pushes and pull requests, checks the frontend, NestJS backend, FastAPI CDSS, Docker Compose config, and validates Docker image builds on `main`.
 - `docker.yml`: manual confirmation workflow that builds and publishes frontend, NestJS API, and CDSS images to GHCR.
-- `deploy-ec2.yml`: manual confirmation workflow that updates the EC2 checkout and restarts Docker Compose.
+- `deploy-ec2.yml`: deploys automatically to EC2 after the `CI` workflow succeeds on `main`; it also keeps a manual trigger for deploying a specific ref.
 - `deploy-template.yml`: manual deployment handoff/reference template.
 
 For EC2 deployment, configure these repository settings in GitHub:
@@ -57,9 +59,17 @@ EC2_APP_DIR=/opt/cdss_system
 VITE_API_BASE_URL=
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+VITE_GRAFANA_URL=https://monitoring.your-domain.tn/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
 ```
 
-Recommended branch protection for `main`: require the `CI` workflow to pass before merging pull requests. Use the manual `Docker` and `Deploy EC2` workflows when you are ready to publish images or deploy a confirmed revision.
+Recommended branch protection for `main`: require the `CI` workflow to pass before merging pull requests. Use the manual `Docker` workflow when you are ready to publish images. EC2 deployment runs automatically after a successful `main` CI run; use the manual `Deploy EC2` workflow only when you need to redeploy a specific ref.
+
+The EC2 deploy workflow updates the remote checkout, rebuilds the Compose stack, removes orphaned containers, and verifies the published frontend/API/CDSS ports plus Grafana when Grafana is published:
+
+```bash
+docker compose up -d --build --remove-orphans
+docker compose ps
+```
 
 ## Images
 
@@ -146,11 +156,28 @@ Set Grafana credentials in `.env`:
 ```env
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=<strong-password>
+GRAFANA_BIND_ADDRESS=127.0.0.1
 PROMETHEUS_PORT=9090
 GRAFANA_PORT=3001
+VITE_GRAFANA_URL=http://localhost:3001/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
 ```
 
 The Grafana dashboard is provisioned automatically at startup under the `MedCity` folder. Prometheus and Grafana ports are bound to `127.0.0.1` by default; on EC2, keep them private and access them through SSH tunneling or a protected reverse proxy instead of exposing them directly to the internet.
+
+The admin dashboard includes a `Monitoring Grafana` action. The button target is compiled into the frontend from `VITE_GRAFANA_URL`. For EC2, set this to the protected public URL or reverse-proxy URL that administrators can reach from their browser:
+
+```env
+VITE_GRAFANA_URL=https://monitoring.your-domain.tn/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
+```
+
+If you intentionally expose Grafana directly from EC2 for a private demo, set:
+
+```env
+GRAFANA_BIND_ADDRESS=0.0.0.0
+VITE_GRAFANA_URL=http://<ec2-public-dns>:3001/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
+```
+
+In that mode, restrict the EC2 security group inbound rule for port `3001` to trusted admin IPs only. Do not open Grafana to `0.0.0.0/0`.
 
 By default, Prometheus monitors the application services. To monitor the EC2 host itself, enable the Linux host-monitoring profile on the EC2 `.env`:
 
@@ -164,3 +191,10 @@ This starts:
 - `cadvisor`: Docker container CPU, memory, network, and filesystem usage.
 
 The additional `MedCity EC2 Host` Grafana dashboard is provisioned automatically. Keep this profile disabled on Windows local development because it uses Linux host mounts such as `/`, `/sys`, and `/var/lib/docker`.
+
+Useful dashboard URLs:
+
+```text
+MedCity Overview: http://localhost:3001/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
+MedCity EC2 Host: http://localhost:3001/d/medcity-ec2-host/medcity-ec2-host?orgId=1&refresh=30s
+```

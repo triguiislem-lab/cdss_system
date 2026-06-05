@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Plus, X, Search, ExternalLink } from "lucide-react";
-import type { InteractionResult } from "@/lib/mock-data";
+import { AlertCircle, ExternalLink, Plus, Search, X } from "lucide-react";
+import { LoadingState } from "@/components/molecules/LoadingState";
 import { severityMeta, severityOrder } from "@/lib/clinical-ui";
+import type { InteractionResult } from "@/lib/mock-data";
 import { useToast } from "@/hooks/use-toast";
 import { listInteractions } from "@/lib/backend-api";
 
@@ -17,16 +18,25 @@ export default function InteractionChecker() {
   ]);
   const [input, setInput] = useState("");
   const [interactions, setInteractions] = useState<InteractionResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  async function refreshInteractions() {
+    setLoading(true);
+    setError(null);
+    try {
+      setInteractions(await listInteractions());
+    } catch (loadError) {
+      setInteractions([]);
+      setError(loadError instanceof Error ? loadError.message : "Unable to load interaction records.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    void (async () => {
-      try {
-        setInteractions(await listInteractions());
-      } catch {
-        setInteractions([]);
-      }
-    })();
+    void refreshInteractions();
   }, []);
 
   const add = () => {
@@ -55,7 +65,7 @@ export default function InteractionChecker() {
           {drugs.map((drug) => (
             <span key={drug} className="inline-flex items-center gap-1.5 rounded-full bg-primary-soft text-primary border border-primary/20 px-3 py-1 text-sm font-medium">
               {drug}
-              <button onClick={() => remove(drug)} className="hover:text-critical transition-smooth">
+              <button type="button" onClick={() => remove(drug)} className="hover:text-critical transition-smooth" aria-label={`Remove ${drug}`}>
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -66,79 +76,97 @@ export default function InteractionChecker() {
             <Search className="h-4 w-4 text-muted-foreground" />
             <input
               value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && add()}
+              onChange={(event) => setInput(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && add()}
               placeholder="Add a drug (e.g. Ibuprofen)..."
               className="flex-1 bg-transparent text-sm outline-none"
               maxLength={80}
             />
           </div>
-          <button onClick={add} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-smooth">
+          <button type="button" onClick={add} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-smooth">
             <Plus className="h-4 w-4" /> Add
           </button>
         </div>
       </div>
 
       <div className="space-y-4">
-        {grouped.map(({ sev, items }) => {
-          if (items.length === 0) return null;
-          const meta = severityMeta[sev];
-          return (
-            <section key={sev}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className={`inline-flex h-2.5 w-2.5 rounded-full ${meta.dot}`} />
-                <h2 className="text-sm font-semibold uppercase tracking-wider">{meta.label}</h2>
-                <span className="text-xs text-muted-foreground">({items.length})</span>
-              </div>
-              <div className="grid gap-3 lg:grid-cols-2">
-                {items.map((entry) => (
-                  <article key={entry.id} className={`rounded-xl border ${meta.border} ${meta.bg} p-4 ${sev === "critical" ? "ring-2 " + meta.ring : ""}`}>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex rounded-md bg-card border border-border px-2 py-0.5 text-sm font-semibold">{entry.drugA}</span>
-                      <span className="text-muted-foreground text-sm">↔</span>
-                      <span className="inline-flex rounded-md bg-card border border-border px-2 py-0.5 text-sm font-semibold">{entry.drugB}</span>
-                    </div>
-                    <dl className="mt-3 space-y-2 text-xs">
-                      <div>
-                        <dt className="font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Mechanism</dt>
-                        <dd className="mt-0.5">{entry.mechanism}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Clinical consequence</dt>
-                        <dd className="mt-0.5">{entry.consequence}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Recommended action</dt>
-                        <dd className="mt-0.5 font-medium">{entry.action}</dd>
-                      </div>
-                    </dl>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        toast({
-                          title: "Evidence source",
-                          description: entry.evidence,
-                        })
-                      }
-                      className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
-                    >
-                      <ExternalLink className="h-3 w-3" /> {entry.evidence}
-                    </button>
-                  </article>
-                ))}
-              </div>
-            </section>
-          );
-        })}
-
-        {visible.length === 0 && (
-          <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success">
-              <Search className="h-5 w-5" />
-            </div>
-            <h3 className="mt-3 font-semibold">No interactions detected</h3>
-            <p className="text-sm text-muted-foreground mt-1">Across the {drugs.length} drugs you've added.</p>
+        {error && (
+          <div className="rounded-lg border border-critical/30 bg-critical-soft px-4 py-3 text-sm text-critical flex flex-wrap items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-2">
+              <AlertCircle className="h-4 w-4" />
+              {error}
+            </span>
+            <button type="button" onClick={() => void refreshInteractions()} className="rounded-md border border-critical/30 bg-card px-3 py-1.5 text-xs font-semibold hover:bg-critical-soft">
+              Retry
+            </button>
           </div>
+        )}
+
+        {loading ? (
+          <LoadingState title="Loading interaction database" subtitle="Checking stored interaction pairs from the backend..." />
+        ) : (
+          <>
+            {grouped.map(({ sev, items }) => {
+              if (items.length === 0) return null;
+              const meta = severityMeta[sev];
+              return (
+                <section key={sev}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={`inline-flex h-2.5 w-2.5 rounded-full ${meta.dot}`} />
+                    <h2 className="text-sm font-semibold uppercase tracking-wider">{meta.label}</h2>
+                    <span className="text-xs text-muted-foreground">({items.length})</span>
+                  </div>
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    {items.map((entry) => (
+                      <article key={entry.id} className={`rounded-xl border ${meta.border} ${meta.bg} p-4 ${sev === "critical" ? "ring-2 " + meta.ring : ""}`}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex rounded-md bg-card border border-border px-2 py-0.5 text-sm font-semibold">{entry.drugA}</span>
+                          <span className="text-muted-foreground text-sm">{"<->"}</span>
+                          <span className="inline-flex rounded-md bg-card border border-border px-2 py-0.5 text-sm font-semibold">{entry.drugB}</span>
+                        </div>
+                        <dl className="mt-3 space-y-2 text-xs">
+                          <div>
+                            <dt className="font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Mechanism</dt>
+                            <dd className="mt-0.5">{entry.mechanism}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Clinical consequence</dt>
+                            <dd className="mt-0.5">{entry.consequence}</dd>
+                          </div>
+                          <div>
+                            <dt className="font-semibold uppercase tracking-wider text-[10px] text-muted-foreground">Recommended action</dt>
+                            <dd className="mt-0.5 font-medium">{entry.action}</dd>
+                          </div>
+                        </dl>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            toast({
+                              title: "Evidence source",
+                              description: entry.evidence,
+                            })
+                          }
+                          className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" /> {entry.evidence}
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+
+            {visible.length === 0 && (
+              <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success">
+                  <Search className="h-5 w-5" />
+                </div>
+                <h3 className="mt-3 font-semibold">No interactions detected</h3>
+                <p className="text-sm text-muted-foreground mt-1">Across the {drugs.length} drugs you've added.</p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

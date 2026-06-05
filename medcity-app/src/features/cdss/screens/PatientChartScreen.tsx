@@ -6,6 +6,7 @@ import { getPatientFullName, type Patient, type PrescriptionCase } from "@/lib/m
 import { riskMeta, statusMeta } from "@/lib/clinical-ui";
 import { PatientMetric as Metric } from "@/features/cdss/components/PatientMetric";
 import { getPatient, listPrescriptions } from "@/lib/backend-api";
+import { LoadingState } from "@/components/molecules/LoadingState";
 
 export default function PatientChart({ basePath }: { basePath: "/doctor" }) {
   const params = useParams<{ id?: string; patientId?: string }>();
@@ -34,11 +35,22 @@ export default function PatientChart({ basePath }: { basePath: "/doctor" }) {
     })();
   }, [patientId]);
 
+  if (loading) {
+    return (
+      <div className="p-4 lg:p-8">
+        <LoadingState
+          title="Chargement patient"
+          subtitle="Recuperation du dossier patient depuis le backend..."
+        />
+      </div>
+    );
+  }
+
   if (!patient) {
     return (
       <div className="p-4 lg:p-8">
         <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <h1 className="text-xl font-semibold">{loading ? "Loading patient..." : "Patient not found"}</h1>
+          <h1 className="text-xl font-semibold">Patient not found</h1>
           <p className="mt-2 text-sm text-muted-foreground">The patient record is not available from the backend.</p>
           <Link href={`${basePath}/patients`} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
             <ArrowLeft className="h-4 w-4" />

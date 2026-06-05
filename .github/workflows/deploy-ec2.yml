@@ -1,6 +1,10 @@
 name: Deploy EC2
 
 on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: ["main"]
   workflow_dispatch:
     inputs:
       ref:
@@ -15,12 +19,13 @@ jobs:
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     env:
       EC2_HOST: ${{ secrets.EC2_HOST }}
       EC2_USER: ${{ vars.EC2_USER || 'ubuntu' }}
       EC2_APP_DIR: ${{ vars.EC2_APP_DIR || '/opt/cdss_system' }}
-      DEPLOY_REF: ${{ inputs.ref }}
+      DEPLOY_REF: ${{ inputs.ref || github.event.workflow_run.head_sha || 'main' }}
 
     steps:
       - name: Validate deployment configuration
@@ -41,18 +46,35 @@ jobs:
 
       - name: Deploy application
         run: |
-          ssh -i ~/.ssh/ec2_key "$EC2_USER@$EC2_HOST" "set -e
-            cd '$EC2_APP_DIR'
-            git fetch origin main --tags
-            git checkout main
-            if [ '$DEPLOY_REF' = 'main' ]; then
+          ssh -i ~/.ssh/ec2_key "$EC2_USER@$EC2_HOST" "DEPLOY_REF='$DEPLOY_REF' EC2_APP_DIR='$EC2_APP_DIR' bash -se" <<'REMOTE'
+            cd "$EC2_APP_DIR"
+
+            git fetch --prune origin main --tags
+            if [ "$DEPLOY_REF" = "main" ]; then
+              git checkout main
               git reset --hard origin/main
             else
-              git reset --hard '$DEPLOY_REF'
+              git fetch --depth=1 origin "$DEPLOY_REF"
+              git checkout --detach FETCH_HEAD
             fi
-            docker compose up -d --build
+
+            docker compose up -d --build --remove-orphans
             docker compose ps
-            curl -fsS http://127.0.0.1:3000/api/health
-            curl -fsS http://127.0.0.1:8000/health
-            curl -fsS -I http://127.0.0.1
-          "
+
+            endpoint_port() {
+              docker compose port "$1" "$2" 2>/dev/null | awk -F: 'END { print $NF }'
+            }
+
+            api_port="$(endpoint_port api 3000)"
+            cdss_port="$(endpoint_port cdss 8000)"
+            frontend_port="$(endpoint_port frontend 80)"
+            grafana_port="$(endpoint_port grafana 3000)"
+
+            curl -fsS "http://127.0.0.1:${api_port:-3000}/api/health"
+            curl -fsS "http://127.0.0.1:${cdss_port:-8000}/health"
+            curl -fsS -I "http://127.0.0.1:${frontend_port:-5173}"
+
+            if [ -n "$grafana_port" ]; then
+              curl -fsS "http://127.0.0.1:$grafana_port/api/health"
+            fi
+          REMOTE

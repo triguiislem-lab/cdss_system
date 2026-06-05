@@ -5,6 +5,7 @@ import { Plus, CheckCircle2, XCircle, Clock, FileEdit, FilePlus2, StickyNote, Pi
 import type { DrugClass, TunisianMedicine } from "@/lib/tunisia-medicines";
 import { type ContributionKind, type ContributionStatus, type MedicineContribution, editableFields } from "@/lib/stores/medicine-contributions-store";
 import { useAuth } from "@/contexts/AuthContext";
+import { LoadingState } from "@/components/molecules/LoadingState";
 import { CdssModal, DetailRow as Row, FormField as Field, FormLabel as Label, SearchablePicker } from "@/features/cdss/components/DialogPrimitives";
 import { createMedicineContribution, listMedicineClasses, listMedicineContributions, listMedicines, refuseMedicineContribution, validateMedicineContribution } from "@/lib/backend-api";
 
@@ -25,6 +26,8 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
   const { user: authUser } = useAuth();
   const user = authUser ? { email: authUser.email, name: authUser.nom } : null;
   const [items, setItems] = useState<MedicineContribution[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [tab, setTab] = useState<ContributionStatus | "all">("pending");
   const [openCreate, setOpenCreate] = useState(false);
@@ -32,7 +35,16 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
   const [viewTarget, setViewTarget] = useState<MedicineContribution | null>(null);
 
   async function refresh() {
-    setItems(await listMedicineContributions());
+    setLoading(true);
+    setError(null);
+    try {
+      setItems(await listMedicineContributions());
+    } catch (loadError) {
+      setItems([]);
+      setError(loadError instanceof Error ? loadError.message : "Impossible de charger les contributions.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -96,7 +108,19 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
       </div>
 
       <div className="rounded-xl border border-border bg-card shadow-card">
-        {filtered.length === 0 ? (
+        {error && (
+          <div className="m-4 rounded-lg border border-critical/30 bg-critical-soft px-4 py-3 text-sm text-critical flex flex-wrap items-center justify-between gap-3">
+            <span>{error}</span>
+            <button type="button" onClick={() => void refresh()} className="rounded-md border border-critical/30 bg-card px-3 py-1.5 text-xs font-semibold hover:bg-critical-soft">
+              Reessayer
+            </button>
+          </div>
+        )}
+        {loading ? (
+          <div className="p-4">
+            <LoadingState title="Chargement des contributions" subtitle="Lecture des propositions et statuts de validation..." />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-sm text-muted-foreground">Aucune contribution dans cette catégorie.</div>
         ) : (
           <ul className="divide-y divide-border">
@@ -254,14 +278,31 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
   const [nmForms, setNmForms] = useState("");
   const [nmLabs, setNmLabs] = useState("");
   const [nmCi, setNmCi] = useState("");
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [dialogError, setDialogError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
-      const [apiMedicines, apiClasses] = await Promise.all([listMedicines(), listMedicineClasses()]);
-      setMedicines(apiMedicines);
-      setClasses(apiClasses);
-      if (!targetId && apiMedicines[0]) setTargetId(apiMedicines[0].id);
+      setCatalogLoading(true);
+      setDialogError(null);
+      try {
+        const [apiMedicines, apiClasses] = await Promise.all([listMedicines(), listMedicineClasses()]);
+        if (cancelled) return;
+        setMedicines(apiMedicines);
+        setClasses(apiClasses);
+        if (!targetId && apiMedicines[0]) setTargetId(apiMedicines[0].id);
+      } catch (loadError) {
+        if (!cancelled) setDialogError(loadError instanceof Error ? loadError.message : "Impossible de charger le catalogue.");
+      } finally {
+        if (!cancelled) setCatalogLoading(false);
+      }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const targetMed = medicines.find((m) => m.id === targetId);
@@ -272,6 +313,7 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
   }, [targetMed, field]);
 
   const canSubmit = () => {
+    if (submitting || catalogLoading) return false;
     if (!rationale.trim()) return false;
     if (kind === "correction") return !!newValue.trim() && !!targetMed;
     if (kind === "note") return !!note.trim() && !!targetMed;
@@ -281,41 +323,51 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
 
   const submit = () => {
     if (!user) return;
+    setSubmitting(true);
+    setDialogError(null);
     const base = {
       authorEmail: user.email,
       authorName: user.name,
       rationale: rationale.trim(),
     };
-    if (kind === "correction" && targetMed) {
-      void createMedicineContribution({
-        kind: "correction",
-        targetMedicineId: targetMed.id,
-        field,
-        oldValue,
-        newValue: newValue.trim(),
-        rationale: base.rationale,
-      });
-    } else if (kind === "note" && targetMed) {
-      void createMedicineContribution({
-        kind: "note",
-        targetMedicineId: targetMed.id,
-        note: note.trim(),
-        rationale: base.rationale,
-      });
-    } else if (kind === "new_medicine") {
-      void createMedicineContribution({
-        kind: "new_medicine",
-        newMedicine: {
-          ...nm,
-          brands: nmBrands.split(",").map((s) => s.trim()).filter(Boolean),
-          forms: nmForms.split(",").map((s) => s.trim()).filter(Boolean),
-          laboratories: nmLabs.split(",").map((s) => s.trim()).filter(Boolean),
-          contraindications: nmCi.split(",").map((s) => s.trim()).filter(Boolean),
-        },
-        rationale: base.rationale,
-      });
-    }
-    onClose();
+    void (async () => {
+      try {
+        if (kind === "correction" && targetMed) {
+          await createMedicineContribution({
+            kind: "correction",
+            targetMedicineId: targetMed.id,
+            field,
+            oldValue,
+            newValue: newValue.trim(),
+            rationale: base.rationale,
+          });
+        } else if (kind === "note" && targetMed) {
+          await createMedicineContribution({
+            kind: "note",
+            targetMedicineId: targetMed.id,
+            note: note.trim(),
+            rationale: base.rationale,
+          });
+        } else if (kind === "new_medicine") {
+          await createMedicineContribution({
+            kind: "new_medicine",
+            newMedicine: {
+              ...nm,
+              brands: nmBrands.split(",").map((s) => s.trim()).filter(Boolean),
+              forms: nmForms.split(",").map((s) => s.trim()).filter(Boolean),
+              laboratories: nmLabs.split(",").map((s) => s.trim()).filter(Boolean),
+              contraindications: nmCi.split(",").map((s) => s.trim()).filter(Boolean),
+            },
+            rationale: base.rationale,
+          });
+        }
+        onClose();
+      } catch (submitError) {
+        setDialogError(submitError instanceof Error ? submitError.message : "Impossible d'enregistrer la contribution.");
+      } finally {
+        setSubmitting(false);
+      }
+    })();
   };
 
   return (
@@ -354,26 +406,30 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
           <div>
             <Label>Médicament concerné</Label>
             <div className="mt-1">
-              <SearchablePicker
-                items={medicines}
-                selectedId={targetId}
-                query={medicineQuery}
-                onQueryChange={setMedicineQuery}
-                onSelect={(medicine) => {
-                  setTargetId(medicine.id);
-                  setMedicineQuery(`${medicine.dci} ${medicine.atcCode}`);
-                }}
-                getId={(medicine) => medicine.id}
-                getSearchText={(medicine) => `${medicine.dci} ${medicine.atcCode} ${medicine.drugClass} ${medicine.brands.join(" ")}`}
-                placeholder="Rechercher par DCI, spécialité, ATC ou classe"
-                emptyLabel="Aucun médicament trouvé"
-                renderItem={(medicine) => (
-                  <span className="flex flex-col gap-0.5">
-                    <span className="font-semibold">{medicine.dci}</span>
-                    <span className="text-xs opacity-75">{medicine.atcCode} · {medicine.drugClass}</span>
-                  </span>
-                )}
-              />
+              {catalogLoading ? (
+                <LoadingState title="Chargement du catalogue" subtitle="Recherche des medicaments TN Med disponibles..." />
+              ) : (
+                <SearchablePicker
+                  items={medicines}
+                  selectedId={targetId}
+                  query={medicineQuery}
+                  onQueryChange={setMedicineQuery}
+                  onSelect={(medicine) => {
+                    setTargetId(medicine.id);
+                    setMedicineQuery(`${medicine.dci} ${medicine.atcCode}`);
+                  }}
+                  getId={(medicine) => medicine.id}
+                  getSearchText={(medicine) => `${medicine.dci} ${medicine.atcCode} ${medicine.drugClass} ${medicine.brands.join(" ")}`}
+                  placeholder="Rechercher par DCI, spécialité, ATC ou classe"
+                  emptyLabel="Aucun médicament trouvé"
+                  renderItem={(medicine) => (
+                    <span className="flex flex-col gap-0.5">
+                      <span className="font-semibold">{medicine.dci}</span>
+                      <span className="text-xs opacity-75">{medicine.atcCode} · {medicine.drugClass}</span>
+                    </span>
+                  )}
+                />
+              )}
             </div>
           </div>
         )}
@@ -438,10 +494,16 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
           <textarea value={rationale} onChange={(e) => setRationale(e.target.value)} rows={2} className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" placeholder="Ex. HAS 2023, Vidal Tunisie, étude clinique…" />
         </div>
 
+        {dialogError && (
+          <div className="rounded-md border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">
+            {dialogError}
+          </div>
+        )}
+
         <div className="flex justify-end gap-2 pt-2 border-t border-border">
           <button onClick={onClose} className="rounded-md border border-input bg-background px-4 py-2 text-sm font-semibold hover:bg-muted">Annuler</button>
           <button onClick={submit} disabled={!canSubmit()} className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-            Soumettre pour validation
+            {submitting ? "Envoi..." : "Soumettre pour validation"}
           </button>
         </div>
       </div>

@@ -52,6 +52,7 @@ type ApiPatient = Partial<Patient> & {
 
 type ApiMedication = {
   id: string;
+  medicineId?: string;
   medicineName: string;
   dosage: string;
   route?: string;
@@ -323,6 +324,10 @@ export async function loginApi(email: string, password: string) {
   });
 }
 
+export async function getCurrentUserApi() {
+  return apiRequest<{ id: string; email: string; role: "admin" | "doctor" }>("/api/auth/me");
+}
+
 export async function listPatients(search?: string) {
   const params = new URLSearchParams({ limit: "100" });
   if (search?.trim()) params.set("search", search.trim());
@@ -378,6 +383,35 @@ export async function savePrescription(input: {
       notes: input.notes,
       medications: input.medications.map((med, index) => ({
         medicineName: med.name,
+        medicineId: med.medicineId,
+        dosage: med.dose,
+        route: med.route,
+        frequency: med.frequency,
+        duration: med.duration,
+        indication: med.indication,
+        confidence: med.confidence,
+        status: med.status,
+        sortOrder: index,
+      })),
+    }),
+  }));
+}
+
+export async function updatePrescription(id: string, input: {
+  patientId: string;
+  diagnosis?: string;
+  notes?: string;
+  medications: Medication[];
+}) {
+  return mapPrescription(await apiRequest<ApiPrescription>(`/api/prescriptions/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      patientId: input.patientId,
+      diagnosis: input.diagnosis,
+      notes: input.notes,
+      medications: input.medications.map((med, index) => ({
+        medicineName: med.name,
+        medicineId: med.medicineId,
         dosage: med.dose,
         route: med.route,
         frequency: med.frequency,
@@ -445,6 +479,10 @@ export async function listMedicines(options: string | MedicineListOptions = {}) 
   return result.data.map(mapMedicine);
 }
 
+export async function getMedicine(id: string) {
+  return mapMedicine(await apiRequest<ApiMedicine>(`/api/medicines/${id}`));
+}
+
 export async function listMedicineClasses() {
   return apiRequest<string[]>("/api/medicines/classes");
 }
@@ -459,6 +497,7 @@ export async function listPublicMedicines(search?: string, limit = 5) {
 export async function getOrdonnance(id: string) {
   return apiRequest<{
     prescriptionNumber: string;
+    patientId?: string;
     status: string;
     diagnosis?: string;
     notes?: string;
@@ -902,6 +941,7 @@ export function mapPrescription(entry: ApiPrescription): PrescriptionCase {
     notes: entry.notes,
     medications: (entry.medications ?? []).map((med) => ({
       id: med.id,
+      medicineId: med.medicineId,
       name: med.medicineName,
       dose: med.dosage,
       route: med.route ?? "",

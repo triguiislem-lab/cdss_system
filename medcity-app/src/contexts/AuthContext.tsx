@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, ReactNode } from "react";
-import { loginApi } from "@/lib/backend-api";
+import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { getCurrentUserApi, loginApi } from "@/lib/backend-api";
 
 export type UserRole = "admin" | "doctor";
 
@@ -21,6 +21,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string; role?: UserRole }>;
   logout: () => void;
   isAuthenticated: boolean;
+  isAuthLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -29,18 +30,43 @@ const REFRESH_TOKEN_KEY = "medcity-refresh-token";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  function toAuthUser(input: { id: string; email: string; role: UserRole }): AuthUser {
+    return {
+      id: input.id,
+      email: input.email,
+      role: input.role,
+      nom: input.email.split("@")[0],
+    };
+  }
+
+  useEffect(() => {
+    const token = window.localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      setIsAuthLoading(false);
+      return;
+    }
+
+    void (async () => {
+      try {
+        setUser(toAuthUser(await getCurrentUserApi()));
+      } catch {
+        window.localStorage.removeItem(TOKEN_KEY);
+        window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+        setUser(null);
+      } finally {
+        setIsAuthLoading(false);
+      }
+    })();
+  }, []);
 
   async function login(email: string, password: string) {
     try {
       const data = await loginApi(email, password);
       window.localStorage.setItem(TOKEN_KEY, data.accessToken);
       window.localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
-      const authUser: AuthUser = {
-        id: data.user.id,
-        email: data.user.email,
-        role: data.user.role,
-        nom: data.user.email.split("@")[0],
-      };
+      const authUser = toAuthUser(data.user);
       setUser(authUser);
       return { ok: true, role: authUser.role };
     } catch (error) {
@@ -57,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user, isAuthLoading }}>
       {children}
     </AuthContext.Provider>
   );

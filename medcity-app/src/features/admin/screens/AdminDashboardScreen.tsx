@@ -3,7 +3,9 @@ import { Link } from "wouter";
 import {
   Activity,
   ArrowRight,
+  ExternalLink,
   FileText,
+  Gauge,
   GitPullRequest,
   Pill,
   ScrollText,
@@ -69,6 +71,16 @@ const quickActions = [
   },
 ];
 
+const DEFAULT_GRAFANA_PATH = "/d/medcity-overview/medcity-overview?orgId=1&refresh=30s";
+
+function getGrafanaUrl() {
+  const configured = (import.meta.env.VITE_GRAFANA_URL as string | undefined)?.trim();
+  if (configured) return configured;
+
+  if (typeof window === "undefined") return "";
+  return `${window.location.protocol}//${window.location.hostname}:3001${DEFAULT_GRAFANA_PATH}`;
+}
+
 export default function AdminDashboard() {
   const { t, language } = useI18n();
   const [counts, setCounts] = useState({
@@ -80,6 +92,7 @@ export default function AdminDashboard() {
   });
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const grafanaUrl = getGrafanaUrl();
 
   const today = new Date().toLocaleDateString(
     language === "ar" ? "ar-TN" : language === "en" ? "en-US" : "fr-TN",
@@ -256,6 +269,25 @@ export default function AdminDashboard() {
                 </p>
               </div>
               <div className="p-3 space-y-2">
+                <a
+                  href={grafanaUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 rounded-lg px-3 py-3 hover:bg-muted transition-smooth"
+                >
+                  <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-success-soft text-success">
+                    <Gauge className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5 text-sm font-semibold">
+                      Monitoring Grafana
+                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                    </span>
+                    <span className="block text-xs text-muted-foreground mt-0.5">
+                      Dashboards Prometheus: API, CDSS, EC2 CPU/RAM/disk et containers.
+                    </span>
+                  </span>
+                </a>
                 {quickActions.map((action) => {
                   const Icon = action.icon;
 

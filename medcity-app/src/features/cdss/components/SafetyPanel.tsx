@@ -49,6 +49,11 @@ export function SafetyPanel({ alerts }: { alerts: SafetyAlert[] }) {
       </div>
 
       <div className="max-h-[calc(100vh-12rem)] overflow-y-auto scrollbar-thin divide-y divide-border">
+        {alerts.length === 0 && (
+          <div className="p-5 text-sm text-muted-foreground">
+            {t("safety.emptyCatalog")}
+          </div>
+        )}
         {grouped.map(({ sev, items }) => {
           if (items.length === 0) return null;
           const meta = severityMeta[sev];

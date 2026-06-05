@@ -5,19 +5,24 @@ import { statusMeta } from "@/lib/clinical-ui";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/i18n/I18nProvider";
 import { listAuditEntries } from "@/lib/backend-api";
+import { LoadingState } from "@/components/molecules/LoadingState";
 
 export default function AuditPage() {
   const { t } = useI18n();
   const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
     void (async () => {
+      setLoading(true);
       try {
         setAuditEntries(await listAuditEntries());
       } catch {
         setAuditEntries([]);
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
@@ -38,7 +43,7 @@ export default function AuditPage() {
         .toLowerCase()
         .includes(normalized),
     );
-  }, [query]);
+  }, [auditEntries, query]);
 
   function exportAudit() {
     const header = [
@@ -101,13 +106,20 @@ export default function AuditPage() {
           </div>
           <button
             onClick={exportAudit}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-smooth"
+            disabled={loading}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-smooth"
           >
             <Download className="h-4 w-4" /> {t("audit.export")}
           </button>
         </div>
       </div>
 
+      {loading ? (
+        <LoadingState
+          title="Chargement audit"
+          subtitle="Recuperation des traces de validation..."
+        />
+      ) : (
       <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
         <div className="overflow-x-auto scrollbar-thin">
           <table className="w-full text-sm">
@@ -126,7 +138,7 @@ export default function AuditPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {visibleEntries.map((entry) => {
-                const status = statusMeta[entry.finalStatus];
+                const status = statusMeta[entry.finalStatus] ?? statusMeta.draft;
                 return (
                   <tr key={entry.id} className="hover:bg-muted/30 align-top">
                     <td className="px-4 py-3 font-mono text-xs">{entry.prescriptionId}</td>
@@ -148,7 +160,7 @@ export default function AuditPage() {
                           {entry.alertsOverridden}
                         </span>
                       ) : (
-                        <span className="text-muted-foreground text-xs">—</span>
+                        <span className="text-muted-foreground text-xs">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -164,6 +176,7 @@ export default function AuditPage() {
           </table>
         </div>
       </div>
+      )}
     </div>
   );
 }

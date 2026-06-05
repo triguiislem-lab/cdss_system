@@ -273,6 +273,7 @@ export class PrescriptionsService {
     const snapshot = prescription.printSnapshot;
     return {
       prescriptionNumber: prescription.prescriptionNumber,
+      patientId: prescription.patientId,
       status: prescription.status,
       diagnosis: prescription.diagnosis,
       notes: prescription.notes,
@@ -289,6 +290,7 @@ export class PrescriptionsService {
         : prescription.doctor,
       patient: snapshot
         ? {
+            id: prescription.patientId,
             firstName: snapshot.patientFirstName,
             lastName: snapshot.patientLastName,
             birthDate: snapshot.patientBirthDate,

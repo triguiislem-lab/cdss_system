@@ -1,13 +1,14 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConsultationVitals } from '../consultations/consultation-vitals.entity';
-import { Consultation } from '../consultations/consultation.entity';
-import { Patient } from '../patients/patient.entity';
-import { Prescription } from '../prescriptions/prescription.entity';
-import { PrescriptionsModule } from '../prescriptions/prescriptions.module';
-import { SafetyAlert } from '../prescriptions/safety-alert.entity';
-import { CdssController } from './cdss.controller';
-import { CdssService } from './cdss.service';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { ConsultationVitals } from "../consultations/consultation-vitals.entity";
+import { Consultation } from "../consultations/consultation.entity";
+import { Patient } from "../patients/patient.entity";
+import { Prescription } from "../prescriptions/prescription.entity";
+import { PrescriptionsModule } from "../prescriptions/prescriptions.module";
+import { SafetyAlert } from "../prescriptions/safety-alert.entity";
+import { CdssController } from "./cdss.controller";
+import { CdssService } from "./cdss.service";
+import { KaggleCdssWorkerService } from "./kaggle-cdss-worker.service";
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { CdssService } from './cdss.service';
     PrescriptionsModule,
   ],
   controllers: [CdssController],
-  providers: [CdssService],
-  exports: [CdssService],
+  providers: [CdssService, KaggleCdssWorkerService],
+  exports: [CdssService, KaggleCdssWorkerService],
 })
 export class CdssModule {}

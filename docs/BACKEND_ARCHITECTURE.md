@@ -94,16 +94,46 @@ These tests are intentionally not part of push/PR CI. They require real secrets 
 
 ### CDSS Adapter
 
-These endpoints are NestJS-facing wrappers around FastAPI CDSS.
+These endpoints are NestJS-facing wrappers around FastAPI CDSS. The integration
+contract is based on
+`cdss_nestjs_fastapi_complete_adapter_v2_with_kaggle_docs.zip`; older local CDSS
+professional folders are not used as the source of truth for this adapter.
+
+Execution modes:
+
+- `CDSS_EXECUTION_MODE=direct`: NestJS calls a reachable FastAPI runtime through `CDSS_API_BASE_URL`.
+- `CDSS_EXECUTION_MODE=kaggle`: NestJS injects a `JOB_PAYLOAD` into the configured Kaggle notebook worker, submits the kernel, then downloads `result.json` after completion.
 
 | Method | Endpoint | Calls FastAPI | Purpose |
 |---|---|---|---|
+| `GET` | `/api/cdss/endpoints/catalog` | internal catalog | List NestJS-to-FastAPI adapter routes |
+| `GET` | `/api/cdss/health` | `/health` | FastAPI process liveness |
+| `GET` | `/api/cdss/system/status` | `/v1/system/status` | Runtime status |
+| `GET` | `/api/cdss/system/model-cache` | `/v1/system/model-cache` | Model/cache diagnostics |
+| `POST` | `/api/cdss/system/model-cache/warmup` | `/v1/system/model-cache/warmup` | Warm model cache |
+| `POST` | `/api/cdss/system/qwen/warmup` | `/v1/system/qwen/warmup` | Warm Qwen runtime |
+| `GET` | `/api/cdss/system/readiness` | `/v1/system/readiness` | Clinical readiness/resource checks |
 | `POST` | `/api/cdss/prescriptions/draft` | `/v1/prescriptions/draft` | Generate IA draft; optionally save mapped prescription |
 | `POST` | `/api/cdss/prescriptions/analyze` | `/v1/prescriptions/analyze` | Clinical analysis without full generation |
+| `POST` | `/api/cdss/prescriptions/evidence` | `/v1/prescriptions/evidence` | Clinical analysis plus evidence retrieval |
 | `POST` | `/api/cdss/prescriptions/validate-plan` | `/v1/prescriptions/validate` | Validate an existing therapeutic plan |
+| `POST` | `/api/cdss/prescriptions/localize` | `/v1/prescriptions/localize` | Map generic plan to local Tunisian product candidates |
 | `GET` | `/api/cdss/formulary/search` | `/v1/prescriptions/formulary/search` | Search CDSS local formulary |
+| `GET` | `/api/cdss/tn-med/search` | `/v1/prescriptions/tn-med/search` | Search TN Med enrichment DB |
 | `GET` | `/api/cdss/kg/search` | `/v1/prescriptions/kg/search` | Search CDSS KG facts |
 | `GET` | `/api/cdss/prescriptions/audit/:traceId` | `/v1/prescriptions/audit/{trace_id}` | Fetch CDSS trace |
+| `GET` | `/api/cdss/prescriptions/audit/:traceId/review-packet` | `/v1/prescriptions/audit/{trace_id}/review-packet` | Fetch clinician review packet |
+| `GET` | `/api/cdss/prescriptions/:traceId` | `/v1/prescriptions/{trace_id}` | Fetch audit record by trace |
+| `GET` | `/api/cdss/prescriptions/patient/:patientId/history` | `/v1/prescriptions/patient/{patient_id}/history` | Debug patient history |
+| `GET` | `/api/cdss/audit/traces/:traceId` | `/v1/audit/traces/{trace_id}` | Fetch trace through audit router |
+| `POST` | `/api/cdss/prescriptions/:traceId/feedback` | `/v1/prescriptions/{trace_id}/feedback` | Store structured clinician feedback |
+| `POST` | `/api/cdss/prescriptions/:traceId/approve` | `/v1/prescriptions/{trace_id}/approve` | Legacy approve wrapper |
+| `POST` | `/api/cdss/prescriptions/:traceId/reject` | `/v1/prescriptions/{trace_id}/reject` | Legacy reject wrapper |
+| `POST` | `/api/cdss/prescriptions/:traceId/revise` | `/v1/prescriptions/{trace_id}/revise` | Legacy revise wrapper |
+| `POST` | `/api/cdss/feedback/clinician` | `/v1/feedback/clinician` | Lightweight clinician feedback |
+| `GET` | `/api/cdss/monitoring/*` | `/v1/monitoring/*` | Monitoring sections in direct mode |
+| `GET` | `/api/cdss/jobs/:owner/:slug/status` | Kaggle CLI | Check Kaggle worker status |
+| `POST` | `/api/cdss/jobs/:owner/:slug/fetch-result` | Kaggle CLI | Download worker outputs and parse result JSON |
 
 ### Patients
 
@@ -198,6 +228,33 @@ Storage can run in either mode:
 | Translation | `/api/translations/languages`, `/api/translations/translate`, `/api/translations/translate-fields` |
 | Health | `/api/health` |
 
+### Monitoring
+
+The Docker runtime includes a Prometheus/Grafana stack for operational monitoring.
+
+```mermaid
+flowchart LR
+  API[NestJS /api/metrics] --> Prom[Prometheus]
+  CDSS[FastAPI /metrics] --> Prom
+  Node[node-exporter EC2 host] --> Prom
+  CAdvisor[cAdvisor Docker containers] --> Prom
+  Prom --> Grafana[Grafana dashboards]
+  Admin[Admin dashboard] -->|VITE_GRAFANA_URL| Grafana
+```
+
+Grafana dashboards are provisioned from `monitoring/grafana/dashboards`:
+
+- `MedCity Overview`: NestJS API, FastAPI CDSS, request rate, latency, memory, and service health.
+- `MedCity EC2 Host`: EC2 CPU, RAM, disk, network, and Docker container resource usage when `COMPOSE_PROFILES=host-monitoring` is enabled.
+
+The admin dashboard exposes an external `Monitoring Grafana` action. Configure it with:
+
+```env
+VITE_GRAFANA_URL=https://monitoring.example.tn/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
+```
+
+Keep Prometheus private. Expose Grafana only through a protected reverse proxy or a security-group rule restricted to trusted admin IPs.
+
 ### Email Delivery
 
 Contact and newsletter submissions are persisted first, then sent through Resend as non-blocking notifications. If Resend is not configured or fails, the saved database record remains available through the admin CMS endpoints.
@@ -222,6 +279,8 @@ FastAPI prefix: `/v1` for most runtime routes. `/health` is unprefixed.
 | `GET` | `/health` | Process liveness |
 | `GET` | `/v1/system/status` | Runtime status |
 | `GET` | `/v1/system/model-cache` | Model/cache status |
+| `POST` | `/v1/system/model-cache/warmup` | Model/cache warmup |
+| `POST` | `/v1/system/qwen/warmup` | Qwen warmup |
 | `GET` | `/v1/system/readiness` | Clinical readiness/resource checks |
 | `POST` | `/v1/prescriptions/draft` | Full CDSS pipeline: analysis, retrieval, generation, safety, localization, audit |
 | `POST` | `/v1/prescriptions/analyze` | Clinical analysis and pre-planning only |
@@ -871,7 +930,9 @@ empty to import the full 6093-row medicines catalog.
 
 | Area | Status | Notes |
 |---|---|---|
-| NestJS consumes FastAPI CDSS | Implemented | `CdssService` calls FastAPI using `CDSS_API_BASE_URL` |
+| NestJS consumes FastAPI CDSS | Implemented | `CdssService` calls FastAPI using `CDSS_API_BASE_URL`; base URL may be root or `/v1` |
+| Complete CDSS adapter contract from zip | Implemented | System, prescription, evidence, localization, search, audit, feedback, monitoring, and Kaggle worker helper routes are exposed under `/api/cdss` |
+| CDSS execution modes | Implemented | `direct` calls FastAPI live; `kaggle` submits offline notebook worker jobs and fetches outputs |
 | Draft prescription mapping | Implemented | FastAPI draft maps to NestJS prescription and medication rows |
 | Safety finding mapping | Implemented | FastAPI safety maps to NestJS `safety_alerts` |
 | Trace/audit reference | Implemented | FastAPI `trace_id` stored on NestJS prescription |

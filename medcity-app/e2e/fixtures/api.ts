@@ -242,6 +242,19 @@ const medicines = [
   },
 ];
 
+const interactions = [
+  {
+    id: "interaction-1",
+    drugA: "Warfarin",
+    drugB: "Amoxicillin-clavulanate",
+    severity: "critical",
+    mechanism: "Potential INR elevation through microbiome and metabolism effects.",
+    consequence: "Increased bleeding risk.",
+    action: "Monitor INR or choose an alternative antibiotic.",
+    evidence: "Test clinical interaction source",
+  },
+];
+
 const medicineContributions = [
   {
     id: "ctr-test-1",
@@ -291,6 +304,20 @@ function jwtForRole(role: UserRole) {
   return `e30.${payload}.signature`;
 }
 
+function roleFromAuth(route: Route): UserRole {
+  const auth = route.request().headers().authorization;
+  const token = auth?.replace(/^Bearer\s+/i, "");
+  const payload = token?.split(".")[1];
+  if (!payload) return "doctor";
+
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, "base64").toString("utf8")) as { role?: UserRole };
+    return decoded.role === "admin" ? "admin" : "doctor";
+  } catch {
+    return "doctor";
+  }
+}
+
 async function fulfillJson(route: Route, body: unknown, status = 200) {
   if (route.request().method() === "OPTIONS") {
     await route.fulfill({ status: 204, headers: corsHeaders, body: "" });
@@ -320,7 +347,10 @@ function parseLoginRole(route: Route): UserRole {
 }
 
 export async function mockMedcityApi(page: Page) {
+  await page.route(/\/api\/.*/, (route) => fulfillJson(route, { message: `Unhandled test API route: ${route.request().method()} ${route.request().url()}` }, 501));
+
   await page.route(/\/api\/public\/home$/, (route) => fulfillJson(route, cmsHome));
+  await page.route(/\/api\/public\/posts(?:\?.*)?$/, (route) => fulfillJson(route, cmsHome.posts));
   await page.route(/\/api\/public\/posts\/[^/]+$/, (route) => fulfillJson(route, cmsHome.posts[0]));
   await page.route(/\/api\/public\/doctors(?:\?.*)?$/, (route) => fulfillJson(route, paginated(doctors)));
   await page.route(/\/api\/public\/contact-messages$/, (route) => fulfillJson(route, {
@@ -355,9 +385,48 @@ export async function mockMedcityApi(page: Page) {
       },
     });
   });
+  await page.route(/\/api\/auth\/me$/, (route) => {
+    const role = roleFromAuth(route);
+    return fulfillJson(route, {
+      id: role === "admin" ? "admin-1" : "doctor-ahmed",
+      email: role === "admin" ? "admin@medcity.tn" : "dr.ahmed@medcity.tn",
+      role,
+    });
+  });
 
   await page.route(/\/api\/patients(?:\?.*)?$/, (route) => fulfillJson(route, paginated(patients)));
+  await page.route(/\/api\/patients\/[^/]+$/, (route) => {
+    const id = route.request().url().split("/").pop() ?? "";
+    return fulfillJson(route, patients.find((patient) => patient.id === id) ?? patients[0]);
+  });
   await page.route(/\/api\/prescriptions(?:\?.*)?$/, (route) => fulfillJson(route, paginated(prescriptions)));
+  await page.route(/\/api\/prescriptions\/[^/]+$/, (route) => {
+    const id = route.request().url().split("/").pop() ?? "";
+    return fulfillJson(route, prescriptions.find((prescription) => prescription.id === id) ?? prescriptions[0]);
+  });
+  await page.route(/\/api\/prescriptions\/[^/]+\/print-snapshot$/, (route) => {
+    const parts = route.request().url().split("/");
+    const id = parts[parts.length - 2];
+    return fulfillJson(route, prescriptions.find((prescription) => prescription.id === id) ?? prescriptions[0]);
+  });
+  await page.route(/\/api\/prescriptions\/[^/]+\/ordonnance$/, (route) => {
+    const parts = route.request().url().split("/");
+    const id = parts[parts.length - 2];
+    const prescription = prescriptions.find((item) => item.id === id) ?? prescriptions[0];
+    const patient = patients.find((item) => item.id === prescription.patientId) ?? patients[0];
+    return fulfillJson(route, {
+      prescriptionNumber: prescription.prescriptionNumber,
+      patientId: prescription.patientId,
+      status: prescription.status,
+      diagnosis: prescription.diagnosis,
+      notes: prescription.notes,
+      printedAt: "2026-05-30T10:00:00.000Z",
+      doctor: prescription.doctor,
+      patient,
+      medications: prescription.medications,
+      footerNumber: prescription.prescriptionNumber,
+    });
+  });
   await page.route(/\/api\/consultations(?:\?.*)?$/, (route) => fulfillJson(route, paginated(consultations)));
   await page.route(/\/api\/consultations\/[^/]+\/vitals$/, (route) => fulfillJson(route, consultationVitals));
   await page.route(/\/api\/consultations\/[^/]+$/, (route) => fulfillJson(route, consultations[0]));
@@ -410,7 +479,19 @@ export async function mockMedcityApi(page: Page) {
   }));
   await page.route(/\/api\/doctors(?:\?.*)?$/, (route) => fulfillJson(route, paginated(doctors)));
   await page.route(/\/api\/cms\/posts$/, (route) => fulfillJson(route, cmsHome.posts));
+  await page.route(/\/api\/cms\/testimonials$/, (route) => fulfillJson(route, cmsHome.testimonials));
+  await page.route(/\/api\/cms\/partners$/, (route) => fulfillJson(route, cmsHome.partners));
+  await page.route(/\/api\/cms\/specialties$/, (route) => fulfillJson(route, cmsHome.specialties));
+  await page.route(/\/api\/cms\/why-features$/, (route) => fulfillJson(route, cmsHome.whyFeatures));
+  await page.route(/\/api\/cms\/contact-messages$/, (route) => fulfillJson(route, paginated([])));
+  await page.route(/\/api\/cms\/newsletter-subscriptions$/, (route) => fulfillJson(route, paginated([])));
   await page.route(/\/api\/medicines(?:\?.*)?$/, (route) => fulfillJson(route, paginated(medicines)));
+  await page.route(/\/api\/medicines\/classes$/, (route) => fulfillJson(route, ["Antalgique"]));
+  await page.route(/\/api\/medicines\/[^/]+$/, (route) => {
+    const id = route.request().url().split("/").pop() ?? "";
+    return fulfillJson(route, medicines.find((medicine) => medicine.id === id) ?? medicines[0]);
+  });
+  await page.route(/\/api\/interactions(?:\?.*)?$/, (route) => fulfillJson(route, paginated(interactions)));
   await page.route(/\/api\/medicine-contributions(?:\?.*)?$/, (route) => fulfillJson(route, paginated(medicineContributions)));
   await page.route(/\/api\/audit(?:\?.*)?$/, (route) => fulfillJson(route, paginated(audits)));
 }

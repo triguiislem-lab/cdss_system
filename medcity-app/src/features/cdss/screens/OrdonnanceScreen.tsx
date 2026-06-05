@@ -1,10 +1,11 @@
-import { Link, useParams } from "wouter";
+import { Link, useLocation, useParams } from "wouter";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Building2, Printer, ShieldCheck, Stethoscope, User as UserIcon } from "lucide-react";
+import { ArrowLeft, Building2, Printer, Stethoscope, User as UserIcon } from "lucide-react";
 import { SendPrescriptionDialog } from "@/features/cdss/components/SendPrescriptionDialog";
 import { getPatientAge, getPatientFullName, getPatientGenderLabel, type Medication, type Patient } from "@/lib/mock-data";
 import type { DispatchTarget } from "@/lib/stores/pharmacy-store";
 import { createPrintSnapshot, getOrdonnance, mapPatient } from "@/lib/backend-api";
+import { LoadingState } from "@/components/molecules/LoadingState";
 
 type OrdonnanceData = {
   prescriptionNumber: string;
@@ -17,47 +18,77 @@ type OrdonnanceData = {
 
 export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: string }) {
   const params = useParams<{ rxId: string }>();
+  const [location] = useLocation();
+  const patientIdFromQuery = useMemo(() => new URLSearchParams(location.split("?")[1] ?? "").get("patientId") ?? undefined, [location]);
   const [rx, setRx] = useState<OrdonnanceData | null>(null);
   const [patient, setPatient] = useState<Patient | null>(null);
   const [sendOpen, setSendOpen] = useState<DispatchTarget | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!params.rxId || params.rxId === "new") return;
+    if (!params.rxId || params.rxId === "new") {
+      setLoading(false);
+      setError("Prescription not found.");
+      return;
+    }
     void (async () => {
-      await createPrintSnapshot(params.rxId);
-      const data = await getOrdonnance(params.rxId);
-      const mappedPatient = data.patient ? mapPatient(data.patient) : null;
-      setPatient(mappedPatient);
-      setRx({
-        prescriptionNumber: data.prescriptionNumber,
-        diagnosis: data.diagnosis,
-        notes: data.notes,
-        doctor: data.doctor,
-        patient: mappedPatient ?? undefined,
-        medications: data.medications.map((med) => ({
-          id: med.id,
-          name: med.medicineName,
-          dose: med.dosage,
-          route: med.route ?? "",
-          frequency: med.frequency,
-          duration: med.duration ?? "",
-          indication: med.indication ?? "",
-          confidence: med.confidence ?? 0,
-          status: med.status ?? "validated",
-        })),
-      });
+      setLoading(true);
+      setError(null);
+      try {
+        await createPrintSnapshot(params.rxId);
+        const data = await getOrdonnance(params.rxId);
+        const resolvedPatientId = data.patient?.id ?? data.patientId ?? patientIdFromQuery ?? "";
+        const mappedPatient = data.patient ? mapPatient({ ...data.patient, id: resolvedPatientId }) : null;
+        setPatient(mappedPatient);
+        setRx({
+          prescriptionNumber: data.prescriptionNumber,
+          diagnosis: data.diagnosis,
+          notes: data.notes,
+          doctor: data.doctor,
+          patient: mappedPatient ?? undefined,
+          medications: data.medications.map((med) => ({
+            id: med.id,
+            name: med.medicineName,
+            dose: med.dosage,
+            route: med.route ?? "",
+            frequency: med.frequency,
+            duration: med.duration ?? "",
+            indication: med.indication ?? "",
+            confidence: med.confidence ?? 0,
+            status: med.status ?? "validated",
+          })),
+        });
+      } catch (loadError) {
+        setRx(null);
+        setPatient(null);
+        setError(loadError instanceof Error ? loadError.message : "Prescription not found.");
+      } finally {
+        setLoading(false);
+      }
     })();
-  }, [params.rxId]);
+  }, [params.rxId, patientIdFromQuery]);
 
   const doctorName = useMemo(() => {
     const name = [rx?.doctor?.firstName, rx?.doctor?.lastName].filter(Boolean).join(" ").trim();
     return name ? `Dr. ${name}` : "MedCity";
   }, [rx]);
 
+  if (loading) {
+    return (
+      <div className="p-4 lg:p-8">
+        <LoadingState
+          title="Chargement de l'ordonnance"
+          subtitle="Preparation du document imprimable..."
+        />
+      </div>
+    );
+  }
+
   if (!rx || !patient) {
     return (
       <div className="p-8 text-center">
-        <p className="text-sm text-muted-foreground">Prescription not found.</p>
+        <p className="text-sm text-muted-foreground">{error ?? "Prescription not found."}</p>
         <Link href={`${basePath}/prescriptions`} className="inline-flex mt-4 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
           Back to queue
         </Link>
@@ -66,6 +97,9 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
   }
 
   const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+  const diagnosisText =
+    rx.diagnosis?.trim() ||
+    Array.from(new Set(rx.medications.map((medication) => medication.indication?.trim()).filter(Boolean))).join(", ");
 
   return (
     <div className="p-4 lg:p-8 print:p-0">
@@ -113,8 +147,8 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
             </div>
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Diagnosis / indication</div>
-              <div className="mt-1 font-medium">{rx.diagnosis}</div>
-              {rx.notes && <div className="text-xs text-muted-foreground mt-1">{rx.notes}</div>}
+              <div className="mt-1 font-medium">{diagnosisText || "Non renseigne"}</div>
+              {rx.notes?.trim() && <div className="text-xs text-muted-foreground mt-1">{rx.notes}</div>}
             </div>
           </section>
 
@@ -125,7 +159,7 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
                 <li key={medication.id} className="rounded-lg border border-border p-4">
                   <div className="flex items-baseline justify-between gap-3">
                     <div className="font-semibold">{index + 1}. {medication.name}</div>
-                    <div className="text-xs text-muted-foreground">{medication.indication}</div>
+                    {medication.indication && <div className="text-xs text-muted-foreground">{medication.indication}</div>}
                   </div>
                   <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                     <Cell label="Dose" value={medication.dose} />
@@ -138,11 +172,7 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
             </ol>
           </section>
 
-          <footer className="mt-8 border-t border-border pt-5 flex items-end justify-between">
-            <div className="text-[11px] text-muted-foreground max-w-md flex items-start gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 mt-0.5 flex-none" />
-              <span>This prescription was generated with AI assistance and explicitly validated by the prescribing clinician, who remains fully responsible.</span>
-            </div>
+          <footer className="mt-8 border-t border-border pt-5 flex justify-end">
             <div className="text-right">
               <div className="h-12 w-44 border-b border-foreground/40" />
               <div className="text-[11px] text-muted-foreground mt-1">Signature</div>
