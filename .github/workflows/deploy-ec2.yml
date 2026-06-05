@@ -32,8 +32,18 @@ jobs:
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
         run: |
-          test -n "$EC2_HOST"
-          test -n "$EC2_SSH_KEY"
+          missing=0
+          if [ -z "$EC2_HOST" ]; then
+            echo "::error title=Missing EC2_HOST::Set the repository secret EC2_HOST to the EC2 public DNS or IP."
+            missing=1
+          fi
+          if [ -z "$EC2_SSH_KEY" ]; then
+            echo "::error title=Missing EC2_SSH_KEY::Set the repository secret EC2_SSH_KEY to the private PEM key content."
+            missing=1
+          fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
 
       - name: Configure SSH
         env:
