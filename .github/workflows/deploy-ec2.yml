@@ -22,7 +22,7 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     env:
-      EC2_HOST: ${{ secrets.EC2_HOST }}
+      EC2_HOST: ${{ secrets.EC2_HOST || vars.EC2_HOST }}
       EC2_USER: ${{ vars.EC2_USER || 'ubuntu' }}
       EC2_APP_DIR: ${{ vars.EC2_APP_DIR || '/opt/cdss_system' }}
       DEPLOY_REF: ${{ inputs.ref || github.event.workflow_run.head_sha || 'main' }}
@@ -34,7 +34,7 @@ jobs:
         run: |
           missing=0
           if [ -z "$EC2_HOST" ]; then
-            echo "::error title=Missing EC2_HOST::Set the repository secret EC2_HOST to the EC2 public DNS or IP."
+            echo "::error title=Missing EC2_HOST::Set EC2_HOST as a repository secret or repository variable to the EC2 public DNS or IP."
             missing=1
           fi
           if [ -z "$EC2_SSH_KEY" ]; then
@@ -42,6 +42,7 @@ jobs:
             missing=1
           fi
           if [ "$missing" -ne 0 ]; then
+            echo "::notice title=EC2 deploy setup::GitHub repository settings required: Secrets EC2_SSH_KEY, and Secret or Variable EC2_HOST. Variables EC2_USER and EC2_APP_DIR are optional."
             exit 1
           fi
 

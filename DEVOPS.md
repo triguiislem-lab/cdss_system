@@ -47,13 +47,13 @@ For EC2 deployment, configure these repository settings in GitHub:
 Secrets:
 
 ```text
-EC2_HOST=ec2-...compute-1.amazonaws.com
 EC2_SSH_KEY=<contents of the private .pem key>
 ```
 
 Variables:
 
 ```text
+EC2_HOST=ec2-...compute-1.amazonaws.com
 EC2_USER=ubuntu
 EC2_APP_DIR=/opt/cdss_system
 VITE_API_BASE_URL=
