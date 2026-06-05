@@ -250,10 +250,11 @@ Grafana dashboards are provisioned from `monitoring/grafana/dashboards`:
 The admin dashboard exposes an external `Monitoring Grafana` action. Configure it with:
 
 ```env
-VITE_GRAFANA_URL=https://monitoring.example.tn/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
+GRAFANA_PUBLIC_URL=https://example.tn/grafana/
+VITE_GRAFANA_URL=https://example.tn/grafana/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
 ```
 
-Keep Prometheus private. Expose Grafana only through a protected reverse proxy or a security-group rule restricted to trusted admin IPs.
+Keep Prometheus private. In Docker production, the frontend Nginx container proxies Grafana at `/grafana/`, so administrators can open monitoring from the admin dashboard through the same public application origin without exposing Grafana port `3001`.
 
 ### Email Delivery
 

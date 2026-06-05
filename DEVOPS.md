@@ -59,7 +59,8 @@ EC2_APP_DIR=/opt/cdss_system
 VITE_API_BASE_URL=
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
-VITE_GRAFANA_URL=https://monitoring.your-domain.tn/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
+GRAFANA_PUBLIC_URL=https://your-domain.tn/grafana/
+VITE_GRAFANA_URL=https://your-domain.tn/grafana/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
 ```
 
 Recommended branch protection for `main`: require the `CI` workflow to pass before merging pull requests. Use the manual `Docker` workflow when you are ready to publish images. EC2 deployment runs automatically after a successful `main` CI run; use the manual `Deploy EC2` workflow only when you need to redeploy a specific ref.
@@ -157,20 +158,23 @@ Set Grafana credentials in `.env`:
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=<strong-password>
 GRAFANA_BIND_ADDRESS=127.0.0.1
+GRAFANA_PUBLIC_URL=http://localhost:5173/grafana/
+GRAFANA_SERVE_FROM_SUB_PATH=true
 PROMETHEUS_PORT=9090
 GRAFANA_PORT=3001
-VITE_GRAFANA_URL=http://localhost:3001/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
+VITE_GRAFANA_URL=http://localhost:5173/grafana/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
 ```
 
-The Grafana dashboard is provisioned automatically at startup under the `MedCity` folder. Prometheus and Grafana ports are bound to `127.0.0.1` by default; on EC2, keep them private and access them through SSH tunneling or a protected reverse proxy instead of exposing them directly to the internet.
+The Grafana dashboard is provisioned automatically at startup under the `MedCity` folder. Prometheus and Grafana ports are bound to `127.0.0.1` by default. The frontend Nginx container exposes Grafana through the same public frontend origin at `/grafana/`, so administrators do not need a separate public `3001` security-group rule.
 
 The admin dashboard includes a `Monitoring Grafana` action. The button target is compiled into the frontend from `VITE_GRAFANA_URL`. For EC2, set this to the protected public URL or reverse-proxy URL that administrators can reach from their browser:
 
 ```env
-VITE_GRAFANA_URL=https://monitoring.your-domain.tn/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
+GRAFANA_PUBLIC_URL=https://your-domain.tn/grafana/
+VITE_GRAFANA_URL=https://your-domain.tn/grafana/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
 ```
 
-If you intentionally expose Grafana directly from EC2 for a private demo, set:
+If you intentionally expose Grafana directly from EC2 for a private demo instead of `/grafana/`, set:
 
 ```env
 GRAFANA_BIND_ADDRESS=0.0.0.0
@@ -195,6 +199,6 @@ The additional `MedCity EC2 Host` Grafana dashboard is provisioned automatically
 Useful dashboard URLs:
 
 ```text
-MedCity Overview: http://localhost:3001/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
-MedCity EC2 Host: http://localhost:3001/d/medcity-ec2-host/medcity-ec2-host?orgId=1&refresh=30s
+MedCity Overview: http://localhost:5173/grafana/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
+MedCity EC2 Host: http://localhost:5173/grafana/d/medcity-ec2-host/medcity-ec2-host?orgId=1&refresh=30s
 ```

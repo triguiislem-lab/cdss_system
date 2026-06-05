@@ -26,6 +26,8 @@ jobs:
       EC2_USER: ${{ vars.EC2_USER || 'ubuntu' }}
       EC2_APP_DIR: ${{ vars.EC2_APP_DIR || '/opt/cdss_system' }}
       DEPLOY_REF: ${{ inputs.ref || github.event.workflow_run.head_sha || 'main' }}
+      VITE_GRAFANA_URL: ${{ vars.VITE_GRAFANA_URL || '' }}
+      GRAFANA_PUBLIC_URL: ${{ vars.GRAFANA_PUBLIC_URL || '' }}
 
     steps:
       - name: Validate deployment configuration
@@ -57,7 +59,7 @@ jobs:
 
       - name: Deploy application
         run: |
-          ssh -i ~/.ssh/ec2_key "$EC2_USER@$EC2_HOST" "DEPLOY_REF='$DEPLOY_REF' EC2_APP_DIR='$EC2_APP_DIR' bash -se" <<'REMOTE'
+          ssh -i ~/.ssh/ec2_key "$EC2_USER@$EC2_HOST" "DEPLOY_REF='$DEPLOY_REF' EC2_APP_DIR='$EC2_APP_DIR' VITE_GRAFANA_URL='$VITE_GRAFANA_URL' GRAFANA_PUBLIC_URL='$GRAFANA_PUBLIC_URL' GRAFANA_SERVE_FROM_SUB_PATH='true' bash -se" <<'REMOTE'
             cd "$EC2_APP_DIR"
 
             git fetch --prune origin main --tags

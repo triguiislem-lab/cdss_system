@@ -78,7 +78,7 @@ function getGrafanaUrl() {
   if (configured) return configured;
 
   if (typeof window === "undefined") return "";
-  return `${window.location.protocol}//${window.location.hostname}:3001${DEFAULT_GRAFANA_PATH}`;
+  return `${window.location.origin}/grafana${DEFAULT_GRAFANA_PATH}`;
 }
 
 export default function AdminDashboard() {
