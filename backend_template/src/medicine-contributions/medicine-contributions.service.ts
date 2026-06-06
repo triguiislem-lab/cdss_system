@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { toPaginated } from '../common/dto/pagination.dto';
 import {
   ContributionKind,
   ContributionStatus,
+  PregnancyStatus,
+  ReimbursementRate,
   UserRole,
 } from '../common/entities/enums';
 import { DoctorsService } from '../doctors/doctors.service';
@@ -107,6 +109,21 @@ export class MedicineContributionsService {
         this.medicinesRepository.create(newMedicine),
       );
     }
+    if (
+      contribution.kind === ContributionKind.Correction &&
+      contribution.targetMedicineId &&
+      contribution.field &&
+      contribution.newValue !== undefined
+    ) {
+      const medicine = await this.medicinesRepository.findOne({
+        where: { id: contribution.targetMedicineId },
+      });
+      if (!medicine) {
+        throw new NotFoundException('Target medicine not found');
+      }
+      applyMedicineCorrection(medicine, contribution.field, contribution.newValue);
+      await this.medicinesRepository.save(medicine);
+    }
 
     return this.contributionsRepository.save(contribution);
   }
@@ -127,4 +144,80 @@ export class MedicineContributionsService {
     await this.contributionsRepository.remove(contribution);
     return { ok: true };
   }
+}
+
+const editableMedicineFields = new Set([
+  'dci',
+  'brands',
+  'atcCode',
+  'drugClass',
+  'forms',
+  'laboratories',
+  'reimbursement',
+  'indication',
+  'contraindications',
+  'posologyAdult',
+  'pregnancy',
+  'priceTndApprox',
+]);
+
+function applyMedicineCorrection(
+  medicine: Medicine,
+  field: string,
+  rawValue: string,
+) {
+  if (!editableMedicineFields.has(field)) {
+    throw new BadRequestException(`Medicine field "${field}" cannot be edited by contribution`);
+  }
+
+  const target = medicine as unknown as Record<string, unknown>;
+  if (field === 'brands' || field === 'forms' || field === 'laboratories' || field === 'contraindications') {
+    target[field] = rawValue
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean);
+    return;
+  }
+  if (field === 'priceTndApprox') {
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      throw new BadRequestException('Invalid medicine price value');
+    }
+    target[field] = parsed;
+    return;
+  }
+  if (field === 'pregnancy') {
+    target[field] = normalizePregnancy(rawValue);
+    return;
+  }
+  if (field === 'reimbursement') {
+    target[field] = normalizeReimbursement(rawValue);
+    return;
+  }
+  target[field] = rawValue.trim();
+}
+
+function normalizePregnancy(value: string): PregnancyStatus {
+  const normalized = normalizeText(value);
+  if (normalized === 'autorise') return PregnancyStatus.Authorized;
+  if (normalized === 'precaution') return PregnancyStatus.Precaution;
+  if (normalized === 'contre-indique') return PregnancyStatus.Contraindicated;
+  throw new BadRequestException('Invalid pregnancy status value');
+}
+
+function normalizeReimbursement(value: string): ReimbursementRate {
+  const normalized = value.trim();
+  if (normalized === ReimbursementRate.Full) return ReimbursementRate.Full;
+  if (normalized === ReimbursementRate.High) return ReimbursementRate.High;
+  if (normalized === ReimbursementRate.Partial) return ReimbursementRate.Partial;
+  if (normalized === ReimbursementRate.None) return ReimbursementRate.None;
+  throw new BadRequestException('Invalid reimbursement value');
+}
+
+function normalizeText(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 }

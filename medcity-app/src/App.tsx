@@ -23,7 +23,6 @@ import Login from "@/pages/login";
 import AdminDoctors from "@/pages/admin/doctors";
 import AdminDashboard from "@/pages/admin/index";
 import AdminCMS from "@/pages/admin/cms";
-import AdminInteractionChecker from "@/pages/admin/cdss/interactions";
 import AdminAuditPage from "@/pages/admin/cdss/audit";
 import AdminMedicines from "@/pages/admin/cdss/medicines";
 import AdminMedicineContributions from "@/pages/admin/cdss/medicine-contributions";
@@ -39,7 +38,6 @@ import ReviewPrescription from "@/pages/doctor/prescription.$rxId.review";
 import Ordonnance from "@/pages/doctor/prescription.$rxId.ordonnance";
 import Medicines from "@/pages/doctor/medicines";
 import MedicineContributions from "@/pages/doctor/medicine-contributions";
-import InteractionChecker from "@/pages/doctor/interactions";
 import DoctorContactAdmin from "@/pages/doctor/contact-admin";
 import { DoctorLayout } from "@/components/templates/DoctorLayout";
 import PatientChartScreen from "@/features/cdss/screens/PatientChartScreen";
@@ -69,9 +67,6 @@ function Router() {
       </Route>
       <Route path="/admin/cms">
         {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminCMS /></AdminLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/admin/cdss/interactions">
-        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminInteractionChecker /></AdminLayout></ProtectedRoute>}
       </Route>
       <Route path="/admin/cdss/medicines">
         {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminMedicines /></AdminLayout></ProtectedRoute>}
@@ -115,9 +110,6 @@ function Router() {
       </Route>
       <Route path="/doctor/medicines">
         {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><Medicines /></DoctorLayout></ProtectedRoute>}
-      </Route>
-      <Route path="/doctor/interactions">
-        {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><InteractionChecker /></DoctorLayout></ProtectedRoute>}
       </Route>
       <Route path="/doctor/contact-admin">
         {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><DoctorContactAdmin /></DoctorLayout></ProtectedRoute>}

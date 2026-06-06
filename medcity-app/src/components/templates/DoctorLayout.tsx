@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import {
-  Activity,
   CalendarClock,
   ClipboardCheck,
   FilePlus2,
@@ -33,7 +32,6 @@ const WORKSPACE_NAV: NavItem[] = [
   { href: "/doctor/prescriptions", labelKey: "nav.prescriptionReview", icon: ClipboardCheck },
   { href: "/doctor/medicines", labelKey: "nav.medicines", icon: Pill },
   { href: "/doctor/medicine-contributions", labelKey: "nav.contributions", icon: GitPullRequest },
-  { href: "/doctor/interactions", labelKey: "nav.interactions", icon: Activity },
   { href: "/doctor/contact-admin", labelKey: "nav.contactAdmin", icon: Mail },
 ];
 

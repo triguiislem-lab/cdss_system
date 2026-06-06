@@ -25,9 +25,12 @@ const statusMeta: Record<ContributionStatus, { label: string; icon: React.Compon
 function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
   const { user: authUser } = useAuth();
   const user = authUser ? { email: authUser.email, name: authUser.nom } : null;
+  const isAdmin = authUser?.role === "admin";
   const [items, setItems] = useState<MedicineContribution[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
+  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
 
   const [tab, setTab] = useState<ContributionStatus | "all">("pending");
   const [openCreate, setOpenCreate] = useState(false);
@@ -64,13 +67,13 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
   }), [items]);
 
   const handleValidate = (c: MedicineContribution) => {
-    if (!user) return;
-    if (c.authorEmail === user.email) {
-      alert("Vous ne pouvez pas valider votre propre contribution. Un autre médecin doit la relire.");
+    if (!isAdmin) {
+      alert("La validation des contributions est réservée à l'administration.");
       return;
     }
     void (async () => {
       await validateMedicineContribution(c.id);
+      setReviewMessage("Contribution validée. La mise à jour du catalogue est appliquée ou sera disponible dès la prochaine synchronisation.");
       await refresh();
     })();
   };
@@ -81,16 +84,37 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
         <div>
           <h1 className="text-2xl font-bold">Contributions médicaments</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Proposez de nouveaux médicaments, corrigez ou complétez les fiches existantes. Chaque contribution doit être validée par un autre médecin.
+            {isAdmin
+              ? "Revoyez les corrections et nouveaux médicaments proposés par les médecins avant application au catalogue."
+              : "Proposez de nouveaux médicaments, corrigez ou complétez les fiches existantes. L'administration vérifiera la contribution avant application."}
           </p>
         </div>
-        <button
-          onClick={() => setOpenCreate(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-card hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" /> Nouvelle contribution
-        </button>
+        {!isAdmin && (
+          <button
+            onClick={() => {
+              setSubmissionMessage(null);
+              setOpenCreate(true);
+            }}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-card hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" /> Nouvelle contribution
+          </button>
+        )}
       </div>
+
+      {submissionMessage && (
+        <div className="rounded-lg border border-success/30 bg-success-soft px-4 py-3 text-sm text-success">
+          <CheckCircle2 className="mr-2 inline h-4 w-4" />
+          {submissionMessage}
+        </div>
+      )}
+
+      {reviewMessage && (
+        <div className="rounded-lg border border-success/30 bg-success-soft px-4 py-3 text-sm text-success">
+          <ShieldCheck className="mr-2 inline h-4 w-4" />
+          {reviewMessage}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-1 rounded-lg border border-border bg-card p-1 w-fit">
         {(["pending", "validated", "refused", "all"] as const).map((t) => (
@@ -127,7 +151,6 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
             {filtered.map((c) => {
               const Kind = kindMeta[c.kind];
               const Stat = statusMeta[c.status];
-              const isOwn = user?.email === c.authorEmail;
               return (
                 <li key={c.id} className="p-4 lg:p-5 hover:bg-muted/30 transition-smooth">
                   <div className="flex flex-wrap items-start gap-3">
@@ -185,21 +208,19 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
                       <button onClick={() => setViewTarget(c)} className="rounded-md border border-input bg-background px-3 py-1.5 text-xs font-semibold hover:bg-muted">
                         Détails
                       </button>
-                      {c.status === "pending" && (
+                      {isAdmin && c.status === "pending" && (
                         <>
                           <button
                             onClick={() => handleValidate(c)}
-                            disabled={isOwn}
-                            title={isOwn ? "Vous ne pouvez pas valider votre propre contribution" : "Valider cette contribution"}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-success px-3 py-1.5 text-xs font-semibold text-success-foreground hover:bg-success/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Valider cette contribution"
+                            className="inline-flex items-center gap-1.5 rounded-md bg-success px-3 py-1.5 text-xs font-semibold text-success-foreground hover:bg-success/90"
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" /> Valider
                           </button>
                           <button
                             onClick={() => setRefuseTarget(c)}
-                            disabled={isOwn}
-                            title={isOwn ? "Vous ne pouvez pas refuser votre propre contribution" : "Refuser cette contribution"}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-critical px-3 py-1.5 text-xs font-semibold text-critical-foreground hover:bg-critical/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Refuser cette contribution"
+                            className="inline-flex items-center gap-1.5 rounded-md bg-critical px-3 py-1.5 text-xs font-semibold text-critical-foreground hover:bg-critical/90"
                           >
                             <XCircle className="h-3.5 w-3.5" /> Refuser
                           </button>
@@ -216,11 +237,25 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
 
       <div className="rounded-lg border border-info/30 bg-info-soft p-3 text-xs text-info">
         <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />
-        Règle de gouvernance : un médecin ne peut pas valider sa propre contribution. Le refus doit toujours être motivé.
+        {isAdmin
+          ? "Règle de gouvernance : l'administration valide ou refuse les contributions. Le refus doit toujours être motivé."
+          : "Votre contribution est reçue par l'administration. Si elle est validée, la mise à jour sera appliquée au catalogue dès que possible."}
         Voir aussi <Link href={`${basePath}/medicines`} className="font-semibold underline">base medicaments Tunisie</Link>.
       </div>
 
-      {openCreate && <CreateDialog onClose={() => { setOpenCreate(false); void refresh(); }} />}
+      {openCreate && (
+        <CreateDialog
+          onClose={() => {
+            setOpenCreate(false);
+            void refresh();
+          }}
+          onCreated={() => {
+            setSubmissionMessage("Contribution reçue. La mise à jour sera vérifiée par l'administration et appliquée dès que possible.");
+            setOpenCreate(false);
+            void refresh();
+          }}
+        />
+      )}
       {refuseTarget && (
         <RefuseDialog
           contribution={refuseTarget}
@@ -229,6 +264,7 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
             if (!user) return;
             void (async () => {
               await refuseMedicineContribution(refuseTarget.id, reason);
+              setReviewMessage("Contribution refusée. Le motif est conservé dans l'historique de revue.");
               await refresh();
             })();
             setRefuseTarget(null);
@@ -242,7 +278,7 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
 
 /* ---------------- Create dialog ---------------- */
 
-function CreateDialog({ onClose }: { onClose: () => void }) {
+function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { user: authUser } = useAuth();
   const user = authUser ? { email: authUser.email, name: authUser.nom } : null;
   const [kind, setKind] = useState<ContributionKind>("correction");
@@ -361,7 +397,7 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
             rationale: base.rationale,
           });
         }
-        onClose();
+        onCreated();
       } catch (submitError) {
         setDialogError(submitError instanceof Error ? submitError.message : "Impossible d'enregistrer la contribution.");
       } finally {

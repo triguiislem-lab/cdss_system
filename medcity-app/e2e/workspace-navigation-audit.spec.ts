@@ -39,7 +39,6 @@ test("doctor workspace routes and direct links are wired", async ({ page }) => {
     "/doctor/prescription/rx-2087/ordonnance?patientId=patient-1042",
     "/doctor/medicines",
     "/doctor/medicine-contributions",
-    "/doctor/interactions",
     "/doctor/contact-admin",
   ];
 
@@ -90,7 +89,6 @@ test("admin workspace routes are wired", async ({ page }) => {
     "/admin/cms",
     "/admin/cdss/medicines",
     "/admin/cdss/medicine-contributions",
-    "/admin/cdss/interactions",
     "/admin/cdss/audit",
   ];
 

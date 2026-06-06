@@ -4,7 +4,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nProvider";
 import { cn } from "@/lib/utils";
 import {
-  Activity,
   FileText,
   GitPullRequest,
   LayoutDashboard,
@@ -27,7 +26,6 @@ const WORKSPACE_NAV: NavItem[] = [
   { href: "/admin", labelKey: "nav.dashboard", icon: LayoutDashboard, exact: true },
   { href: "/admin/cdss/medicines", labelKey: "nav.medicines", icon: Pill },
   { href: "/admin/cdss/medicine-contributions", labelKey: "nav.contributions", icon: GitPullRequest },
-  { href: "/admin/cdss/interactions", labelKey: "nav.interactions", icon: Activity },
   { href: "/admin/cdss/audit", labelKey: "nav.audit", icon: ScrollText },
 ];
 

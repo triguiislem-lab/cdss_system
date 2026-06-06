@@ -1,6 +1,5 @@
 import type {
   AuditEntry,
-  InteractionResult,
   Medication,
   Patient,
   PrescriptionCase,
@@ -460,11 +459,6 @@ export async function listAuditEntries() {
     finalStatus: entry.finalStatus ?? "draft",
     timestamp: entry.timestamp ?? "",
   }));
-}
-
-export async function listInteractions() {
-  const result = await apiRequest<Paginated<InteractionResult>>("/api/interactions?limit=100");
-  return result.data;
 }
 
 export async function listMedicines(options: string | MedicineListOptions = {}) {
