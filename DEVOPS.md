@@ -61,7 +61,22 @@ VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 GRAFANA_PUBLIC_URL=https://your-domain.tn/grafana/
 VITE_GRAFANA_URL=https://your-domain.tn/grafana/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
+EMAIL_ENABLED=true
+RESEND_TIMEOUT_MS=10000
+NEWSLETTER_CONFIRMATION_ENABLED=true
 ```
+
+Email delivery through Resend uses these GitHub secrets:
+
+```text
+RESEND_API_KEY=<resend-api-key>
+RESEND_FROM=MedCity Connect <contact@your-domain.tn>
+CONTACT_NOTIFICATION_TO=contact@your-domain.tn
+NEWSLETTER_NOTIFICATION_TO=contact@your-domain.tn
+```
+
+The deploy workflow forwards these values to Docker Compose. They can also be
+kept directly in the EC2 `.env` file for manual deployments.
 
 Recommended branch protection for `main`: require the `CI` workflow to pass before merging pull requests. Use the manual `Docker` workflow when you are ready to publish images. EC2 deployment runs automatically after a successful `main` CI run; use the manual `Deploy EC2` workflow only when you need to redeploy a specific ref.
 

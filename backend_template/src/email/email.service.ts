@@ -1,9 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  DispatchChannel,
+  PharmacyTarget,
+} from '../common/entities/enums';
+import {
   ContactMessage,
   NewsletterSubscription,
 } from '../cms/cms.entities';
+import { Prescription } from '../prescriptions/prescription.entity';
 
 type ResendEmailPayload = {
   from: string;
@@ -108,6 +113,98 @@ export class EmailService {
     ]);
   }
 
+  async sendPrescriptionDispatchEmail(input: {
+    prescription: Prescription;
+    target: PharmacyTarget;
+    recipient: string;
+    channel: DispatchChannel;
+    note?: string;
+  }) {
+    if (input.channel !== DispatchChannel.Email) {
+      return;
+    }
+    if (!this.looksLikeEmail(input.recipient)) {
+      this.logger.warn(
+        `Prescription dispatch email skipped; invalid recipient: ${input.recipient}`,
+      );
+      return;
+    }
+
+    const prescription = input.prescription;
+    const patientName = [
+      prescription.patient?.firstName,
+      prescription.patient?.lastName,
+    ].filter(Boolean).join(' ') || 'Patient';
+    const doctorName = [
+      prescription.doctor?.firstName,
+      prescription.doctor?.lastName,
+    ].filter(Boolean).join(' ') || 'MedCity';
+    const targetLabel =
+      input.target === PharmacyTarget.Patient ? 'patient' : 'pharmacie';
+    const medicationRows = [...(prescription.medications ?? [])]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((medication) => `
+        <tr>
+          <td>${this.escapeHtml(medication.medicineName)}</td>
+          <td>${this.escapeHtml(medication.dosage)}</td>
+          <td>${this.escapeHtml(medication.frequency)}</td>
+          <td>${this.escapeHtml(medication.duration || '')}</td>
+          <td>${this.escapeHtml(medication.instructions || medication.indication || '')}</td>
+        </tr>
+      `)
+      .join('');
+
+    await this.sendEmail({
+      to: input.recipient,
+      subject: `[MedCity] Ordonnance ${prescription.prescriptionNumber}`,
+      html: `
+        <h2>Ordonnance MedCity</h2>
+        <p>Bonjour,</p>
+        <p>Une ordonnance a ete transmise a votre attention via MedCity.</p>
+        <p><strong>Numero:</strong> ${this.escapeHtml(prescription.prescriptionNumber)}</p>
+        <p><strong>Patient:</strong> ${this.escapeHtml(patientName)}</p>
+        <p><strong>Medecin:</strong> Dr. ${this.escapeHtml(doctorName)}</p>
+        ${prescription.diagnosis ? `<p><strong>Diagnostic / indication:</strong> ${this.escapeHtml(prescription.diagnosis)}</p>` : ''}
+        ${input.note ? `<p><strong>Note:</strong> ${this.escapeHtml(input.note)}</p>` : ''}
+        <table border="1" cellpadding="6" cellspacing="0">
+          <thead>
+            <tr>
+              <th>Medicament</th>
+              <th>Dosage</th>
+              <th>Frequence</th>
+              <th>Duree</th>
+              <th>Instructions</th>
+            </tr>
+          </thead>
+          <tbody>${medicationRows}</tbody>
+        </table>
+        <p>Ce message est destine au ${this.escapeHtml(targetLabel)} indique par le prescripteur.</p>
+      `,
+      text: [
+        'Ordonnance MedCity',
+        `Numero: ${prescription.prescriptionNumber}`,
+        `Patient: ${patientName}`,
+        `Medecin: Dr. ${doctorName}`,
+        prescription.diagnosis ? `Diagnostic / indication: ${prescription.diagnosis}` : '',
+        input.note ? `Note: ${input.note}` : '',
+        '',
+        ...(prescription.medications ?? []).map((medication) =>
+          [
+            medication.medicineName,
+            medication.dosage,
+            medication.frequency,
+            medication.duration,
+            medication.instructions || medication.indication,
+          ].filter(Boolean).join(' - '),
+        ),
+      ].filter(Boolean).join('\n'),
+      tags: [
+        { name: 'event', value: 'prescription_dispatch' },
+        { name: 'target', value: input.target },
+      ],
+    });
+  }
+
   private async sendEmail(payload: Omit<ResendEmailPayload, 'from'>) {
     if (!this.emailEnabled()) {
       this.logger.debug('EMAIL_ENABLED=false; Resend email skipped.');
@@ -183,6 +280,10 @@ export class EmailService {
   private tagValue(value: string) {
     const normalized = value.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 256);
     return normalized || 'unknown';
+  }
+
+  private looksLikeEmail(value: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
   }
 
   private escapeHtml(value: string) {

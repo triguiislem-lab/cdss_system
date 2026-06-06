@@ -3,9 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository } from 'typeorm';
 import { toPaginated } from '../common/dto/pagination.dto';
 import {
+  DispatchChannel,
   DispatchStatus,
   PharmacyTarget,
 } from '../common/entities/enums';
+import { EmailService } from '../email/email.service';
 import { Prescription } from '../prescriptions/prescription.entity';
 import {
   CreatePharmacyDispatchDto,
@@ -21,6 +23,7 @@ export class PharmacyService {
     private readonly dispatchesRepository: Repository<PharmacyDispatch>,
     @InjectRepository(Prescription)
     private readonly prescriptionsRepository: Repository<Prescription>,
+    private readonly emailService: EmailService,
   ) {}
 
   async findAll(query: PharmacyDispatchQueryDto) {
@@ -85,14 +88,14 @@ export class PharmacyService {
     );
   }
 
-  createForPrescription(
+  async createForPrescription(
     prescription: Prescription,
     target: PharmacyTarget,
     recipient: string,
     channel: CreatePharmacyDispatchDto['channel'],
     note?: string,
   ) {
-    return this.dispatchesRepository.save(
+    const dispatch = await this.dispatchesRepository.save(
       this.dispatchesRepository.create({
         prescriptionId: prescription.id,
         patientId: prescription.patientId,
@@ -105,6 +108,22 @@ export class PharmacyService {
         sentAt: new Date(),
       }),
     );
+    if (channel === DispatchChannel.Email) {
+      const emailPrescription = await this.prescriptionsRepository.findOne({
+        where: { id: prescription.id },
+        relations: { patient: true, doctor: true, medications: true },
+      });
+      if (emailPrescription) {
+        void this.emailService.sendPrescriptionDispatchEmail({
+          prescription: emailPrescription,
+          target,
+          recipient,
+          channel,
+          note,
+        });
+      }
+    }
+    return dispatch;
   }
 
   async update(id: string, dto: UpdatePharmacyDispatchDto) {

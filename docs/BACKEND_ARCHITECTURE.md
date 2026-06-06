@@ -258,7 +258,7 @@ Keep Prometheus private. In Docker production, the frontend Nginx container prox
 
 ### Email Delivery
 
-Contact and newsletter submissions are persisted first, then sent through Resend as non-blocking notifications. If Resend is not configured or fails, the saved database record remains available through the admin CMS endpoints.
+Contact, doctor-to-admin messages, newsletter submissions, and email-channel prescription dispatches are persisted first, then sent through Resend as non-blocking notifications. If Resend is not configured or fails, the saved database/dispatch record remains available through the admin endpoints.
 
 Required environment variables:
 
@@ -270,6 +270,10 @@ Required environment variables:
 | `CONTACT_NOTIFICATION_TO` | Admin/contact mailbox for public and doctor contact messages |
 | `NEWSLETTER_NOTIFICATION_TO` | Admin/contact mailbox notified on new newsletter subscriptions |
 | `NEWSLETTER_CONFIRMATION_ENABLED` | Sends confirmation email to the subscriber when `true` |
+
+Prescription dispatch emails use the same `EMAIL_ENABLED`, `RESEND_API_KEY`,
+`RESEND_FROM`, and `RESEND_TIMEOUT_MS` settings. SMS, fax, portal, and pharmacy
+portal dispatch channels are currently stored as dispatch records only.
 
 ## FastAPI CDSS Endpoints
 
