@@ -122,13 +122,16 @@ export class DoctorsService {
         status: DoctorStatus.Active,
       }),
     );
-    void this.emailService.sendDoctorCredentialsEmail({
+    const credentialEmail = await this.emailService.sendDoctorCredentialsEmail({
       firstName: doctor.firstName,
       lastName: doctor.lastName,
       email: doctor.email,
       password: dto.password,
     });
-    return doctor;
+    return {
+      ...doctor,
+      credentialEmail,
+    };
   }
 
   async update(id: string, dto: UpdateDoctorDto) {

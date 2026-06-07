@@ -2,6 +2,8 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -9,6 +11,7 @@ import {
 import { ConsultationVitals } from '../consultations/consultation-vitals.entity';
 import { Consultation } from '../consultations/consultation.entity';
 import { Gender } from '../common/entities/enums';
+import { DoctorProfile } from '../doctors/doctor-profile.entity';
 import { PharmacyDispatch } from '../pharmacy/pharmacy-dispatch.entity';
 import { Prescription } from '../prescriptions/prescription.entity';
 
@@ -81,6 +84,16 @@ export class Patient {
 
   @Column({ name: 'missing_data', type: 'simple-json', nullable: true })
   missingData?: string[];
+
+  @Column({ name: 'owner_doctor_id', nullable: true })
+  ownerDoctorId?: string;
+
+  @ManyToOne(() => DoctorProfile, (doctor) => doctor.patients, {
+    nullable: true,
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'owner_doctor_id' })
+  ownerDoctor?: DoctorProfile;
 
   @OneToMany(() => Consultation, (consultation) => consultation.patient)
   consultations: Consultation[];

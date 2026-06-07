@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { toPaginated } from '../common/dto/pagination.dto';
 import { ConsultationStatus, UserRole } from '../common/entities/enums';
 import { DoctorsService } from '../doctors/doctors.service';
+import { Patient } from '../patients/patient.entity';
 import { User } from '../users/user.entity';
 import { ConsultationVitals } from './consultation-vitals.entity';
 import { Consultation } from './consultation.entity';
@@ -25,6 +26,8 @@ export class ConsultationsService {
     private readonly consultationsRepository: Repository<Consultation>,
     @InjectRepository(ConsultationVitals)
     private readonly vitalsRepository: Repository<ConsultationVitals>,
+    @InjectRepository(Patient)
+    private readonly patientsRepository: Repository<Patient>,
     private readonly doctorsService: DoctorsService,
   ) {}
 
@@ -86,6 +89,25 @@ export class ConsultationsService {
     if (!doctorId) {
       throw new BadRequestException('Admin-created consultations require doctorId');
     }
+
+    const patient = await this.patientsRepository.findOne({
+      where: { id: dto.patientId },
+    });
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
+    if (
+      user.role === UserRole.Doctor &&
+      patient.ownerDoctorId &&
+      patient.ownerDoctorId !== doctorId
+    ) {
+      throw new NotFoundException('Patient not found');
+    }
+    if (!patient.ownerDoctorId) {
+      patient.ownerDoctorId = doctorId;
+      await this.patientsRepository.save(patient);
+    }
+
     return this.consultationsRepository.save(
       this.consultationsRepository.create({
         ...dto,

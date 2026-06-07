@@ -148,6 +148,11 @@ type ApiDoctor = {
   cnamCode?: string;
   city?: string;
   status?: "active" | "inactive";
+  credentialEmail?: {
+    status: "sent" | "skipped" | "failed";
+    id?: string;
+    reason?: string;
+  };
 };
 
 export type ApiPublicDoctor = {

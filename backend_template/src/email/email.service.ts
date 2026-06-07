@@ -26,6 +26,12 @@ type ResendEmailResponse = {
   name?: string;
 };
 
+export type EmailDeliveryResult = {
+  status: 'sent' | 'skipped' | 'failed';
+  id?: string;
+  reason?: string;
+};
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -36,10 +42,13 @@ export class EmailService {
     const recipients = this.recipients('CONTACT_NOTIFICATION_TO');
     if (recipients.length === 0) {
       this.logger.warn('CONTACT_NOTIFICATION_TO is empty; contact email skipped.');
-      return;
+      return {
+        status: 'skipped',
+        reason: 'CONTACT_NOTIFICATION_TO is empty',
+      } satisfies EmailDeliveryResult;
     }
 
-    await this.sendEmail({
+    return this.sendEmail({
       to: recipients,
       subject: `[MedCity] Nouveau message contact: ${message.subject || 'Sans objet'}`,
       reply_to: message.email,
@@ -70,7 +79,7 @@ export class EmailService {
 
   async sendNewsletterSubscriptionEmails(subscription: NewsletterSubscription) {
     const adminRecipients = this.recipients('NEWSLETTER_NOTIFICATION_TO');
-    await Promise.all([
+    return Promise.all([
       adminRecipients.length
         ? this.sendEmail({
             to: adminRecipients,
@@ -92,7 +101,10 @@ export class EmailService {
               { name: 'source', value: this.tagValue(subscription.source) },
             ],
           })
-        : Promise.resolve(),
+        : Promise.resolve({
+            status: 'skipped',
+            reason: 'NEWSLETTER_NOTIFICATION_TO is empty',
+          } satisfies EmailDeliveryResult),
       this.newsletterConfirmationEnabled()
         ? this.sendEmail({
             to: subscription.email,
@@ -109,7 +121,10 @@ export class EmailService {
             ].join('\n'),
             tags: [{ name: 'event', value: 'newsletter_confirmation' }],
           })
-        : Promise.resolve(),
+        : Promise.resolve({
+            status: 'skipped',
+            reason: 'Newsletter confirmation disabled',
+          } satisfies EmailDeliveryResult),
     ]);
   }
 
@@ -123,7 +138,7 @@ export class EmailService {
     const loginUrl = this.config.get<string>('FRONTEND_PUBLIC_URL', '').replace(/\/$/, '');
     const loginLine = loginUrl ? `${loginUrl}/login` : 'MedCity Connect';
 
-    await this.sendEmail({
+    return this.sendEmail({
       to: input.email,
       subject: 'Vos identifiants MedCity Connect',
       html: `
@@ -156,13 +171,19 @@ export class EmailService {
     note?: string;
   }) {
     if (input.channel !== DispatchChannel.Email) {
-      return;
+      return {
+        status: 'skipped',
+        reason: 'Dispatch channel is not email',
+      } satisfies EmailDeliveryResult;
     }
     if (!this.looksLikeEmail(input.recipient)) {
       this.logger.warn(
         `Prescription dispatch email skipped; invalid recipient: ${input.recipient}`,
       );
-      return;
+      return {
+        status: 'skipped',
+        reason: 'Invalid email recipient',
+      } satisfies EmailDeliveryResult;
     }
 
     const prescription = input.prescription;
@@ -189,7 +210,7 @@ export class EmailService {
       `)
       .join('');
 
-    await this.sendEmail({
+    return this.sendEmail({
       to: input.recipient,
       subject: `[MedCity] Ordonnance ${prescription.prescriptionNumber}`,
       html: `
@@ -243,13 +264,19 @@ export class EmailService {
   private async sendEmail(payload: Omit<ResendEmailPayload, 'from'>) {
     if (!this.emailEnabled()) {
       this.logger.debug('EMAIL_ENABLED=false; Resend email skipped.');
-      return;
+      return {
+        status: 'skipped',
+        reason: 'EMAIL_ENABLED=false',
+      } satisfies EmailDeliveryResult;
     }
 
     const apiKey = this.config.get<string>('RESEND_API_KEY');
     if (!apiKey) {
       this.logger.warn('RESEND_API_KEY is empty; Resend email skipped.');
-      return;
+      return {
+        status: 'skipped',
+        reason: 'RESEND_API_KEY is empty',
+      } satisfies EmailDeliveryResult;
     }
 
     const from = this.config.get<string>(
@@ -277,17 +304,27 @@ export class EmailService {
 
       const data = (await response.json().catch(() => ({}))) as ResendEmailResponse;
       if (!response.ok) {
-        this.logger.error(
-          `Resend returned HTTP ${response.status}: ${data.message || data.name || 'unknown error'}`,
-        );
-        return;
+        const reason =
+          data.message || data.name || `Resend HTTP ${response.status}`;
+        this.logger.error(`Resend returned HTTP ${response.status}: ${reason}`);
+        return {
+          status: 'failed',
+          reason,
+        } satisfies EmailDeliveryResult;
       }
 
       this.logger.log(`Resend email sent: ${data.id || 'no-id'}`);
+      return {
+        status: 'sent',
+        id: data.id,
+      } satisfies EmailDeliveryResult;
     } catch (error) {
-      this.logger.error(
-        `Resend email failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Resend email failed: ${reason}`);
+      return {
+        status: 'failed',
+        reason,
+      } satisfies EmailDeliveryResult;
     } finally {
       clearTimeout(timeout);
     }

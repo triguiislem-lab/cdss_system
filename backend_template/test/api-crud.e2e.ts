@@ -131,9 +131,19 @@ async function main() {
 
     await expectStatus(baseUrl, '/api/patients', 401);
     const doctorAuth = await login(baseUrl, 'doctor.crud@medcity.tn', 'Medcity123');
+    const secondDoctorAuth = await login(
+      baseUrl,
+      'doctor2.crud@medcity.tn',
+      'Medcity123',
+    );
     const adminAuth = await login(baseUrl, 'admin.crud@medcity.tn', 'Admin123');
 
-    await verifyPatientCrud(baseUrl, doctorAuth.accessToken);
+    await verifyPatientCrud(
+      baseUrl,
+      doctorAuth.accessToken,
+      secondDoctorAuth.accessToken,
+      adminAuth.accessToken,
+    );
     await verifyConsultationCrud(baseUrl, doctorAuth.accessToken);
     await verifyCmsCrud(baseUrl, adminAuth.accessToken);
     await verifyPublicEngagementCrud(baseUrl, adminAuth.accessToken);
@@ -182,9 +192,39 @@ async function seedUsers(dataSource: DataSource) {
       status: DoctorStatus.Active,
     }),
   );
+
+  const secondDoctorUser = await users.save(
+    users.create({
+      email: 'doctor2.crud@medcity.tn',
+      passwordHash: await bcrypt.hash('Medcity123', 4),
+      role: UserRole.Doctor,
+      isActive: true,
+    }),
+  );
+
+  await doctors.save(
+    doctors.create({
+      userId: secondDoctorUser.id,
+      firstName: 'Sami',
+      lastName: 'Crud',
+      email: secondDoctorUser.email,
+      phone: '+21671000112',
+      fiscalNumber: 'MF-CRUD-002',
+      specialty: 'Pediatrie',
+      cnamCode: 'CNAM-CRUD-002',
+      address: 'Avenue des tests',
+      city: 'Tunis',
+      status: DoctorStatus.Active,
+    }),
+  );
 }
 
-async function verifyPatientCrud(baseUrl: string, token: string) {
+async function verifyPatientCrud(
+  baseUrl: string,
+  token: string,
+  secondDoctorToken: string,
+  adminToken: string,
+) {
   const created = await createPatient(baseUrl, token, {
     firstName: 'Amira',
     lastName: 'Mansouri',
@@ -207,6 +247,7 @@ async function verifyPatientCrud(baseUrl: string, token: string) {
   });
   assert.equal(created.firstName, 'Amira');
   assert.ok(created.id);
+  assert.ok(created.ownerDoctorId);
 
   const fetched = await request<Patient>(baseUrl, `/api/patients/${created.id}`, {
     headers: authHeaders(token),
@@ -214,11 +255,30 @@ async function verifyPatientCrud(baseUrl: string, token: string) {
   assert.equal(fetched.internalCode, 'CRUD-PATIENT-001');
   assert.deepEqual(fetched.allergies, ['Penicillin']);
 
+  const adminFetched = await request<Patient>(
+    baseUrl,
+    `/api/patients/${created.id}`,
+    {
+      headers: authHeaders(adminToken),
+    },
+  );
+  assert.equal(adminFetched.id, created.id);
+
   const list = await request<Paginated<Patient>>(baseUrl, '/api/patients?limit=50', {
     headers: authHeaders(token),
   });
   assertPaginated(list);
   assert.ok(list.data.some((patient) => patient.id === created.id));
+
+  const secondDoctorList = await request<Paginated<Patient>>(
+    baseUrl,
+    '/api/patients?limit=50',
+    {
+      headers: authHeaders(secondDoctorToken),
+    },
+  );
+  assert.ok(!secondDoctorList.data.some((patient) => patient.id === created.id));
+  await expectStatus(baseUrl, `/api/patients/${created.id}`, 404, secondDoctorToken);
 
   const updated = await request<Patient>(
     baseUrl,

@@ -11,6 +11,7 @@ import {
 import { Consultation } from '../consultations/consultation.entity';
 import { DoctorStatus } from '../common/entities/enums';
 import { MedicineContribution } from '../medicine-contributions/medicine-contribution.entity';
+import { Patient } from '../patients/patient.entity';
 import { Prescription } from '../prescriptions/prescription.entity';
 import { User } from '../users/user.entity';
 
@@ -67,6 +68,9 @@ export class DoctorProfile {
 
   @OneToMany(() => MedicineContribution, (contribution) => contribution.author)
   contributions: MedicineContribution[];
+
+  @OneToMany(() => Patient, (patient) => patient.ownerDoctor)
+  patients: Patient[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

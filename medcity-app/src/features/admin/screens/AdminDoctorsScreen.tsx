@@ -17,6 +17,7 @@ import {
 import { MetricCard } from "@/components/molecules/MetricCard";
 import { LoadingState } from "@/components/molecules/LoadingState";
 import { CdssModal, FormField as Field } from "@/features/cdss/components/DialogPrimitives";
+import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/i18n/I18nProvider";
 import { createDoctor as createDoctorApi, deleteDoctor as deleteDoctorApi, listDoctors, updateDoctor as updateDoctorApi } from "@/lib/backend-api";
 
@@ -69,6 +70,7 @@ function doctorDisplayName(doc: AdminDoctor) {
 
 export default function AdminDoctors() {
   const { t } = useI18n();
+  const { toast } = useToast();
   const [doctors, setDoctors] = useState<AdminDoctor[]>([]);
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<AdminDoctor | null>(null);
@@ -128,20 +130,38 @@ export default function AdminDoctors() {
 
   function saveDoctor(nextDoctor: AdminDoctor) {
     void (async () => {
-      const payload = {
-        firstName: nextDoctor.prenom || nextDoctor.nom.split(" ")[0] || "Doctor",
-        lastName: nextDoctor.prenom ? nextDoctor.nom : nextDoctor.nom.split(" ").slice(1).join(" ") || nextDoctor.nom,
-        email: nextDoctor.email || `${Date.now()}@medcity.tn`,
-        phone: nextDoctor.telephone,
-        fiscalNumber: nextDoctor.matriculeFiscale || `MF-${Date.now()}`,
-        specialty: nextDoctor.specialite,
-        city: nextDoctor.ville,
-      };
-      const exists = doctors.some((doc) => doc.id === nextDoctor.id);
-      if (exists) await updateDoctorApi(nextDoctor.id, payload);
-      else await createDoctorApi({ ...payload, password: nextDoctor.password ?? "" });
-      await refreshDoctors();
-      setEditing(null);
+      try {
+        const payload = {
+          firstName: nextDoctor.prenom || nextDoctor.nom.split(" ")[0] || "Doctor",
+          lastName: nextDoctor.prenom ? nextDoctor.nom : nextDoctor.nom.split(" ").slice(1).join(" ") || nextDoctor.nom,
+          email: nextDoctor.email || `${Date.now()}@medcity.tn`,
+          phone: nextDoctor.telephone,
+          fiscalNumber: nextDoctor.matriculeFiscale || `MF-${Date.now()}`,
+          specialty: nextDoctor.specialite,
+          city: nextDoctor.ville,
+        };
+        const exists = doctors.some((doc) => doc.id === nextDoctor.id);
+        if (exists) {
+          await updateDoctorApi(nextDoctor.id, payload);
+        } else {
+          const created = await createDoctorApi({ ...payload, password: nextDoctor.password ?? "" });
+          if (created.credentialEmail?.status === "sent") {
+            toast({
+              title: "Identifiants envoyes",
+              description: `Email envoye a ${payload.email}.`,
+            });
+          } else {
+            toast({
+              title: "Email non envoye",
+              description: created.credentialEmail?.reason ?? "Configuration Resend indisponible.",
+            });
+          }
+        }
+        await refreshDoctors();
+        setEditing(null);
+      } catch (saveError) {
+        setError(saveError instanceof Error ? saveError.message : "Impossible d'enregistrer le medecin.");
+      }
     })();
   }
 

@@ -113,14 +113,15 @@ export class PrescriptionsService {
   }
 
   async create(dto: CreatePrescriptionDto, user: User) {
+    const doctorId = await this.resolveDoctorId(user, dto.consultationId);
     const patient = await this.patientsRepository.findOne({
       where: { id: dto.patientId },
     });
     if (!patient) {
       throw new NotFoundException('Patient not found');
     }
+    await this.attachPatientToDoctorIfNeeded(patient, user, doctorId);
 
-    const doctorId = await this.resolveDoctorId(user, dto.consultationId);
     const prescription = await this.prescriptionsRepository.save(
       this.prescriptionsRepository.create({
         patientId: dto.patientId,
@@ -148,8 +149,18 @@ export class PrescriptionsService {
     return this.getById(prescription.id);
   }
 
-  async update(id: string, dto: UpdatePrescriptionDto) {
+  async update(id: string, dto: UpdatePrescriptionDto, user?: User) {
     const prescription = await this.getById(id);
+    await this.assertPrescriptionAccess(prescription, user);
+    if (dto.patientId && dto.patientId !== prescription.patientId) {
+      const patient = await this.patientsRepository.findOne({
+        where: { id: dto.patientId },
+      });
+      if (!patient) {
+        throw new NotFoundException('Patient not found');
+      }
+      await this.attachPatientToDoctorIfNeeded(patient, user, prescription.doctorId);
+    }
     const { medications, ...data } = dto;
     Object.assign(prescription, data);
     await this.prescriptionsRepository.save(prescription);
@@ -379,6 +390,34 @@ export class PrescriptionsService {
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const random = Math.random().toString(36).slice(2, 8).toUpperCase();
     return `RX-${date}-${random}`;
+  }
+
+  private async attachPatientToDoctorIfNeeded(
+    patient: Patient,
+    user: User | undefined,
+    doctorId: string,
+  ) {
+    if (
+      user?.role === UserRole.Doctor &&
+      patient.ownerDoctorId &&
+      patient.ownerDoctorId !== doctorId
+    ) {
+      throw new NotFoundException('Patient not found');
+    }
+    if (!patient.ownerDoctorId) {
+      patient.ownerDoctorId = doctorId;
+      await this.patientsRepository.save(patient);
+    }
+  }
+
+  private async assertPrescriptionAccess(prescription: Prescription, user?: User) {
+    if (!user || user.role !== UserRole.Doctor) {
+      return;
+    }
+    const doctor = await this.doctorsService.getByUserId(user.id);
+    if (prescription.doctorId !== doctor.id) {
+      throw new NotFoundException('Prescription not found');
+    }
   }
 
   private async writeAudit(

@@ -7,6 +7,7 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
 } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { Gender } from '../../common/entities/enums';
@@ -91,6 +92,10 @@ export class CreatePatientDto {
   @IsOptional()
   @IsArray()
   missingData?: string[];
+
+  @IsOptional()
+  @IsUUID()
+  ownerDoctorId?: string;
 }
 
 export class UpdatePatientDto extends PartialType(CreatePatientDto) {}

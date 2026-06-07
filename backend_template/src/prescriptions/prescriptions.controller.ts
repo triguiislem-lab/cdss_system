@@ -43,8 +43,12 @@ export class PrescriptionsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdatePrescriptionDto) {
-    return this.prescriptionsService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePrescriptionDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.prescriptionsService.update(id, dto, user);
   }
 
   @Delete(':id')
