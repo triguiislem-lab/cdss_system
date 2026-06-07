@@ -9,6 +9,7 @@ import * as bcrypt from 'bcryptjs';
 import { ILike, Repository } from 'typeorm';
 import { PaginationQueryDto, toPaginated } from '../common/dto/pagination.dto';
 import { DoctorStatus, UserRole } from '../common/entities/enums';
+import { EmailService } from '../email/email.service';
 import { User } from '../users/user.entity';
 import { CreateDoctorDto, UpdateDoctorDto } from './dto/doctors.dto';
 import { DoctorProfile } from './doctor-profile.entity';
@@ -20,6 +21,7 @@ export class DoctorsService {
     private readonly doctorsRepository: Repository<DoctorProfile>,
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    private readonly emailService: EmailService,
   ) {}
 
   async findAll(query: PaginationQueryDto) {
@@ -113,13 +115,20 @@ export class DoctorsService {
     );
 
     const { password: _password, ...profileData } = dto;
-    return this.doctorsRepository.save(
+    const doctor = await this.doctorsRepository.save(
       this.doctorsRepository.create({
         ...profileData,
         userId: user.id,
         status: DoctorStatus.Active,
       }),
     );
+    void this.emailService.sendDoctorCredentialsEmail({
+      firstName: doctor.firstName,
+      lastName: doctor.lastName,
+      email: doctor.email,
+      password: dto.password,
+    });
+    return doctor;
   }
 
   async update(id: string, dto: UpdateDoctorDto) {

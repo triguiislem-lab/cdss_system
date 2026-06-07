@@ -113,6 +113,41 @@ export class EmailService {
     ]);
   }
 
+  async sendDoctorCredentialsEmail(input: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    password: string;
+  }) {
+    const doctorName = [input.firstName, input.lastName].filter(Boolean).join(' ');
+    const loginUrl = this.config.get<string>('FRONTEND_PUBLIC_URL', '').replace(/\/$/, '');
+    const loginLine = loginUrl ? `${loginUrl}/login` : 'MedCity Connect';
+
+    await this.sendEmail({
+      to: input.email,
+      subject: 'Vos identifiants MedCity Connect',
+      html: `
+        <h2>Bienvenue sur MedCity Connect</h2>
+        <p>Bonjour Dr. ${this.escapeHtml(doctorName || input.email)},</p>
+        <p>Votre compte medecin a ete cree par l'administration MedCity.</p>
+        <p><strong>Email:</strong> ${this.escapeHtml(input.email)}</p>
+        <p><strong>Mot de passe initial:</strong> ${this.escapeHtml(input.password)}</p>
+        ${loginUrl ? `<p><strong>Lien de connexion:</strong> <a href="${this.escapeHtml(loginUrl)}/login">${this.escapeHtml(loginUrl)}/login</a></p>` : ''}
+        <p>Pour des raisons de securite, veuillez changer ce mot de passe apres votre premiere connexion.</p>
+      `,
+      text: [
+        'Bienvenue sur MedCity Connect',
+        `Bonjour Dr. ${doctorName || input.email},`,
+        "Votre compte medecin a ete cree par l'administration MedCity.",
+        `Email: ${input.email}`,
+        `Mot de passe initial: ${input.password}`,
+        `Connexion: ${loginLine}`,
+        'Pour des raisons de securite, veuillez changer ce mot de passe apres votre premiere connexion.',
+      ].join('\n'),
+      tags: [{ name: 'event', value: 'doctor_credentials' }],
+    });
+  }
+
   async sendPrescriptionDispatchEmail(input: {
     prescription: Prescription;
     target: PharmacyTarget;

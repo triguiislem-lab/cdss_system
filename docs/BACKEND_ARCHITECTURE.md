@@ -258,13 +258,14 @@ Keep Prometheus private. In Docker production, the frontend Nginx container prox
 
 ### Email Delivery
 
-Contact, doctor-to-admin messages, newsletter submissions, and email-channel prescription dispatches are persisted first, then sent through Resend as non-blocking notifications. If Resend is not configured or fails, the saved database/dispatch record remains available through the admin endpoints.
+Contact, doctor-to-admin messages, newsletter submissions, doctor account credentials, and email-channel prescription dispatches are persisted first, then sent through Resend as non-blocking notifications. If Resend is not configured or fails, the saved database/dispatch record remains available through the admin endpoints.
 
 Required environment variables:
 
 | Variable | Purpose |
 |---|---|
 | `EMAIL_ENABLED` | Enables/disables outbound email |
+| `FRONTEND_PUBLIC_URL` | Public frontend URL used in doctor credential emails, for example `https://your-domain.tn` |
 | `RESEND_API_KEY` | Resend API key |
 | `RESEND_FROM` | Sender identity, for example `MedCity Connect <onboarding@resend.dev>` for tests or a verified domain sender in production |
 | `CONTACT_NOTIFICATION_TO` | Admin/contact mailbox for public and doctor contact messages |
@@ -274,6 +275,11 @@ Required environment variables:
 Prescription dispatch emails use the same `EMAIL_ENABLED`, `RESEND_API_KEY`,
 `RESEND_FROM`, and `RESEND_TIMEOUT_MS` settings. SMS, fax, portal, and pharmacy
 portal dispatch channels are currently stored as dispatch records only.
+
+When an admin creates a doctor account through `POST /api/doctors`, NestJS hashes
+the password for persistence, then sends the initial email/password credentials
+to the doctor's email address through Resend. The plaintext password is used only
+for that non-blocking email and is never returned by the API.
 
 ## FastAPI CDSS Endpoints
 

@@ -380,6 +380,9 @@ function DoctorModal({
         {isNew && (
           <Field label="Mot de passe initial">
             <input required type="password" minLength={8} value={form.password ?? ""} onChange={(event) => update("password", event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Les identifiants seront envoyes automatiquement a l'adresse email du medecin.
+            </p>
           </Field>
         )}
         <Field label={t("adminDoctors.status")}>

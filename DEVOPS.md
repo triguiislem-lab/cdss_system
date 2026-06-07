@@ -62,6 +62,7 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 GRAFANA_PUBLIC_URL=https://your-domain.tn/grafana/
 VITE_GRAFANA_URL=https://your-domain.tn/grafana/d/medcity-overview/medcity-overview?orgId=1&refresh=30s
 EMAIL_ENABLED=true
+FRONTEND_PUBLIC_URL=https://your-domain.tn
 RESEND_TIMEOUT_MS=10000
 NEWSLETTER_CONFIRMATION_ENABLED=true
 ```
