@@ -133,9 +133,11 @@ Copy `.env.example` to `.env`, then fill the values required for your environmen
 | `SUPABASE_SERVICE_ROLE_KEY` | Backend-only storage access for consultation audio |
 | `KAGGLE_USERNAME`, `KAGGLE_KEY` | Kaggle dataset/kernel automation |
 | `FRONTEND_PUBLIC_URL` | Public frontend URL included in doctor credential emails |
-| `RESEND_API_KEY` | Email notifications for contact, newsletter, doctor credentials, and prescription dispatch flows |
+| `RESEND_API_KEY`, `RESEND_FROM` | Email notifications for contact, newsletter, doctor credentials, and prescription dispatch flows. `RESEND_FROM` should use a verified sender on `triguiislem.me`, for example `MedCity Connect <noreply@triguiislem.me>` |
 | `GRAFANA_PUBLIC_URL`, `VITE_GRAFANA_URL` | Admin monitoring dashboard URL |
 | `COMPOSE_PROFILES=host-monitoring` | Enables EC2 host/container metrics through node-exporter and cAdvisor |
+
+Once `triguiislem.me` is verified in Resend, the backend can send doctor credential emails and other notifications to any recipient at the configured sender domain, not just the account owner.
 
 Never commit real `.env` files, service-role keys, JWT secrets, Kaggle keys, or PEM files.
 

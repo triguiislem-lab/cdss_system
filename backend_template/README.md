@@ -65,6 +65,18 @@ Keep the real password in `.env` or deployment secrets only.
 - `audit`: admin-only prescription audit trail
 - `cms`: admin CMS plus public website endpoints
 
+## Email Delivery
+
+The backend sends contact notifications, newsletter emails, doctor credentials, and prescription dispatch emails through Resend when email delivery is enabled.
+
+Use a verified sender on the `triguiislem.me` domain:
+
+```env
+EMAIL_ENABLED=true
+RESEND_API_KEY=<your-resend-api-key>
+RESEND_FROM=MedCity Connect <noreply@triguiislem.me>
+```
+
 ## Important Access Rules
 
 - Admin endpoints are protected with `@Roles(UserRole.Admin)`.

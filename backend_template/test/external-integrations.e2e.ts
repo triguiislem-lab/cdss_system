@@ -73,7 +73,7 @@ async function main() {
 
 async function verifyRealResend() {
   requireEnv('RESEND_API_KEY');
-  const from = process.env.RESEND_FROM || 'MedCity Connect <onboarding@resend.dev>';
+  const from = process.env.RESEND_FROM || 'MedCity Connect <noreply@triguiislem.me>';
   const body = {
     from,
     to: [testEmail],

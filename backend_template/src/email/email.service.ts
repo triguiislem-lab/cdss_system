@@ -281,7 +281,7 @@ export class EmailService {
 
     const from = this.config.get<string>(
       'RESEND_FROM',
-      'MedCity Connect <onboarding@resend.dev>',
+      'MedCity Connect <noreply@triguiislem.me>',
     );
     const timeoutMs = this.config.get<number>('RESEND_TIMEOUT_MS', 10000);
     const controller = new AbortController();
