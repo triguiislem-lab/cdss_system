@@ -352,7 +352,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
       name: productName,
       dose,
       route: inferRouteFromMedicine(medicine),
-      frequency: medicine.posologyAdult || "",
+      frequency: "",
       indication: medicine.indication,
     });
   }
