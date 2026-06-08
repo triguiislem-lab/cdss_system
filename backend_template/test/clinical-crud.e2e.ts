@@ -286,6 +286,46 @@ async function verifyDoctorsCrud(
     { method: 'DELETE', headers: authHeaders(adminToken) },
   );
   assert.equal(removed.ok, true);
+
+  const afterDelete = await request<Paginated<DoctorProfile>>(
+    baseUrl,
+    '/api/doctors?limit=50',
+    { headers: authHeaders(adminToken) },
+  );
+  assertPaginated(afterDelete);
+  assert.ok(!afterDelete.data.some((doctor) => doctor.id === created.id));
+
+  const recreated = await request<DoctorProfile>(
+    baseUrl,
+    '/api/doctors',
+    {
+      method: 'POST',
+      headers: authHeaders(adminToken),
+      body: JSON.stringify({
+        firstName: 'Rim',
+        lastName: 'Automation',
+        email: 'rim.automation@medcity.tn',
+        phone: '+21671000333',
+        fiscalNumber: 'MF-CLINICAL-002-REUSED',
+        specialty: 'Cardiologie',
+        cnamCode: 'CNAM-CLINICAL-002',
+        city: 'Tunis',
+        password: 'Medcity123',
+      }),
+    },
+    201,
+  );
+  assert.equal(recreated.id, created.id);
+  assert.equal(recreated.email, 'rim.automation@medcity.tn');
+  assert.equal(recreated.status, DoctorStatus.Active);
+
+  const afterRecreate = await request<Paginated<DoctorProfile>>(
+    baseUrl,
+    '/api/doctors?limit=50',
+    { headers: authHeaders(adminToken) },
+  );
+  assertPaginated(afterRecreate);
+  assert.ok(afterRecreate.data.some((doctor) => doctor.id === created.id));
 }
 
 async function verifyMedicinesCrud(

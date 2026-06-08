@@ -27,13 +27,14 @@ export class DoctorsService {
   async findAll(query: PaginationQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
+    const activeOnly = { status: DoctorStatus.Active };
     const where = query.search
       ? [
-          { firstName: ILike(`%${query.search}%`) },
-          { lastName: ILike(`%${query.search}%`) },
-          { email: ILike(`%${query.search}%`) },
+          { ...activeOnly, firstName: ILike(`%${query.search}%`) },
+          { ...activeOnly, lastName: ILike(`%${query.search}%`) },
+          { ...activeOnly, email: ILike(`%${query.search}%`) },
         ]
-      : undefined;
+      : activeOnly;
     const [data, total] = await this.doctorsRepository.findAndCount({
       where,
       relations: { user: true },
@@ -90,7 +91,10 @@ export class DoctorsService {
   }
 
   async getByUserId(userId: string) {
-    const doctor = await this.doctorsRepository.findOne({ where: { userId } });
+    const doctor = await this.doctorsRepository.findOne({
+      where: { userId },
+      relations: { user: true },
+    });
     if (!doctor) {
       throw new NotFoundException('Doctor profile not found');
     }
@@ -98,19 +102,55 @@ export class DoctorsService {
   }
 
   async create(dto: CreateDoctorDto) {
+    const email = this.normalizeEmail(dto.email);
     const existing = await this.usersRepository.findOne({
-      where: { email: dto.email },
+      where: { email },
+      relations: { doctorProfile: true },
     });
     if (existing) {
-      throw new ConflictException('Email already exists');
+      if (existing.role !== UserRole.Doctor || existing.isActive) {
+        throw new ConflictException('Email already exists');
+      }
+
+      existing.passwordHash = await bcrypt.hash(dto.password, 12);
+      existing.isActive = true;
+      await this.usersRepository.save(existing);
+
+      const { password: _password, ...profileData } = dto;
+      const doctor = existing.doctorProfile
+        ? Object.assign(existing.doctorProfile, {
+            ...profileData,
+            email,
+            userId: existing.id,
+            status: DoctorStatus.Active,
+          })
+        : this.doctorsRepository.create({
+            ...profileData,
+            email,
+            userId: existing.id,
+            status: DoctorStatus.Active,
+          });
+
+      const savedDoctor = await this.doctorsRepository.save(doctor);
+      const credentialEmail = await this.emailService.sendDoctorCredentialsEmail({
+        firstName: savedDoctor.firstName,
+        lastName: savedDoctor.lastName,
+        email: savedDoctor.email,
+        password: dto.password,
+      });
+      return {
+        ...savedDoctor,
+        credentialEmail,
+      };
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
     const user = await this.usersRepository.save(
       this.usersRepository.create({
-        email: dto.email,
+        email,
         passwordHash,
         role: UserRole.Doctor,
+        isActive: true,
       }),
     );
 
@@ -118,6 +158,7 @@ export class DoctorsService {
     const doctor = await this.doctorsRepository.save(
       this.doctorsRepository.create({
         ...profileData,
+        email,
         userId: user.id,
         status: DoctorStatus.Active,
       }),
@@ -136,16 +177,29 @@ export class DoctorsService {
 
   async update(id: string, dto: UpdateDoctorDto) {
     const doctor = await this.getById(id);
-    const { password, ...profileData } = dto;
-    Object.assign(doctor, profileData);
-    if (dto.email && dto.email !== doctor.user.email) {
-      doctor.user.email = dto.email;
-      await this.usersRepository.save(doctor.user);
+    const { password, email, ...profileData } = dto;
+    const normalizedEmail = email ? this.normalizeEmail(email) : undefined;
+    let shouldSaveUser = false;
+    if (normalizedEmail && normalizedEmail !== doctor.user.email) {
+      const existing = await this.usersRepository.findOne({
+        where: { email: normalizedEmail },
+      });
+      if (existing && existing.id !== doctor.user.id) {
+        throw new ConflictException('Email already exists');
+      }
+      doctor.user.email = normalizedEmail;
+      doctor.email = normalizedEmail;
+      shouldSaveUser = true;
     }
+    Object.assign(doctor, profileData);
     if (password) {
       doctor.user.passwordHash = await bcrypt.hash(password, 12);
+      shouldSaveUser = true;
+    }
+    if (shouldSaveUser) {
       await this.usersRepository.save(doctor.user);
     }
+    doctor.email = doctor.user.email;
     return this.doctorsRepository.save(doctor);
   }
 
@@ -154,7 +208,25 @@ export class DoctorsService {
     if ('password' in dto) {
       throw new ForbiddenException('Password changes are managed by admin');
     }
-    Object.assign(doctor, dto);
+    const { email, ...profileData } = dto;
+    const normalizedEmail = email ? this.normalizeEmail(email) : undefined;
+    let shouldSaveUser = false;
+    if (normalizedEmail && normalizedEmail !== doctor.user.email) {
+      const existing = await this.usersRepository.findOne({
+        where: { email: normalizedEmail },
+      });
+      if (existing && existing.id !== doctor.user.id) {
+        throw new ConflictException('Email already exists');
+      }
+      doctor.user.email = normalizedEmail;
+      doctor.email = normalizedEmail;
+      shouldSaveUser = true;
+    }
+    Object.assign(doctor, profileData);
+    if (shouldSaveUser) {
+      await this.usersRepository.save(doctor.user);
+    }
+    doctor.email = doctor.user.email;
     return this.doctorsRepository.save(doctor);
   }
 
@@ -168,7 +240,14 @@ export class DoctorsService {
 
   async remove(id: string) {
     const doctor = await this.getById(id);
-    await this.doctorsRepository.remove(doctor);
+    doctor.status = DoctorStatus.Inactive;
+    doctor.user.isActive = false;
+    await this.usersRepository.save(doctor.user);
+    await this.doctorsRepository.save(doctor);
     return { ok: true };
+  }
+
+  private normalizeEmail(email: string) {
+    return email.trim().toLowerCase();
   }
 }
