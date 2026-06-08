@@ -449,9 +449,12 @@ export class CdssService {
         renal_impairment: context?.renalImpairment ?? false,
         hepatic_impairment: context?.hepaticImpairment ?? false,
         temperature_c: context?.temperatureC,
+        systolic_bp: context?.systolicBp,
+        diastolic_bp: context?.diastolicBp,
         heart_rate: context?.heartRate,
         spo2: context?.spo2,
         respiratory_rate: context?.respiratoryRate,
+        pain_score: context?.painScore,
       };
     }
 
@@ -479,12 +482,15 @@ export class CdssService {
       hepatic_impairment: context?.hepaticImpairment ?? false,
       temperature_c:
         context?.temperatureC ?? this.toNumber(latestVitals?.temperature),
+      systolic_bp:
+        context?.systolicBp ?? bp?.systolic,
+      diastolic_bp:
+        context?.diastolicBp ?? bp?.diastolic,
       heart_rate: context?.heartRate ?? latestVitals?.heartRate,
       spo2: context?.spo2 ?? this.toNumber(latestVitals?.oxygenSaturation),
       respiratory_rate:
         context?.respiratoryRate ?? latestVitals?.respiratoryRate,
-      systolic_bp: bp?.systolic,
-      diastolic_bp: bp?.diastolic,
+      pain_score: context?.painScore,
     };
   }
 

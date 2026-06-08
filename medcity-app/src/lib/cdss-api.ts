@@ -56,12 +56,24 @@ export type CdssDraftResult = {
   };
 };
 
+export type CdssPatientContextOverrides = Partial<{
+  weightKg: number;
+  temperatureC: number;
+  systolicBp: number;
+  diastolicBp: number;
+  spo2: number;
+  heartRate: number;
+  respiratoryRate: number;
+  painScore: number;
+}>;
+
 export async function requestCdssDraft(input: {
   patient: Patient;
   diagnosis: string;
   notes: string;
   language?: string;
   save?: boolean;
+  patientContext?: CdssPatientContextOverrides;
 }) {
   const res = await fetch(`${API_BASE}/api/cdss/prescriptions/draft`, {
     method: "POST",
@@ -75,7 +87,7 @@ export async function requestCdssDraft(input: {
       notes: input.notes,
       language: input.language ?? "fr",
       save: input.save ?? false,
-      patientContext: mapPatientContext(input.patient),
+      patientContext: mapPatientContext(input.patient, input.patientContext),
     }),
   });
 
@@ -145,11 +157,16 @@ export function mapCdssSafetyAlerts(result: CdssDraftResult): SafetyAlert[] {
   }));
 }
 
-function mapPatientContext(patient: Patient) {
+function mapPatientContext(
+  patient: Patient,
+  overrides: CdssPatientContextOverrides = {},
+) {
+  const bloodPressure = patient.vitals.bp?.trim() || "";
+  const parsedBloodPressure = parseBloodPressure(bloodPressure);
   return {
     sex: patient.sex === "F" ? "female" : patient.sex === "M" ? "male" : "unknown",
     ageYears: patient.age,
-    weightKg: patient.weightKg,
+    weightKg: overrides.weightKg ?? patient.weightKg,
     allergies: patient.allergies,
     currentMedications: patient.currentMedications.map((med) => `${med.name} ${med.dose}`.trim()),
     chronicConditions: patient.comorbidities,
@@ -160,9 +177,22 @@ function mapPatientContext(patient: Patient) {
     pregnancyStatus: patient.flags.some((flag) => flag.toLowerCase().includes("pregnan"))
       ? "pregnant"
       : undefined,
-    temperatureC: patient.vitals.temp,
-    heartRate: patient.vitals.hr,
-    spo2: patient.vitals.spo2,
+    temperatureC: overrides.temperatureC ?? patient.vitals.temp,
+    systolicBp: overrides.systolicBp ?? parsedBloodPressure?.systolic,
+    diastolicBp: overrides.diastolicBp ?? parsedBloodPressure?.diastolic,
+    heartRate: overrides.heartRate ?? patient.vitals.hr,
+    spo2: overrides.spo2 ?? patient.vitals.spo2,
+    respiratoryRate: overrides.respiratoryRate,
+    painScore: overrides.painScore,
+  };
+}
+
+function parseBloodPressure(value: string) {
+  const match = value.match(/(\d{2,3})\s*\/\s*(\d{2,3})/);
+  if (!match) return undefined;
+  return {
+    systolic: Number(match[1]),
+    diastolic: Number(match[2]),
   };
 }
 

@@ -81,6 +81,14 @@ export class CdssPatientContextDto {
 
   @IsOptional()
   @IsInt()
+  systolicBp?: number;
+
+  @IsOptional()
+  @IsInt()
+  diastolicBp?: number;
+
+  @IsOptional()
+  @IsInt()
   heartRate?: number;
 
   @IsOptional()
@@ -90,6 +98,10 @@ export class CdssPatientContextDto {
   @IsOptional()
   @IsInt()
   respiratoryRate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  painScore?: number;
 
   @IsOptional()
   @IsObject()

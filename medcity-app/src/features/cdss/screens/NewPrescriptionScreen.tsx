@@ -20,6 +20,69 @@ import { mapCdssMedications, mapCdssSafetyAlerts, requestCdssDraft } from "@/lib
 import { getMedicine, getPrescription, listMedicines, listPatients, rejectPrescription, savePrescription, updatePrescription, validatePrescription } from "@/lib/backend-api";
 import type { TunisianMedicine } from "@/lib/tunisia-medicines";
 
+type PhysicalMeasurementsDraft = {
+  weightKg: string;
+  bloodPressure: string;
+  temperatureC: string;
+  heartRate: string;
+  spo2: string;
+  respiratoryRate: string;
+  painScore: string;
+};
+
+function emptyPhysicalMeasurements(): PhysicalMeasurementsDraft {
+  return {
+    weightKg: "",
+    bloodPressure: "",
+    temperatureC: "",
+    heartRate: "",
+    spo2: "",
+    respiratoryRate: "",
+    painScore: "",
+  };
+}
+
+function physicalMeasurementsFromPatient(patient?: Patient | null): PhysicalMeasurementsDraft {
+  if (!patient) return emptyPhysicalMeasurements();
+  return {
+    weightKg: patient.weightKg > 0 ? String(patient.weightKg) : "",
+    bloodPressure: patient.vitals.bp?.trim() || "",
+    temperatureC: patient.vitals.temp > 0 ? String(patient.vitals.temp) : "",
+    heartRate: patient.vitals.hr > 0 ? String(patient.vitals.hr) : "",
+    spo2: patient.vitals.spo2 > 0 ? String(patient.vitals.spo2) : "",
+    respiratoryRate: "",
+    painScore: "",
+  };
+}
+
+function numberOrUndefined(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseBloodPressure(value: string) {
+  const match = value.trim().match(/(\d{2,3})\s*\/\s*(\d{2,3})/);
+  if (!match) return {};
+  return {
+    systolicBp: Number(match[1]),
+    diastolicBp: Number(match[2]),
+  };
+}
+
+function physicalContextFromDraft(draft: PhysicalMeasurementsDraft) {
+  return {
+    weightKg: numberOrUndefined(draft.weightKg),
+    temperatureC: numberOrUndefined(draft.temperatureC),
+    heartRate: numberOrUndefined(draft.heartRate),
+    spo2: numberOrUndefined(draft.spo2),
+    respiratoryRate: numberOrUndefined(draft.respiratoryRate),
+    painScore: numberOrUndefined(draft.painScore),
+    ...parseBloodPressure(draft.bloodPressure),
+  };
+}
+
 export default function NewPrescription({ basePath = "/admin/cdss", prescriptionId }: { basePath?: string; prescriptionId?: string }) {
   const { t } = useI18n();
   const [location, setLocation] = useLocation();
@@ -38,6 +101,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
   const [manualStarted, setManualStarted] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [patientsLoaded, setPatientsLoaded] = useState(false);
+  const [physicalMeasurements, setPhysicalMeasurements] = useState<PhysicalMeasurementsDraft>(emptyPhysicalMeasurements());
   const [caseStatus, setCaseStatus] = useState<"draft" | "pending_review" | "validated" | "rejected">("draft");
   const [savedPrescriptionId, setSavedPrescriptionId] = useState<string | null>(null);
   const [loadedPrescriptionId, setLoadedPrescriptionId] = useState<string | null>(null);
@@ -65,6 +129,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
     if (patientFromUrl) {
       setSelectedPatient(patientFromUrl);
       setPatientQuery(getPatientFullName(patientFromUrl));
+      setPhysicalMeasurements(physicalMeasurementsFromPatient(patientFromUrl));
     }
   }, [initialPatientId, patients, selectedPatient]);
 
@@ -77,6 +142,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
         if (patientFromPrescription) {
           setSelectedPatient(patientFromPrescription);
           setPatientQuery(getPatientFullName(patientFromPrescription));
+          setPhysicalMeasurements(physicalMeasurementsFromPatient(patientFromPrescription));
         } else {
           setPatientQuery(prescription.patientId);
         }
@@ -120,6 +186,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
         patient: selectedPatient,
         diagnosis,
         notes,
+        patientContext: physicalContextFromDraft(physicalMeasurements),
         save: false,
       });
       const aiMeds = mapCdssMedications(result);
@@ -148,9 +215,10 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
   };
 
   function selectPatient(patient: Patient) {
+    resetPrescriptionDraft();
     setSelectedPatient(patient);
     setPatientQuery(getPatientFullName(patient));
-    resetPrescriptionDraft();
+    setPhysicalMeasurements(physicalMeasurementsFromPatient(patient));
   }
 
   function resetPrescriptionDraft() {
@@ -161,6 +229,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
     setMedicineOptionsByLine({});
     setMedicineLoadingByLine({});
     setSelectedMedicineByLine({});
+    setPhysicalMeasurements(emptyPhysicalMeasurements());
     setCaseStatus("draft");
     setSavedPrescriptionId(null);
   }
@@ -510,9 +579,79 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
       </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-3 lg:sticky lg:top-20 self-start">
+        <div className="lg:col-span-3 lg:sticky lg:top-20 self-start space-y-4">
           {selectedPatient ? (
-            <PatientSummary patient={selectedPatient} />
+            <>
+              <PatientSummary patient={selectedPatient} />
+              <section className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
+                <div className="flex items-start justify-between gap-3 border-b border-border px-5 py-4">
+                  <div>
+                    <h2 className="text-sm font-semibold">{t("patientSummary.vitals")}</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">{t("consultation.vitalsHelp")}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPhysicalMeasurements(physicalMeasurementsFromPatient(selectedPatient))}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-card px-2.5 py-1.5 text-xs font-semibold hover:bg-muted transition-smooth"
+                    title="Reinitialiser les mesures"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
+                  <MeasurementField
+                    label="Poids"
+                    unit="kg"
+                    value={physicalMeasurements.weightKg}
+                    onChange={(value) => setPhysicalMeasurements((current) => ({ ...current, weightKg: value }))}
+                    inputMode="decimal"
+                  />
+                  <MeasurementField
+                    label="TA"
+                    unit="mmHg"
+                    value={physicalMeasurements.bloodPressure}
+                    onChange={(value) => setPhysicalMeasurements((current) => ({ ...current, bloodPressure: value }))}
+                    placeholder="120/80"
+                  />
+                  <MeasurementField
+                    label="Temp."
+                    unit="C"
+                    value={physicalMeasurements.temperatureC}
+                    onChange={(value) => setPhysicalMeasurements((current) => ({ ...current, temperatureC: value }))}
+                    inputMode="decimal"
+                  />
+                  <MeasurementField
+                    label="FC"
+                    unit="bpm"
+                    value={physicalMeasurements.heartRate}
+                    onChange={(value) => setPhysicalMeasurements((current) => ({ ...current, heartRate: value }))}
+                    inputMode="numeric"
+                  />
+                  <MeasurementField
+                    label="SpO2"
+                    unit="%"
+                    value={physicalMeasurements.spo2}
+                    onChange={(value) => setPhysicalMeasurements((current) => ({ ...current, spo2: value }))}
+                    inputMode="numeric"
+                  />
+                  <MeasurementField
+                    label="FR"
+                    unit="/min"
+                    value={physicalMeasurements.respiratoryRate}
+                    onChange={(value) => setPhysicalMeasurements((current) => ({ ...current, respiratoryRate: value }))}
+                    inputMode="numeric"
+                  />
+                  <MeasurementField
+                    label="Pain"
+                    unit="/10"
+                    value={physicalMeasurements.painScore}
+                    onChange={(value) => setPhysicalMeasurements((current) => ({ ...current, painScore: value }))}
+                    inputMode="decimal"
+                    className="sm:col-span-2"
+                  />
+                </div>
+              </section>
+            </>
           ) : (
             <div className="rounded-xl border border-dashed border-border bg-card p-6 text-sm text-muted-foreground">
               {t("rx.patientSummaryAfterSelection")}
@@ -729,3 +868,37 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
 }
 
 export { CheckCircle2 };
+
+function MeasurementField({
+  label,
+  unit,
+  value,
+  onChange,
+  placeholder,
+  inputMode,
+  className,
+}: {
+  label: string;
+  unit?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  inputMode?: "none" | "text" | "tel" | "url" | "email" | "numeric" | "decimal" | "search";
+  className?: string;
+}) {
+  return (
+    <label className={`space-y-1.5 ${className ?? ""}`}>
+      <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span>{label}</span>
+        {unit ? <span>{unit}</span> : <span />}
+      </div>
+      <input
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        inputMode={inputMode}
+        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/20"
+      />
+    </label>
+  );
+}
