@@ -101,6 +101,7 @@ export interface Medication {
 export interface PrescriptionCase {
   id: string;
   patientId: string;
+  patient?: Patient;
   diagnosis: string;
   status: PrescriptionStatus;
   risk: RiskLevel;

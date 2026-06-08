@@ -18,16 +18,19 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
     setLoading(true);
     setError(null);
     try {
-      const [apiPatients, apiPrescriptions] = await Promise.all([
+      const [patientsResult, prescriptionsResult] = await Promise.allSettled([
         listPatients(),
         listPrescriptions(),
       ]);
-      setPatients(apiPatients);
-      setPrescriptions(apiPrescriptions);
-    } catch (loadError) {
-      setPatients([]);
-      setPrescriptions([]);
-      setError(loadError instanceof Error ? loadError.message : "Unable to load prescriptions.");
+      const nextPatients = patientsResult.status === "fulfilled" ? patientsResult.value : [];
+      const nextPrescriptions = prescriptionsResult.status === "fulfilled" ? prescriptionsResult.value : [];
+      setPatients(nextPatients);
+      setPrescriptions(nextPrescriptions);
+      const errors = [
+        patientsResult.status === "rejected" ? "patients" : null,
+        prescriptionsResult.status === "rejected" ? "prescriptions" : null,
+      ].filter(Boolean);
+      setError(errors.length ? `Unable to load ${errors.join(" and ")}.` : null);
     } finally {
       setLoading(false);
     }
@@ -145,7 +148,7 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {visiblePrescriptions.map((entry) => {
-            const patient = patients.find((item) => item.id === entry.patientId);
+            const patient = entry.patient ?? patients.find((item) => item.id === entry.patientId);
             const status = statusMeta[entry.status] ?? statusMeta.draft;
             const risk = riskMeta[entry.risk] ?? riskMeta.low;
             const diagnosisText =

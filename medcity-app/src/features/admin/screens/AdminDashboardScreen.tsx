@@ -170,7 +170,7 @@ export default function AdminDashboard() {
     void (async () => {
       setLoading(true);
       try {
-        const [doctors, posts, medicines, contributions, audits] = await Promise.all([
+        const [doctors, posts, medicines, contributions, audits] = await Promise.allSettled([
           listDoctors(),
           listCmsPosts(),
           listMedicines(),
@@ -179,13 +179,15 @@ export default function AdminDashboard() {
         ]);
 
         setCounts({
-          doctors: doctors.length,
-          posts: posts.length,
-          medicines: medicines.length,
-          pendingContributions: contributions.filter((contribution) => contribution.status === "pending").length,
-          audits: audits.length,
+          doctors: doctors.status === "fulfilled" ? doctors.value.length : 0,
+          posts: posts.status === "fulfilled" ? posts.value.length : 0,
+          medicines: medicines.status === "fulfilled" ? medicines.value.length : 0,
+          pendingContributions: contributions.status === "fulfilled"
+            ? contributions.value.filter((contribution) => contribution.status === "pending").length
+            : 0,
+          audits: audits.status === "fulfilled" ? audits.value.length : 0,
         });
-        setAuditEntries(audits.slice(0, 6));
+        setAuditEntries(audits.status === "fulfilled" ? audits.value.slice(0, 6) : []);
       } finally {
         setLoading(false);
       }

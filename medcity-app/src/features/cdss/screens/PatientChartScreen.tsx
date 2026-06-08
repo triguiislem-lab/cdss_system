@@ -20,11 +20,14 @@ export default function PatientChart({ basePath }: { basePath: "/doctor" }) {
     void (async () => {
       setLoading(true);
       try {
-        const [apiPatient, prescriptions] = await Promise.all([
+        const [patientResult, prescriptionsResult] = await Promise.allSettled([
           getPatient(patientId),
           listPrescriptions({ patientId }),
         ]);
-        setPatient(apiPatient);
+        const prescriptions = prescriptionsResult.status === "fulfilled" ? prescriptionsResult.value : [];
+        const fallbackPatient = prescriptions.find((entry) => entry.patient)?.patient ?? null;
+        const apiPatient = patientResult.status === "fulfilled" ? patientResult.value : fallbackPatient;
+        setPatient(apiPatient ?? null);
         setPatientCases(prescriptions);
       } catch {
         setPatient(null);

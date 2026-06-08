@@ -30,12 +30,12 @@ function Dashboard() {
     void (async () => {
       setLoading(true);
       try {
-        const [apiPatients, apiPrescriptions] = await Promise.all([
+        const [patientsResult, prescriptionsResult] = await Promise.allSettled([
           listPatients(),
           listPrescriptions(),
         ]);
-        setPatients(apiPatients);
-        setPrescriptions(apiPrescriptions);
+        setPatients(patientsResult.status === "fulfilled" ? patientsResult.value : []);
+        setPrescriptions(prescriptionsResult.status === "fulfilled" ? prescriptionsResult.value : []);
       } finally {
         setLoading(false);
       }
@@ -150,7 +150,7 @@ function Dashboard() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {recentPrescriptions.map((rx) => {
-                      const patient = patientById(rx.patientId);
+                      const patient = rx.patient ?? patientById(rx.patientId);
                       const status = statusMeta[rx.status];
                       const risk = riskMeta[rx.risk];
 

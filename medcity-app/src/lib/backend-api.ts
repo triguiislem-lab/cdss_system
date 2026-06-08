@@ -1001,6 +1001,7 @@ export function mapPrescription(entry: ApiPrescription): PrescriptionCase {
   return {
     id: entry.id,
     patientId: entry.patientId,
+    patient: entry.patient ? mapPatient(entry.patient) : undefined,
     diagnosis: entry.diagnosis ?? "",
     status: entry.status ?? "draft",
     risk: entry.risk ?? inferRisk(entry.safetyAlerts),

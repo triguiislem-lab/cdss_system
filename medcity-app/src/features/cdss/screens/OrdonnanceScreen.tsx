@@ -4,7 +4,7 @@ import { ArrowLeft, Building2, Printer, Stethoscope, User as UserIcon } from "lu
 import { SendPrescriptionDialog } from "@/features/cdss/components/SendPrescriptionDialog";
 import { getPatientAge, getPatientFullName, getPatientGenderLabel, type Medication, type Patient } from "@/lib/mock-data";
 import type { DispatchTarget } from "@/lib/stores/pharmacy-store";
-import { createPrintSnapshot, getOrdonnance, mapPatient } from "@/lib/backend-api";
+import { createPrintSnapshot, getOrdonnance, getPatient, mapPatient } from "@/lib/backend-api";
 import { LoadingState } from "@/components/molecules/LoadingState";
 
 type OrdonnanceData = {
@@ -39,7 +39,11 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
         await createPrintSnapshot(params.rxId);
         const data = await getOrdonnance(params.rxId);
         const resolvedPatientId = data.patient?.id ?? data.patientId ?? patientIdFromQuery ?? "";
-        const mappedPatient = data.patient ? mapPatient({ ...data.patient, id: resolvedPatientId }) : null;
+        const mappedPatient = data.patient
+          ? mapPatient({ ...data.patient, id: resolvedPatientId })
+          : resolvedPatientId
+            ? await getPatient(resolvedPatientId)
+            : null;
         setPatient(mappedPatient);
         setRx({
           prescriptionNumber: data.prescriptionNumber,

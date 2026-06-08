@@ -6,7 +6,6 @@ import {
   getPatientFullName,
   getPatientGenderLabel,
   getPatientSearchText,
-  safetyAlerts as mockSafetyAlerts,
   type Medication,
   type Patient,
   type SafetyAlert,
@@ -201,13 +200,13 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
       });
     } catch (error) {
       setMeds([]);
-      setAlerts(mockSafetyAlerts);
-      setGenerated(true);
-      setManualStarted(false);
-      setCaseStatus("pending_review");
+      setAlerts([]);
+      setGenerated(false);
+      setManualStarted(true);
+      setCaseStatus("draft");
       toast({
         title: "CDSS indisponible",
-        description: error instanceof Error ? error.message : "Fallback sur la proposition de démonstration.",
+        description: error instanceof Error ? error.message : "La redaction manuelle reste disponible.",
       });
     } finally {
       setGenerating(false);
