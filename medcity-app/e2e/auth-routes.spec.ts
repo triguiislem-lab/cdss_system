@@ -43,7 +43,7 @@ test("keeps doctor consultations wired to the backend", async ({ page }) => {
 
   await page.getByText("Eleanor Whitfield - Suivi pneumonie communautaire").click();
   await expect(page).toHaveURL(/\/doctor\/consultations\/consultation-5001$/);
-  await expect(page.getByText("consultation-5001 - Eleanor Whitfield")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Eleanor Whitfield" })).toBeVisible();
   await expect(page.getByText("Suivi pneumonie communautaire").first()).toBeVisible();
 });
 
@@ -58,5 +58,6 @@ test("logs in as an admin and loads administration KPIs", async ({ page }) => {
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByText("MedCity Admin", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Administration plateforme|Platform administration/i)).toBeVisible();
-  await expect(page.getByText("rx-2087 - pending_review")).toBeVisible();
+  await expect(page.getByText("pending_review")).toBeVisible();
+  await expect(page.getByText(/Eleanor Whitfield.*Review high-risk interaction/)).toBeVisible();
 });
