@@ -19,6 +19,7 @@ import {
   CreateSpecialtyDto,
   CreateTestimonialDto,
   CreateWhyFeatureDto,
+  SendNewsletterCampaignDto,
   UpdateContactMessageStatusDto,
   UpdatePartnerDto,
   UpdatePostDto,
@@ -157,5 +158,10 @@ export class CmsController {
   @Get('newsletter-subscriptions')
   newsletterSubscriptions() {
     return this.cmsService.listNewsletterSubscriptions();
+  }
+
+  @Post('newsletter-subscriptions/send-campaign')
+  sendNewsletterCampaign(@Body() dto: SendNewsletterCampaignDto) {
+    return this.cmsService.sendNewsletterCampaign(dto);
   }
 }

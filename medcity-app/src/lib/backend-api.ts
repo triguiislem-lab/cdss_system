@@ -155,6 +155,25 @@ type ApiDoctor = {
   };
 };
 
+export type ApiDoctorProfile = ApiDoctor & {
+  cnamCode?: string;
+  gsm?: string;
+  address?: string;
+};
+
+export type NewsletterCampaignResult = {
+  total: number;
+  sent: number;
+  failed: number;
+  skipped: number;
+  results: Array<{
+    recipient: string;
+    status: "sent" | "skipped" | "failed";
+    id?: string;
+    reason?: string;
+  }>;
+};
+
 export type ApiPublicDoctor = {
   id: string;
   firstName: string;
@@ -752,6 +771,28 @@ export async function deleteDoctor(id: string) {
   return apiRequest<{ ok: boolean }>(`/api/doctors/${id}`, { method: "DELETE" });
 }
 
+export async function getDoctorProfile() {
+  return apiRequest<ApiDoctorProfile>("/api/doctors/me/profile");
+}
+
+export async function updateDoctorProfile(input: Partial<{
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  fiscalNumber: string;
+  specialty: string;
+  cnamCode: string;
+  gsm: string;
+  address: string;
+  city: string;
+}>) {
+  return apiRequest<ApiDoctorProfile>("/api/doctors/me/profile", {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function listCmsPosts() {
   return apiRequest<ApiCmsPost[]>("/api/cms/posts");
 }
@@ -864,11 +905,39 @@ export async function createContactMessage(input: {
   });
 }
 
+export async function listContactMessages() {
+  return apiRequest<ApiContactMessage[]>("/api/cms/contact-messages");
+}
+
+export async function updateContactMessageStatus(
+  id: string,
+  status: ApiContactMessage["status"],
+) {
+  return apiRequest<ApiContactMessage>(`/api/cms/contact-messages/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
 export async function subscribeNewsletter(email: string, source = "footer") {
   return apiRequest<ApiNewsletterSubscription>("/api/public/newsletter-subscriptions", {
     method: "POST",
     body: JSON.stringify({ email, source }),
     auth: false,
+  });
+}
+
+export async function listNewsletterSubscriptions() {
+  return apiRequest<ApiNewsletterSubscription[]>("/api/cms/newsletter-subscriptions");
+}
+
+export async function sendNewsletterCampaign(input: {
+  subject: string;
+  message: string;
+}) {
+  return apiRequest<NewsletterCampaignResult>("/api/cms/newsletter-subscriptions/send-campaign", {
+    method: "POST",
+    body: JSON.stringify(input),
   });
 }
 

@@ -8,9 +8,11 @@ import {
   GitPullRequest,
   LayoutDashboard,
   LogOut,
+  Mail,
   Pill,
   ScrollText,
   Search,
+  Send,
   Stethoscope,
   UserCheck,
 } from "lucide-react";
@@ -31,6 +33,8 @@ const WORKSPACE_NAV: NavItem[] = [
 
 const PLATFORM_NAV: NavItem[] = [
   { href: "/admin/doctors", labelKey: "nav.doctors", icon: UserCheck },
+  { href: "/admin/contact-messages", labelKey: "nav.contactMessages", icon: Mail },
+  { href: "/admin/newsletter", labelKey: "nav.newsletter", icon: Send },
   { href: "/admin/cms", labelKey: "nav.cms", icon: FileText },
 ];
 

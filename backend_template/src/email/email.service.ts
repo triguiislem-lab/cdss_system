@@ -128,6 +128,54 @@ export class EmailService {
     ]);
   }
 
+  async sendNewsletterCampaign(input: {
+    recipients: string[];
+    subject: string;
+    message: string;
+  }) {
+    const recipients = Array.from(
+      new Set(
+        input.recipients
+          .map((email) => email.trim().toLowerCase())
+          .filter((email) => this.looksLikeEmail(email)),
+      ),
+    );
+
+    if (recipients.length === 0) {
+      return {
+        total: 0,
+        sent: 0,
+        failed: 0,
+        skipped: 0,
+        results: [],
+      };
+    }
+
+    const results = await Promise.all(
+      recipients.map(async (recipient) => ({
+        recipient,
+        ...(await this.sendEmail({
+          to: recipient,
+          subject: input.subject,
+          html: `
+            <h2>${this.escapeHtml(input.subject)}</h2>
+            <p>${this.escapeHtml(input.message).replace(/\n/g, '<br />')}</p>
+          `,
+          text: input.message,
+          tags: [{ name: 'event', value: 'newsletter_campaign' }],
+        })),
+      })),
+    );
+
+    return {
+      total: recipients.length,
+      sent: results.filter((result) => result.status === 'sent').length,
+      failed: results.filter((result) => result.status === 'failed').length,
+      skipped: results.filter((result) => result.status === 'skipped').length,
+      results,
+    };
+  }
+
   async sendDoctorCredentialsEmail(input: {
     firstName: string;
     lastName: string;

@@ -217,3 +217,13 @@ export class CreateNewsletterSubscriptionDto {
   @Length(1, 80)
   source?: string;
 }
+
+export class SendNewsletterCampaignDto {
+  @IsString()
+  @Length(3, 160)
+  subject: string;
+
+  @IsString()
+  @Length(10, 8000)
+  message: string;
+}

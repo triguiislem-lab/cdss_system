@@ -7,8 +7,10 @@ import {
   FileText,
   Gauge,
   GitPullRequest,
+  Mail,
   Pill,
   ScrollText,
+  Send,
   UserCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -56,6 +58,18 @@ const quickActions = [
     label: "Contenu public",
     description: "Articles, partenaires, temoignages et sections home.",
     icon: FileText,
+  },
+  {
+    href: "/admin/contact-messages",
+    label: "Messages contact",
+    description: "Demandes publiques et messages envoyes par les docteurs.",
+    icon: Mail,
+  },
+  {
+    href: "/admin/newsletter",
+    label: "Newsletter",
+    description: "Abonnes et campagnes envoyees via Resend.",
+    icon: Send,
   },
   {
     href: "/admin/cdss/medicine-contributions",

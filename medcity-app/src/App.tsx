@@ -23,11 +23,14 @@ import Login from "@/pages/login";
 import AdminDoctors from "@/pages/admin/doctors";
 import AdminDashboard from "@/pages/admin/index";
 import AdminCMS from "@/pages/admin/cms";
+import AdminContactMessages from "@/pages/admin/contact-messages";
+import AdminNewsletter from "@/pages/admin/newsletter";
 import AdminAuditPage from "@/pages/admin/cdss/audit";
 import AdminMedicines from "@/pages/admin/cdss/medicines";
 import AdminMedicineContributions from "@/pages/admin/cdss/medicine-contributions";
 
 import DoctorDashboard from "@/pages/doctor/index";
+import DoctorProfile from "@/pages/doctor/profile";
 import DoctorPatients from "@/pages/doctor/patients";
 import PatientDetail from "@/pages/doctor/patients.$patientId";
 import ConsultationDetail from "@/pages/doctor/consultations.$consultationId";
@@ -68,6 +71,12 @@ function Router() {
       <Route path="/admin/cms">
         {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminCMS /></AdminLayout></ProtectedRoute>}
       </Route>
+      <Route path="/admin/contact-messages">
+        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminContactMessages /></AdminLayout></ProtectedRoute>}
+      </Route>
+      <Route path="/admin/newsletter">
+        {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminNewsletter /></AdminLayout></ProtectedRoute>}
+      </Route>
       <Route path="/admin/cdss/medicines">
         {() => <ProtectedRoute requiredRole="admin"><AdminLayout><AdminMedicines /></AdminLayout></ProtectedRoute>}
       </Route>
@@ -80,6 +89,9 @@ function Router() {
 
       <Route path="/doctor">
         {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><DoctorDashboard /></DoctorLayout></ProtectedRoute>}
+      </Route>
+      <Route path="/doctor/profile">
+        {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><DoctorProfile /></DoctorLayout></ProtectedRoute>}
       </Route>
       <Route path="/doctor/patients">
         {() => <ProtectedRoute requiredRole="doctor"><DoctorLayout><DoctorPatients /></DoctorLayout></ProtectedRoute>}

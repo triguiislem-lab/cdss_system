@@ -14,6 +14,7 @@ import {
   Pill,
   Search,
   Stethoscope,
+  UserCircle,
   Users,
 } from "lucide-react";
 
@@ -26,6 +27,7 @@ type NavItem = {
 
 const WORKSPACE_NAV: NavItem[] = [
   { href: "/doctor", labelKey: "nav.dashboard", icon: LayoutDashboard, exact: true },
+  { href: "/doctor/profile", labelKey: "nav.profile", icon: UserCircle },
   { href: "/doctor/patients", labelKey: "nav.patients", icon: Users },
   { href: "/doctor/consultations", labelKey: "nav.consultations", icon: CalendarClock },
   { href: "/doctor/prescription/new", labelKey: "nav.newPrescription", icon: FilePlus2 },

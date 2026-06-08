@@ -17,6 +17,7 @@ import {
 import {
   CreateContactMessageDto,
   CreateNewsletterSubscriptionDto,
+  SendNewsletterCampaignDto,
 } from './dto/cms.dto';
 
 type CmsRepository<T extends { id: string }> = Repository<T>;
@@ -174,6 +175,18 @@ export class CmsService {
   listNewsletterSubscriptions() {
     return this.newsletterSubscriptions.find({
       order: { createdAt: 'DESC' },
+    });
+  }
+
+  async sendNewsletterCampaign(data: SendNewsletterCampaignDto) {
+    const subscriptions = await this.newsletterSubscriptions.find({
+      where: { status: NewsletterSubscriptionStatus.Active },
+      order: { createdAt: 'DESC' },
+    });
+    return this.emailService.sendNewsletterCampaign({
+      recipients: subscriptions.map((subscription) => subscription.email),
+      subject: data.subject.trim(),
+      message: data.message.trim(),
     });
   }
 

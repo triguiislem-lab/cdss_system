@@ -664,6 +664,28 @@ async function verifyPublicEngagementCrud(baseUrl: string, adminToken: string) {
     { headers: authHeaders(adminToken) },
   );
   assert.ok(subscriptions.some((item) => item.id === subscription.id));
+
+  const campaign = await request<{
+    total: number;
+    sent: number;
+    failed: number;
+    skipped: number;
+  }>(
+    baseUrl,
+    '/api/cms/newsletter-subscriptions/send-campaign',
+    {
+      method: 'POST',
+      headers: authHeaders(adminToken),
+      body: JSON.stringify({
+        subject: 'Newsletter CRUD',
+        message: 'Newsletter campaign body for automated CRUD verification.',
+      }),
+    },
+    201,
+  );
+  assert.equal(campaign.total, subscriptions.filter((item) => item.status === 'active').length);
+  assert.equal(campaign.sent, 0);
+  assert.equal(campaign.skipped, campaign.total);
 }
 
 async function createPatient(
