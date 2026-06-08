@@ -53,8 +53,7 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
     if (!needle) return true;
     return (
       consultation.patientName.toLowerCase().includes(needle) ||
-      consultation.reason.toLowerCase().includes(needle) ||
-      consultation.id.toLowerCase().includes(needle)
+      consultation.reason.toLowerCase().includes(needle)
     );
   }), [consultations, filter, query]);
 
@@ -124,7 +123,6 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
                 <li key={consultation.id} className="flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition-smooth">
                   <Link href={detailHref} className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs text-muted-foreground">{consultation.id}</span>
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${status.cls}`}>
                         {t(status.labelKey)}
                       </span>

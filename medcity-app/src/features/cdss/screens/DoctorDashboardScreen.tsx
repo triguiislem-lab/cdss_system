@@ -159,7 +159,7 @@ function Dashboard() {
                           <td className="px-5 py-3.5">
                             <div className="font-semibold">{patient?.name ?? "Patient inconnu"}</div>
                             <div className="text-xs text-muted-foreground">
-                              {[patient?.id, patient ? `${patient.age}${patient.sex}` : undefined, rx.id].filter(Boolean).join(" - ")}
+                              {patient ? `${patient.age} ${patient.sex}` : "Patient non charge"}
                             </div>
                           </td>
                           <td className="px-5 py-3.5">{rx.diagnosis}</td>

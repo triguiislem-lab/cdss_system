@@ -261,7 +261,7 @@ export default function AdminDashboard() {
                         <Activity className="h-4 w-4" />
                       </span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold">{entry.prescriptionId} - {entry.finalStatus}</p>
+                        <p className="text-sm font-semibold">{entry.finalStatus}</p>
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">
                           {[entry.patient, entry.doctor, entry.recommendation].filter(Boolean).join(" - ")}
                         </p>

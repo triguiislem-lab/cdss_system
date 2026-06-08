@@ -489,7 +489,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
           <p className="text-sm text-muted-foreground mt-1">{t("rx.newSubtitle")}</p>
         </div>
         <div className="text-xs text-muted-foreground">
-          {t("rx.caseModel", { id: savedPrescriptionId ?? "Nouveau" })}
+          {savedPrescriptionId ? t("rx.status.draft") : t("rx.status.manualDraft")}
         </div>
       </div>
 
@@ -538,7 +538,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
                     <span>
                       <span className="block font-semibold">{getPatientFullName(patient)}</span>
                       <span className="text-xs text-muted-foreground">
-                        {patient.id} · {getPatientAge(patient)} {t("patients.ageUnit")} · {getPatientGenderLabel(patient)}
+                        {getPatientAge(patient)} {t("patients.ageUnit")} - {getPatientGenderLabel(patient)}
                       </span>
                     </span>
                     <span className="text-xs text-muted-foreground">{t("rx.conditionsCount", { count: patient.comorbidities.length })}</span>
@@ -556,7 +556,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
               <div>
                 <div className="font-semibold">{getPatientFullName(selectedPatient)}</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {selectedPatient.id} · {getPatientAge(selectedPatient)} {t("patients.ageUnit")} · {getPatientGenderLabel(selectedPatient)}
+                  {getPatientAge(selectedPatient)} {t("patients.ageUnit")} - {getPatientGenderLabel(selectedPatient)}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {selectedPatient.flags.length === 0 ? (

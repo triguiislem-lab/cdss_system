@@ -24,6 +24,9 @@ type PatientFormState = {
   profession: string;
   internalCode: string;
   address: string;
+  allergiesText: string;
+  currentMedicationsText: string;
+  comorbiditiesText: string;
 };
 
 const emptyForm: PatientFormState = {
@@ -37,6 +40,9 @@ const emptyForm: PatientFormState = {
   profession: "",
   internalCode: "",
   address: "",
+  allergiesText: "",
+  currentMedicationsText: "",
+  comorbiditiesText: "",
 };
 
 function splitLegacyName(name: string) {
@@ -61,7 +67,32 @@ function formFromPatient(patient?: Patient | null): PatientFormState {
     profession: patient.profession ?? "",
     internalCode: patient.internalCode ?? "",
     address: patient.address ?? "",
+    allergiesText: patient.allergies.join("\n"),
+    currentMedicationsText: patient.currentMedications.map((medication) => [medication.name, medication.dose].filter(Boolean).join(" | ")).join("\n"),
+    comorbiditiesText: patient.comorbidities.join("\n"),
   };
+}
+
+function parseLineList(value: string) {
+  return value
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseMedicationLines(value: string) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [name, ...doseParts] = line.split("|").map((part) => part.trim());
+      return {
+        name,
+        dose: doseParts.join(" | "),
+      };
+    })
+    .filter((medication) => medication.name);
 }
 
 export function PatientFormDialog({ open, onClose, editing, onSaved }: Props) {
@@ -100,9 +131,9 @@ export function PatientFormDialog({ open, onClose, editing, onSaved }: Props) {
       profession: form.profession.trim() || undefined,
       internalCode: form.internalCode.trim() || undefined,
       address: form.address.trim() || undefined,
-      allergies: editing?.allergies ?? [],
-      currentMedications: editing?.currentMedications ?? [],
-      comorbidities: editing?.comorbidities ?? [],
+      allergies: parseLineList(form.allergiesText),
+      currentMedications: parseMedicationLines(form.currentMedicationsText),
+      comorbidities: parseLineList(form.comorbiditiesText),
       renal: editing?.renal ?? { gfr: 90, status: "normal" },
       liver: editing?.liver ?? { status: "normal" },
       vitalsSnapshot: editing?.vitals ?? { hr: 0, bp: "", temp: 0, spo2: 0 },
@@ -179,6 +210,39 @@ export function PatientFormDialog({ open, onClose, editing, onSaved }: Props) {
               </Field>
               <Field label={t("patients.address")}>
                 <input value={form.address} onChange={(event) => update("address", event.target.value)} className={input} />
+              </Field>
+            </div>
+          </section>
+
+          <section className="mt-4 rounded-xl border border-border bg-muted/20 p-4">
+            <h3 className="text-sm font-semibold">Clinical information</h3>
+            <div className="mt-4 grid grid-cols-1 gap-3">
+              <Field label={t("patientSummary.allergies")}>
+                <textarea
+                  value={form.allergiesText}
+                  onChange={(event) => update("allergiesText", event.target.value)}
+                  rows={3}
+                  className={`${input} resize-y`}
+                  placeholder={"Penicilline\nLatex"}
+                />
+              </Field>
+              <Field label={t("patientSummary.currentMedications")}>
+                <textarea
+                  value={form.currentMedicationsText}
+                  onChange={(event) => update("currentMedicationsText", event.target.value)}
+                  rows={3}
+                  className={`${input} resize-y`}
+                  placeholder={"Metformine | 500 mg x 2/jour\nAmlodipine | 5 mg/jour"}
+                />
+              </Field>
+              <Field label={t("patientSummary.comorbidities")}>
+                <textarea
+                  value={form.comorbiditiesText}
+                  onChange={(event) => update("comorbiditiesText", event.target.value)}
+                  rows={3}
+                  className={`${input} resize-y`}
+                  placeholder={"Diabete type 2\nHypertension"}
+                />
               </Field>
             </div>
           </section>

@@ -41,7 +41,7 @@ export function ConsultationFormDialog({ open, onClose, editingId }: Props) {
       if (!editingId) return;
       const existing = await getConsultation(editingId);
       setPatientId(existing.patientId);
-      setPatientQuery(`${existing.patientName} ${existing.patientId}`);
+      setPatientQuery(existing.patientName);
       setReason(existing.reason);
       setDoctor(existing.doctor);
       setScheduledAt(new Date(existing.scheduledAt).toISOString().slice(0, 16));
@@ -79,22 +79,19 @@ export function ConsultationFormDialog({ open, onClose, editingId }: Props) {
             onQueryChange={setPatientQuery}
             onSelect={(patient) => {
               setPatientId(patient.id);
-              setPatientQuery(`${getPatientFullName(patient)} ${patient.id}`);
+              setPatientQuery(getPatientFullName(patient));
             }}
             getId={(patient) => patient.id}
-            getSearchText={(patient) => `${getPatientFullName(patient)} ${patient.id}`}
+            getSearchText={(patient) => getPatientFullName(patient)}
             placeholder={t("consultations.patientSearch")}
             emptyLabel={t("consultations.noPatient")}
             renderItem={(patient) => (
-              <span className="flex items-center justify-between gap-3">
-                <span className="font-semibold">{getPatientFullName(patient)}</span>
-                <span className="text-xs opacity-75">{patient.id}</span>
-              </span>
+              <span className="font-semibold">{getPatientFullName(patient)}</span>
             )}
           />
           {selectedPatient && (
             <p className="mt-2 text-xs text-muted-foreground">
-              {t("consultations.selection", { name: getPatientFullName(selectedPatient), id: selectedPatient.id })}
+              {getPatientFullName(selectedPatient)}
             </p>
           )}
         </Field>

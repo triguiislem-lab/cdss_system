@@ -85,7 +85,7 @@ function PatientsPage() {
                   </div>
                   <div>
                     <div className="font-semibold group-hover:text-primary transition-smooth">{getPatientFullName(p)}</div>
-                    <div className="text-xs text-muted-foreground">{p.id} · {getPatientAge(p)} {t("patients.ageUnit")} · {getPatientGenderLabel(p)}</div>
+                    <div className="text-xs text-muted-foreground">{getPatientAge(p)} {t("patients.ageUnit")} - {getPatientGenderLabel(p)}</div>
                   </div>
                 </Link>
                 {p.missingData && p.missingData.length > 0 && (
@@ -101,7 +101,7 @@ function PatientsPage() {
                 <div className="text-muted-foreground">{t("patients.profession")}</div>
                 <div className="font-medium">{p.profession || t("common.notProvidedF")}</div>
                 <div className="text-muted-foreground">{t("patients.internalCode")}</div>
-                <div className="font-medium">{p.internalCode || p.id}</div>
+                <div className="font-medium">{p.internalCode || t("common.notProvided")}</div>
               </div>
 
               {p.flags.length > 0 && (

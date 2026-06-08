@@ -160,7 +160,7 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
               <div key={entry.id} className="rounded-xl border border-border bg-card shadow-card p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-xs text-muted-foreground font-mono">{entry.id} - {entry.lastUpdate}</div>
+                    <div className="text-xs text-muted-foreground">{entry.lastUpdate}</div>
                     <div className="font-semibold mt-0.5">
                       {patient ? getPatientFullName(patient) : entry.patientId}{" "}
                       {patient && <span className="text-muted-foreground font-normal">({getPatientAge(patient)} {t("patients.ageUnit")})</span>}

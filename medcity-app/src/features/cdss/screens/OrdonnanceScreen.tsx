@@ -146,7 +146,7 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Patient</div>
               <div className="mt-1 font-semibold">{getPatientFullName(patient)}</div>
-              <div className="text-xs text-muted-foreground">{patient.id} - {getPatientAge(patient)} ans - {getPatientGenderLabel(patient)}</div>
+              <div className="text-xs text-muted-foreground">{getPatientAge(patient)} ans - {getPatientGenderLabel(patient)}</div>
               {patient.allergies.length > 0 && <div className="mt-2 text-xs"><span className="font-semibold text-critical">Allergies:</span> {patient.allergies.join(", ")}</div>}
             </div>
             <div>

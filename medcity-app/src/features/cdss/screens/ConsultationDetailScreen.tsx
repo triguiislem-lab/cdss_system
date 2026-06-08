@@ -419,7 +419,7 @@ export default function ConsultationDetailPage({ basePath = "/doctor" }: { baseP
             <ArrowLeft className="h-4 w-4" /> {t("consultations.title")}
           </Link>
           <span className="text-muted-foreground">/</span>
-          <h1 className="text-xl font-bold truncate">{consultation.id} - {consultation.patientName}</h1>
+          <h1 className="text-xl font-bold truncate">{consultation.patientName}</h1>
         </div>
         <div className="flex items-center gap-2">
           <button

@@ -125,7 +125,6 @@ export default function AuditPage() {
           <table className="w-full text-sm">
             <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground bg-muted/40">
               <tr>
-                <th className="px-4 py-3 font-semibold">{t("audit.rxId")}</th>
                 <th className="px-4 py-3 font-semibold">{t("common.patient")}</th>
                 <th className="px-4 py-3 font-semibold">{t("common.doctor")}</th>
                 <th className="px-4 py-3 font-semibold">{t("audit.model")}</th>
@@ -141,7 +140,6 @@ export default function AuditPage() {
                 const status = statusMeta[entry.finalStatus] ?? statusMeta.draft;
                 return (
                   <tr key={entry.id} className="hover:bg-muted/30 align-top">
-                    <td className="px-4 py-3 font-mono text-xs">{entry.prescriptionId}</td>
                     <td className="px-4 py-3 font-medium">{entry.patient}</td>
                     <td className="px-4 py-3 text-muted-foreground">{entry.doctor}</td>
                     <td className="px-4 py-3 text-xs font-mono text-muted-foreground">{entry.modelVersion}</td>

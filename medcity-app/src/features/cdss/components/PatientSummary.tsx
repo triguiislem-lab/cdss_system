@@ -16,7 +16,7 @@ export function PatientSummary({ patient }: { patient: Patient }) {
           <div>
             <div className="font-semibold text-base leading-tight">{getPatientFullName(patient)}</div>
             <div className="text-xs text-muted-foreground mt-0.5">
-              {patient.id} · {getPatientAge(patient)} {t("patients.ageUnit")} · {getPatientGenderLabel(patient)}
+              {getPatientAge(patient)} {t("patients.ageUnit")} - {getPatientGenderLabel(patient)}
             </div>
             {patient.phone1 && <div className="mt-1 text-xs text-muted-foreground">{patient.phone1}</div>}
           </div>
@@ -43,7 +43,7 @@ export function PatientSummary({ patient }: { patient: Patient }) {
             <dt className="text-muted-foreground">{t("patients.profession")}</dt>
             <dd className="font-medium">{patient.profession || t("common.notProvidedF")}</dd>
             <dt className="text-muted-foreground">{t("patients.internalCode")}</dt>
-            <dd className="font-medium">{patient.internalCode || patient.id}</dd>
+            <dd className="font-medium">{patient.internalCode || t("common.notProvided")}</dd>
             <dt className="text-muted-foreground">{t("patients.address")}</dt>
             <dd className="font-medium">{patient.address || t("common.notProvidedF")}</dd>
           </dl>
@@ -77,9 +77,9 @@ export function PatientSummary({ patient }: { patient: Patient }) {
             {patient.currentMedications.length === 0 ? (
               <li className="text-xs text-muted-foreground">{t("patientSummary.noMedication")}</li>
             ) : patient.currentMedications.map((medication) => (
-              <li key={medication.name} className="flex justify-between text-xs">
+              <li key={`${medication.name}-${medication.dose ?? ""}`} className="flex justify-between gap-3 text-xs">
                 <span className="font-medium">{medication.name}</span>
-                <span className="text-muted-foreground">{medication.dose}</span>
+                <span className="text-muted-foreground text-right">{medication.dose}</span>
               </li>
             ))}
           </ul>
@@ -91,21 +91,6 @@ export function PatientSummary({ patient }: { patient: Patient }) {
               <li className="text-muted-foreground">{t("patientSummary.noComorbidity")}</li>
             ) : patient.comorbidities.map((condition) => <li key={condition}>- {condition}</li>)}
           </ul>
-        </Section>
-
-        <Section title={t("patientSummary.renalLiver")} icon={Droplets}>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <div className="text-muted-foreground">eGFR</div>
-              <div className="font-semibold">{patient.renal.gfr} mL/min</div>
-              <div className="text-[11px] capitalize text-muted-foreground">{patient.renal.status} {t("patientSummary.renalImpairment")}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">{t("patientSummary.liver")}</div>
-              <div className="font-semibold capitalize">{patient.liver.status}</div>
-              {patient.liver.note && <div className="text-[11px] text-muted-foreground">{patient.liver.note}</div>}
-            </div>
-          </div>
         </Section>
 
         <Section title={t("patientSummary.vitals")} icon={Droplets}>

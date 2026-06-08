@@ -121,7 +121,7 @@ export default function PatientChart({ basePath }: { basePath: "/doctor" }) {
                     <article key={entry.id} className="p-5">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <div className="text-xs font-mono text-muted-foreground">{entry.id} · {entry.lastUpdate}</div>
+                          <div className="text-xs text-muted-foreground">{entry.lastUpdate}</div>
                           <h3 className="mt-1 font-semibold">{entry.diagnosis}</h3>
                           <p className="mt-1 text-xs text-muted-foreground">{entry.doctor}</p>
                         </div>
