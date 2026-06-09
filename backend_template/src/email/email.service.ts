@@ -284,6 +284,10 @@ export class EmailService {
       prescription.patient?.firstName,
       prescription.patient?.lastName,
     ].filter(Boolean).join(' ') || 'Patient';
+    const patientSummary = this.patientSummary(
+      prescription.patient?.birthDate,
+      prescription.patient?.gender,
+    );
     const doctorName = [
       prescription.doctor?.firstName,
       prescription.doctor?.lastName,
@@ -305,17 +309,20 @@ export class EmailService {
     const pdf = this.buildPrescriptionPdf({
       prescriptionNumber: prescription.prescriptionNumber,
       patientName,
+      patientSummary,
       doctorName,
       diagnosis: prescription.diagnosis,
-      note: input.note,
+      notes: prescription.notes,
       medications: [...(prescription.medications ?? [])].sort(
         (a, b) => a.sortOrder - b.sortOrder,
       ).map((medication) => ({
         name: medication.medicineName,
         dosage: medication.dosage,
+        route: medication.route || '',
         frequency: medication.frequency,
         duration: medication.duration || '',
-        instructions: medication.instructions || medication.indication || '',
+        indication: medication.indication || '',
+        instructions: medication.instructions || '',
       })),
     });
 
@@ -477,51 +484,100 @@ export class EmailService {
   private buildPrescriptionPdf(input: {
     prescriptionNumber: string;
     patientName: string;
+    patientSummary?: string;
     doctorName: string;
     diagnosis?: string;
-    note?: string;
+    notes?: string;
     medications: Array<{
       name: string;
       dosage: string;
+      route: string;
       frequency: string;
       duration: string;
+      indication: string;
       instructions: string;
     }>;
   }) {
-    const lines = [
-      { text: 'ORDONNANCE MEDCITY', size: 18, gap: 24 },
-      { text: `Numero: ${input.prescriptionNumber}`, size: 11, gap: 16 },
-      { text: `Patient: ${input.patientName}`, size: 11, gap: 16 },
-      { text: `Medecin: Dr. ${input.doctorName}`, size: 11, gap: 16 },
-      ...(input.diagnosis ? [{ text: `Diagnostic / indication: ${input.diagnosis}`, size: 11, gap: 16 }] : []),
-      ...(input.note ? [{ text: `Note: ${input.note}`, size: 11, gap: 22 }] : [{ text: '', size: 11, gap: 10 }]),
-      { text: 'Medicaments', size: 14, gap: 18 },
-      ...input.medications.flatMap((medication, index) => [
-        { text: `${index + 1}. ${medication.name}`, size: 12, gap: 15 },
-        { text: `   Dosage: ${medication.dosage || '-'} | Frequence: ${medication.frequency || '-'} | Duree: ${medication.duration || '-'}`, size: 10, gap: 14 },
-        ...(medication.instructions ? this.wrapText(`   Instructions: ${medication.instructions}`, 92).map((text) => ({ text, size: 10, gap: 13 })) : []),
-        { text: '', size: 10, gap: 8 },
-      ]),
-      { text: 'Document transmis par MedCity. Le prescripteur reste responsable de la validation clinique.', size: 9, gap: 12 },
-    ];
+    const contentLines: string[] = [];
+    const text = (
+      value: string,
+      x: number,
+      y: number,
+      size = 10,
+      bold = false,
+    ) => {
+      contentLines.push(
+        'BT',
+        `${bold ? '/F2' : '/F1'} ${size} Tf`,
+        `${x} ${y} Td`,
+        `(${this.escapePdfText(value)}) Tj`,
+        'ET',
+      );
+    };
+    const line = (x1: number, y1: number, x2: number, y2: number) => {
+      contentLines.push(`0.75 w ${x1} ${y1} m ${x2} ${y2} l S`);
+    };
+    const rect = (x: number, y: number, width: number, height: number) => {
+      contentLines.push(`0.65 w ${x} ${y} ${width} ${height} re S`);
+    };
 
-    const contentLines: string[] = ['BT', '/F1 11 Tf', '50 780 Td'];
-    let previousSize = 11;
-    for (const line of lines) {
-      if (line.size !== previousSize) {
-        contentLines.push(`/F1 ${line.size} Tf`);
-        previousSize = line.size;
-      }
-      contentLines.push(`(${this.escapePdfText(line.text)}) Tj`);
-      contentLines.push(`0 -${line.gap} Td`);
+    text('MedCity Connect', 262, 800, 7, true);
+    text('MedCity - Ordonnance numerique', 88, 770, 14, true);
+    text(`Digital prescription - ${input.prescriptionNumber}`, 88, 754, 8);
+    text(`Date: ${this.formatDisplayDate(new Date())}`, 430, 775, 8);
+    text(`Prescriber: Dr. ${input.doctorName}`, 386, 761, 8, true);
+    line(50, 730, 545, 730);
+
+    text('PATIENT', 50, 708, 8, true);
+    text(input.patientName, 50, 691, 10, true);
+    if (input.patientSummary) text(input.patientSummary, 50, 678, 8);
+
+    text('DIAGNOSIS / INDICATION', 305, 708, 8, true);
+    const diagnosisLines = this.wrapText(input.diagnosis || 'Non renseigne', 42);
+    diagnosisLines.slice(0, 3).forEach((value, index) => {
+      text(value, 305, 691 - index * 13, 9);
+    });
+    if (input.notes) {
+      this.wrapText(input.notes, 42).slice(0, 3).forEach((value, index) => {
+        text(value, 305, 650 - index * 12, 8);
+      });
     }
-    contentLines.push('ET');
+
+    text('PRESCRIPTION', 50, 626, 8, true);
+    let y = 590;
+    input.medications.forEach((medication, index) => {
+      const instruction = medication.instructions || medication.indication;
+      const instructionLines = instruction ? this.wrapText(instruction, 52) : [];
+      const cardHeight = Math.max(64, 58 + Math.max(0, instructionLines.length - 1) * 11);
+      rect(50, y - cardHeight + 22, 495, cardHeight);
+      text(`${index + 1}. ${medication.name}`, 66, y, 11, true);
+      if (instructionLines[0]) text(instructionLines[0], 230, y, 8);
+      instructionLines.slice(1, 4).forEach((value, lineIndex) => {
+        text(value, 230, y - 12 - lineIndex * 11, 8);
+      });
+
+      const detailY = y - cardHeight + 42;
+      text('DOSE', 66, detailY + 14, 7, true);
+      text(medication.dosage || '-', 66, detailY, 8);
+      text('ROUTE', 185, detailY + 14, 7, true);
+      text(medication.route || '-', 185, detailY, 8);
+      text('FREQUENCY', 305, detailY + 14, 7, true);
+      text(medication.frequency || '-', 305, detailY, 8);
+      text('DURATION', 425, detailY + 14, 7, true);
+      text(medication.duration || '-', 425, detailY, 8);
+      y -= cardHeight + 16;
+    });
+
+    line(50, 180, 545, 180);
+    line(425, 135, 545, 135);
+    text('Signature', 510, 121, 8);
     const stream = contentLines.join('\n');
     const objects = [
       '<< /Type /Catalog /Pages 2 0 R >>',
       '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>',
       '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
       `<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}\nendstream`,
     ];
     const chunks = ['%PDF-1.4\n'];
@@ -555,6 +611,42 @@ export class EmailService {
     }
     if (current) lines.push(current);
     return lines;
+  }
+
+  private patientSummary(birthDate?: Date | string, gender?: string) {
+    const parts: string[] = [];
+    const age = this.ageYears(birthDate);
+    if (age !== undefined) parts.push(`${age} ans`);
+    if (gender) parts.push(this.genderLabel(gender));
+    return parts.join(' - ');
+  }
+
+  private ageYears(birthDate?: Date | string) {
+    if (!birthDate) return undefined;
+    const date = new Date(birthDate);
+    if (Number.isNaN(date.getTime())) return undefined;
+    const now = new Date();
+    let age = now.getFullYear() - date.getFullYear();
+    const monthDiff = now.getMonth() - date.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < date.getDate())) {
+      age -= 1;
+    }
+    return age >= 0 ? age : undefined;
+  }
+
+  private genderLabel(gender: string) {
+    const normalized = gender.toLowerCase();
+    if (normalized === 'male') return 'Homme';
+    if (normalized === 'female') return 'Femme';
+    return gender;
+  }
+
+  private formatDisplayDate(date: Date) {
+    return date.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
   }
 
   private escapePdfText(value: string) {

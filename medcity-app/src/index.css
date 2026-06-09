@@ -304,7 +304,7 @@
 
 @media print {
   @page {
-    margin: 12mm;
+    margin: 0;
   }
 
   html,
@@ -326,9 +326,9 @@
   body:has([data-print-root]) [data-print-root] {
     position: absolute !important;
     inset: 0 auto auto 0 !important;
-    width: 100% !important;
+    width: calc(100% - 24mm) !important;
     max-width: none !important;
-    margin: 0 !important;
+    margin: 12mm !important;
     box-shadow: none !important;
     border: 0 !important;
     border-radius: 0 !important;
