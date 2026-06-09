@@ -25,6 +25,13 @@ export class UsersService {
     });
   }
 
+  findByPasswordResetTokenHash(passwordResetTokenHash: string) {
+    return this.usersRepository.findOne({
+      where: { passwordResetTokenHash },
+      relations: { doctorProfile: true },
+    });
+  }
+
   async getById(id: string) {
     const user = await this.findById(id);
     if (!user) {
@@ -35,6 +42,10 @@ export class UsersService {
 
   create(email: string, passwordHash: string, role: UserRole) {
     const user = this.usersRepository.create({ email, passwordHash, role });
+    return this.usersRepository.save(user);
+  }
+
+  save(user: User) {
     return this.usersRepository.save(user);
   }
 }

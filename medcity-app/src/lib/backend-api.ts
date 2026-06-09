@@ -347,6 +347,22 @@ export async function loginApi(email: string, password: string) {
   });
 }
 
+export async function requestPasswordResetApi(email: string) {
+  return apiRequest<{ ok: boolean }>("/api/auth/request-password-reset", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+    auth: false,
+  });
+}
+
+export async function resetPasswordApi(token: string, password: string) {
+  return apiRequest<{ ok: boolean }>("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+    auth: false,
+  });
+}
+
 export async function getCurrentUserApi() {
   return apiRequest<{ id: string; email: string; role: "admin" | "doctor" }>("/api/auth/me");
 }

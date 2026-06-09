@@ -17,6 +17,11 @@ type ResendEmailPayload = {
   html: string;
   text?: string;
   reply_to?: string;
+  attachments?: Array<{
+    filename: string;
+    content: string;
+    content_type?: string;
+  }>;
   tags?: Array<{ name: string; value: string }>;
 };
 
@@ -211,6 +216,46 @@ export class EmailService {
     });
   }
 
+  async sendPasswordResetEmail(input: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    resetToken: string;
+    expiresMinutes: number;
+  }) {
+    const doctorName = [input.firstName, input.lastName].filter(Boolean).join(' ');
+    const frontendUrl = this.config.get<string>('FRONTEND_PUBLIC_URL', '').replace(/\/$/, '');
+    const resetUrl = frontendUrl
+      ? `${frontendUrl}/reset-password?token=${encodeURIComponent(input.resetToken)}`
+      : `Reset token: ${input.resetToken}`;
+
+    return this.sendEmail({
+      to: input.email,
+      subject: 'Reinitialisation de votre mot de passe MedCity',
+      html: `
+        <h2>Reinitialisation du mot de passe</h2>
+        <p>Bonjour Dr. ${this.escapeHtml(doctorName || input.email)},</p>
+        <p>Une demande de reinitialisation de mot de passe a ete recue pour votre compte MedCity.</p>
+        ${
+          frontendUrl
+            ? `<p><a href="${this.escapeHtml(resetUrl)}">Definir un nouveau mot de passe</a></p>`
+            : `<p><strong>Token:</strong> ${this.escapeHtml(input.resetToken)}</p>`
+        }
+        <p>Ce lien expire dans ${input.expiresMinutes} minutes.</p>
+        <p>Si vous n'etes pas a l'origine de cette demande, ignorez cet email.</p>
+      `,
+      text: [
+        'Reinitialisation du mot de passe MedCity',
+        `Bonjour Dr. ${doctorName || input.email},`,
+        'Une demande de reinitialisation de mot de passe a ete recue pour votre compte MedCity.',
+        `Lien/token: ${resetUrl}`,
+        `Expiration: ${input.expiresMinutes} minutes`,
+        "Si vous n'etes pas a l'origine de cette demande, ignorez cet email.",
+      ].join('\n'),
+      tags: [{ name: 'event', value: 'doctor_password_reset' }],
+    });
+  }
+
   async sendPrescriptionDispatchEmail(input: {
     prescription: Prescription;
     target: PharmacyTarget;
@@ -257,6 +302,22 @@ export class EmailService {
         </tr>
       `)
       .join('');
+    const pdf = this.buildPrescriptionPdf({
+      prescriptionNumber: prescription.prescriptionNumber,
+      patientName,
+      doctorName,
+      diagnosis: prescription.diagnosis,
+      note: input.note,
+      medications: [...(prescription.medications ?? [])].sort(
+        (a, b) => a.sortOrder - b.sortOrder,
+      ).map((medication) => ({
+        name: medication.medicineName,
+        dosage: medication.dosage,
+        frequency: medication.frequency,
+        duration: medication.duration || '',
+        instructions: medication.instructions || medication.indication || '',
+      })),
+    });
 
     return this.sendEmail({
       to: input.recipient,
@@ -302,6 +363,13 @@ export class EmailService {
           ].filter(Boolean).join(' - '),
         ),
       ].filter(Boolean).join('\n'),
+      attachments: [
+        {
+          filename: `${this.safeFilename(prescription.prescriptionNumber)}.pdf`,
+          content: pdf.toString('base64'),
+          content_type: 'application/pdf',
+        },
+      ],
       tags: [
         { name: 'event', value: 'prescription_dispatch' },
         { name: 'target', value: input.target },
@@ -404,6 +472,107 @@ export class EmailService {
 
   private looksLikeEmail(value: string) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  }
+
+  private buildPrescriptionPdf(input: {
+    prescriptionNumber: string;
+    patientName: string;
+    doctorName: string;
+    diagnosis?: string;
+    note?: string;
+    medications: Array<{
+      name: string;
+      dosage: string;
+      frequency: string;
+      duration: string;
+      instructions: string;
+    }>;
+  }) {
+    const lines = [
+      { text: 'ORDONNANCE MEDCITY', size: 18, gap: 24 },
+      { text: `Numero: ${input.prescriptionNumber}`, size: 11, gap: 16 },
+      { text: `Patient: ${input.patientName}`, size: 11, gap: 16 },
+      { text: `Medecin: Dr. ${input.doctorName}`, size: 11, gap: 16 },
+      ...(input.diagnosis ? [{ text: `Diagnostic / indication: ${input.diagnosis}`, size: 11, gap: 16 }] : []),
+      ...(input.note ? [{ text: `Note: ${input.note}`, size: 11, gap: 22 }] : [{ text: '', size: 11, gap: 10 }]),
+      { text: 'Medicaments', size: 14, gap: 18 },
+      ...input.medications.flatMap((medication, index) => [
+        { text: `${index + 1}. ${medication.name}`, size: 12, gap: 15 },
+        { text: `   Dosage: ${medication.dosage || '-'} | Frequence: ${medication.frequency || '-'} | Duree: ${medication.duration || '-'}`, size: 10, gap: 14 },
+        ...(medication.instructions ? this.wrapText(`   Instructions: ${medication.instructions}`, 92).map((text) => ({ text, size: 10, gap: 13 })) : []),
+        { text: '', size: 10, gap: 8 },
+      ]),
+      { text: 'Document transmis par MedCity. Le prescripteur reste responsable de la validation clinique.', size: 9, gap: 12 },
+    ];
+
+    const contentLines: string[] = ['BT', '/F1 11 Tf', '50 780 Td'];
+    let previousSize = 11;
+    for (const line of lines) {
+      if (line.size !== previousSize) {
+        contentLines.push(`/F1 ${line.size} Tf`);
+        previousSize = line.size;
+      }
+      contentLines.push(`(${this.escapePdfText(line.text)}) Tj`);
+      contentLines.push(`0 -${line.gap} Td`);
+    }
+    contentLines.push('ET');
+    const stream = contentLines.join('\n');
+    const objects = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+      `<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}\nendstream`,
+    ];
+    const chunks = ['%PDF-1.4\n'];
+    const offsets: number[] = [0];
+    for (const [index, object] of objects.entries()) {
+      offsets.push(Buffer.byteLength(chunks.join(''), 'latin1'));
+      chunks.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
+    }
+    const xrefOffset = Buffer.byteLength(chunks.join(''), 'latin1');
+    chunks.push(`xref\n0 ${objects.length + 1}\n`);
+    chunks.push('0000000000 65535 f \n');
+    offsets.slice(1).forEach((offset) => {
+      chunks.push(`${String(offset).padStart(10, '0')} 00000 n \n`);
+    });
+    chunks.push(`trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`);
+    return Buffer.from(chunks.join(''), 'latin1');
+  }
+
+  private wrapText(value: string, maxLength: number) {
+    const words = value.split(/\s+/).filter(Boolean);
+    const lines: string[] = [];
+    let current = '';
+    for (const word of words) {
+      const next = current ? `${current} ${word}` : word;
+      if (next.length > maxLength && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = next;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  }
+
+  private escapePdfText(value: string) {
+    return this.toPdfSafeText(value)
+      .replace(/\\/g, '\\\\')
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)');
+  }
+
+  private toPdfSafeText(value: string) {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\x20-\x7E]/g, ' ');
+  }
+
+  private safeFilename(value: string) {
+    return value.replace(/[^a-zA-Z0-9_-]/g, '_') || 'ordonnance';
   }
 
   private escapeHtml(value: string) {

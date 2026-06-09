@@ -26,6 +26,12 @@ export class User {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  @Column({ name: 'password_reset_token_hash', type: 'varchar', nullable: true })
+  passwordResetTokenHash?: string | null;
+
+  @Column({ name: 'password_reset_expires_at_ms', type: 'bigint', nullable: true })
+  passwordResetExpiresAtMs?: number | null;
+
   @OneToOne(() => DoctorProfile, (profile) => profile.user)
   doctorProfile?: DoctorProfile;
 

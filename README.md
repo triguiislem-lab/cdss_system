@@ -132,8 +132,9 @@ Copy `.env.example` to `.env`, then fill the values required for your environmen
 | `TN_MED_SQLITE_PATH` | Path to the Tunisian medicine SQLite database |
 | `SUPABASE_SERVICE_ROLE_KEY` | Backend-only storage access for consultation audio |
 | `KAGGLE_USERNAME`, `KAGGLE_KEY` | Kaggle dataset/kernel automation |
-| `FRONTEND_PUBLIC_URL` | Public frontend URL included in doctor credential emails |
-| `RESEND_API_KEY`, `RESEND_FROM` | Email notifications for contact, newsletter, doctor credentials, and prescription dispatch flows. `RESEND_FROM` should use a verified sender on `triguiislem.me`, for example `MedCity Connect <noreply@triguiislem.me>` |
+| `FRONTEND_PUBLIC_URL` | Public frontend URL included in doctor credential and password reset emails |
+| `RESEND_API_KEY`, `RESEND_FROM` | Email notifications for contact, newsletter, doctor credentials, password reset, and prescription dispatch flows with ordonnance PDF attachment. `RESEND_FROM` should use a verified sender on `triguiislem.me`, for example `MedCity Connect <noreply@triguiislem.me>` |
+| `PASSWORD_RESET_EXPIRES_MINUTES` | Lifetime of doctor password reset links, default `30` |
 | `GRAFANA_PUBLIC_URL`, `VITE_GRAFANA_URL` | Admin monitoring dashboard URL |
 | `COMPOSE_PROFILES=host-monitoring` | Enables EC2 host/container metrics through node-exporter and cAdvisor |
 
