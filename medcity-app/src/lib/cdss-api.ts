@@ -2,6 +2,8 @@ import type { Medication, Patient, SafetyAlert } from "@/lib/mock-data";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 const TOKEN_KEY = "medcity-auth-token";
+const REFRESH_TOKEN_KEY = "medcity-refresh-token";
+const AUTH_EXPIRED_EVENT = "medcity-auth-expired";
 
 export type CdssDraftResult = {
   saved: boolean;
@@ -92,6 +94,9 @@ export async function requestCdssDraft(input: {
   });
 
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      notifyAuthExpired();
+    }
     let message = `CDSS request failed (${res.status})`;
     try {
       const data = (await res.json()) as { message?: string; error?: string };
@@ -199,6 +204,12 @@ function parseBloodPressure(value: string) {
 function authHeaders(): Record<string, string> {
   const token = window.localStorage.getItem(TOKEN_KEY);
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function notifyAuthExpired() {
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+  window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
 }
 
 function mapSeverity(severity?: "info" | "warning" | "critical"): SafetyAlert["severity"] {

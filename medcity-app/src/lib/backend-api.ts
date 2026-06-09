@@ -26,6 +26,8 @@ import type {
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 const TOKEN_KEY = "medcity-auth-token";
+const REFRESH_TOKEN_KEY = "medcity-refresh-token";
+const AUTH_EXPIRED_EVENT = "medcity-auth-expired";
 
 type Paginated<T> = {
   data: T[];
@@ -1140,6 +1142,9 @@ async function apiRequest<T>(
     ...options,
     headers,
   });
+  if ((response.status === 401 || response.status === 403) && options.auth !== false) {
+    notifyAuthExpired();
+  }
   if (!response.ok) {
     let message = `API request failed (${response.status})`;
     try {
@@ -1170,6 +1175,9 @@ async function apiBinaryRequest<T>(
     ...options,
     headers,
   });
+  if ((response.status === 401 || response.status === 403) && options.auth !== false) {
+    notifyAuthExpired();
+  }
   if (!response.ok) {
     let message = `API request failed (${response.status})`;
     try {
@@ -1181,6 +1189,12 @@ async function apiBinaryRequest<T>(
     throw new Error(message);
   }
   return (await response.json()) as T;
+}
+
+function notifyAuthExpired() {
+  window.localStorage.removeItem(TOKEN_KEY);
+  window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+  window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
 }
 
 function calculateAge(birthDate?: string): number {

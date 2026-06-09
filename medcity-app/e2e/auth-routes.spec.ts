@@ -47,6 +47,26 @@ test("keeps doctor consultations wired to the backend", async ({ page }) => {
   await expect(page.getByText("Suivi pneumonie communautaire").first()).toBeVisible();
 });
 
+test("redirects to login when a protected API call reports an expired session", async ({ page }) => {
+  await mockMedcityApi(page);
+
+  await page.goto("/login");
+  await page.locator('input[type="email"]').fill("dr.ahmed@medcity.tn");
+  await page.locator('input[type="password"]').fill("Medcity123");
+  await page.locator('button[type="submit"]').click();
+  await expect(page).toHaveURL(/\/doctor$/);
+
+  await page.route(/\/api\/patients(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 401,
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: "Unauthorized" }),
+    }),
+  );
+  await page.getByRole("link", { name: /patients/i }).first().click();
+  await expect(page).toHaveURL(/\/login$/);
+});
+
 test("logs in as an admin and loads administration KPIs", async ({ page }) => {
   await mockMedcityApi(page);
 
