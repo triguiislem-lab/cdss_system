@@ -163,7 +163,6 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
                 <li key={medication.id} className="rounded-lg border border-border p-4">
                   <div className="flex items-baseline justify-between gap-3">
                     <div className="font-semibold">{index + 1}. {medication.name}</div>
-                    {medication.indication && <div className="text-xs text-muted-foreground">{medication.indication}</div>}
                   </div>
                   <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                     <Cell label="Dose" value={medication.dose} />

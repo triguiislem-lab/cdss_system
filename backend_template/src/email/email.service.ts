@@ -294,6 +294,15 @@ export class EmailService {
     ].filter(Boolean).join(' ') || 'MedCity';
     const targetLabel =
       input.target === PharmacyTarget.Patient ? 'patient' : 'pharmacie';
+    const diagnosisText =
+      prescription.diagnosis?.trim() ||
+      Array.from(
+        new Set(
+          [...(prescription.medications ?? [])]
+            .map((medication) => medication.indication?.trim())
+            .filter(Boolean),
+        ),
+      ).join(', ');
     const medicationRows = [...(prescription.medications ?? [])]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((medication) => `
@@ -302,7 +311,7 @@ export class EmailService {
           <td>${this.escapeHtml(medication.dosage)}</td>
           <td>${this.escapeHtml(medication.frequency)}</td>
           <td>${this.escapeHtml(medication.duration || '')}</td>
-          <td>${this.escapeHtml(medication.instructions || medication.indication || '')}</td>
+          <td>${this.escapeHtml(medication.instructions || '')}</td>
         </tr>
       `)
       .join('');
@@ -311,7 +320,7 @@ export class EmailService {
       patientName,
       patientSummary,
       doctorName,
-      diagnosis: prescription.diagnosis,
+      diagnosis: diagnosisText,
       notes: prescription.notes,
       medications: [...(prescription.medications ?? [])].sort(
         (a, b) => a.sortOrder - b.sortOrder,
@@ -336,7 +345,7 @@ export class EmailService {
         <p><strong>Numero:</strong> ${this.escapeHtml(prescription.prescriptionNumber)}</p>
         <p><strong>Patient:</strong> ${this.escapeHtml(patientName)}</p>
         <p><strong>Medecin:</strong> Dr. ${this.escapeHtml(doctorName)}</p>
-        ${prescription.diagnosis ? `<p><strong>Diagnostic / indication:</strong> ${this.escapeHtml(prescription.diagnosis)}</p>` : ''}
+        ${diagnosisText ? `<p><strong>Diagnostic / indication:</strong> ${this.escapeHtml(diagnosisText)}</p>` : ''}
         ${input.note ? `<p><strong>Note:</strong> ${this.escapeHtml(input.note)}</p>` : ''}
         <table border="1" cellpadding="6" cellspacing="0">
           <thead>
@@ -357,7 +366,7 @@ export class EmailService {
         `Numero: ${prescription.prescriptionNumber}`,
         `Patient: ${patientName}`,
         `Medecin: Dr. ${doctorName}`,
-        prescription.diagnosis ? `Diagnostic / indication: ${prescription.diagnosis}` : '',
+        diagnosisText ? `Diagnostic / indication: ${diagnosisText}` : '',
         input.note ? `Note: ${input.note}` : '',
         '',
         ...(prescription.medications ?? []).map((medication) =>
@@ -366,7 +375,7 @@ export class EmailService {
             medication.dosage,
             medication.frequency,
             medication.duration,
-            medication.instructions || medication.indication,
+            medication.instructions,
           ].filter(Boolean).join(' - '),
         ),
       ].filter(Boolean).join('\n'),
@@ -533,7 +542,7 @@ export class EmailService {
     if (input.patientSummary) text(input.patientSummary, 50, 678, 8);
 
     text('DIAGNOSIS / INDICATION', 305, 708, 8, true);
-    const diagnosisLines = this.wrapText(input.diagnosis || 'Non renseigne', 42);
+    const diagnosisLines = this.wrapText(input.diagnosis || this.medicationIndicationFallback(input.medications) || 'Non renseigne', 42);
     diagnosisLines.slice(0, 3).forEach((value, index) => {
       text(value, 305, 691 - index * 13, 9);
     });
@@ -546,7 +555,7 @@ export class EmailService {
     text('PRESCRIPTION', 50, 626, 8, true);
     let y = 590;
     input.medications.forEach((medication, index) => {
-      const instruction = medication.instructions || medication.indication;
+      const instruction = medication.instructions;
       const instructionLines = instruction ? this.wrapText(instruction, 52) : [];
       const cardHeight = Math.max(64, 58 + Math.max(0, instructionLines.length - 1) * 11);
       rect(50, y - cardHeight + 22, 495, cardHeight);
@@ -611,6 +620,18 @@ export class EmailService {
     }
     if (current) lines.push(current);
     return lines;
+  }
+
+  private medicationIndicationFallback(
+    medications: Array<{ indication?: string }>,
+  ) {
+    return Array.from(
+      new Set(
+        medications
+          .map((medication) => medication.indication?.trim())
+          .filter(Boolean),
+      ),
+    ).join(', ');
   }
 
   private patientSummary(birthDate?: Date | string, gender?: string) {
