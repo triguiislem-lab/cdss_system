@@ -41,6 +41,11 @@ export interface TunisianMedicine {
   noticeUrl?: string;
   sourceReference?: string;
   sourceSystems?: string[];
+  adverseEffects?: string[];
+  interactions?: string[];
+  warnings?: string[];
+  specialPopulations?: string[];
+  overdose?: string[];
 }
 
 export const drugClasses: DrugClass[] = [

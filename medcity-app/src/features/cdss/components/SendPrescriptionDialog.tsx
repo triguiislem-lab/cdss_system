@@ -28,21 +28,31 @@ export function SendPrescriptionDialog({ open, onClose, rxId, patientId, patient
   const [channel, setChannel] = useState<DispatchChannel>(defaultTarget === "pharmacist" ? "portal" : "email");
   const [note, setNote] = useState("");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   if (!open) return null;
 
   const handleSubmit = () => {
     if (!recipient.trim()) return;
     void (async () => {
-      await sendPrescriptionToTarget({
-        prescriptionId: rxId,
-        target,
-        recipient: recipient.trim(),
-        channel,
-        note: note.trim() || undefined,
-      });
-      setSent(true);
-      setTimeout(() => { setSent(false); onClose(); }, 1200);
+      setSending(true);
+      setError(null);
+      try {
+        await sendPrescriptionToTarget({
+          prescriptionId: rxId,
+          target,
+          recipient: recipient.trim(),
+          channel,
+          note: note.trim() || undefined,
+        });
+        setSent(true);
+        setTimeout(() => { setSent(false); onClose(); }, 1200);
+      } catch (submitError) {
+        setError(submitError instanceof Error ? submitError.message : "Impossible d'envoyer l'ordonnance.");
+      } finally {
+        setSending(false);
+      }
     })();
   };
 
@@ -56,6 +66,8 @@ export function SendPrescriptionDialog({ open, onClose, rxId, patientId, patient
           </div>
           <button onClick={onClose} className="rounded-md p-1.5 hover:bg-muted" aria-label={t("common.close")}><X className="h-4 w-4" /></button>
         </div>
+
+        {error && <p className="mx-5 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">{error}</p>}
 
         <div className="p-5 space-y-4">
           <div>
@@ -117,7 +129,7 @@ export function SendPrescriptionDialog({ open, onClose, rxId, patientId, patient
 
         <div className="flex items-center justify-end gap-2 p-5 border-t border-border">
           <button onClick={onClose} className="rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted">{t("common.cancel")}</button>
-          <button onClick={handleSubmit} disabled={!recipient.trim() || sent} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+          <button onClick={handleSubmit} disabled={!recipient.trim() || sent || sending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
             <Send className="h-4 w-4" /> {sent ? t("sendRx.sent") : t("sendRx.send")}
           </button>
         </div>

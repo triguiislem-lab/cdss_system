@@ -34,8 +34,8 @@ export class MedicineContributionsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.contributionsService.getById(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.contributionsService.getById(id, user);
   }
 
   @Post()
@@ -45,8 +45,8 @@ export class MedicineContributionsController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.contributionsService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.contributionsService.remove(id, user);
   }
 
   @Post(':id/validate')

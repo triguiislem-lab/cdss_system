@@ -1,7 +1,9 @@
 import { PartialType } from '@nestjs/mapped-types';
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -9,19 +11,75 @@ import {
   IsUUID,
   ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import {
   DispatchChannel,
+  AlertSeverity,
   MedicationStatus,
   PrescriptionStatus,
   RiskLevel,
 } from '../../common/entities/enums';
 
+export class PrescriptionSafetyAlertDto {
+  @IsEnum(AlertSeverity)
+  severity: AlertSeverity;
+
+  @IsString()
+  title: string;
+
+  @IsArray()
+  @IsString({ each: true })
+  drugsInvolved: string[];
+
+  @IsString()
+  explanation: string;
+
+  @IsString()
+  recommendedAction: string;
+
+  @IsOptional()
+  @IsString()
+  alternative?: string;
+
+  @IsString()
+  evidence: string;
+
+  @IsOptional()
+  @IsString()
+  evidenceUrl?: string;
+}
+
+export type PrescriptionSafetyAction =
+  | 'replace'
+  | 'adjust_dose'
+  | 'monitor'
+  | 'override';
+
+export class RecordPrescriptionSafetyActionDto {
+  @IsIn(['replace', 'adjust_dose', 'monitor', 'override'])
+  action: PrescriptionSafetyAction;
+
+  @IsString()
+  alertTitle: string;
+
+  @IsOptional()
+  @IsString()
+  recommendation?: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
 export class MedicationLineDto {
   @IsOptional()
-  @IsUUID()
+  @IsString()
   medicineId?: string;
+
+  @IsOptional()
+  @IsString()
+  dci?: string;
 
   @IsString()
   medicineName: string;
@@ -81,13 +139,15 @@ export class CreatePrescriptionDto {
   @ValidateNested({ each: true })
   @Type(() => MedicationLineDto)
   medications: MedicationLineDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PrescriptionSafetyAlertDto)
+  safetyAlerts?: PrescriptionSafetyAlertDto[];
 }
 
 export class UpdatePrescriptionDto extends PartialType(CreatePrescriptionDto) {
-  @IsOptional()
-  @IsEnum(PrescriptionStatus)
-  status?: PrescriptionStatus;
-
   @IsOptional()
   @IsEnum(RiskLevel)
   risk?: RiskLevel;
@@ -117,4 +177,13 @@ export class PrescriptionQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsUUID()
   doctorId?: string;
+
+  @IsOptional()
+  @IsEnum(RiskLevel)
+  risk?: RiskLevel;
+
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  reviewable?: boolean;
 }

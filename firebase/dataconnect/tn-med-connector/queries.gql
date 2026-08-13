@@ -1,0 +1,218 @@
+# Public read-only operations for the core medication catalogue.
+# Mutations are intentionally not exposed from a web client.
+
+query ListMedicaments($limit: Int = 50) @auth(level: PUBLIC, insecureReason: "Public medication reference catalogue; no patient data.") {
+  medicaments(limit: $limit) {
+    id
+    idMedicament
+    nomMedicament
+    dciRaw
+    dosage
+    forme
+    presentation
+    laboratoire
+    amm
+    classeTherapeutique
+    sousClasseTherapeutique
+    dateAmm
+    statutGp
+    tableau
+    veicStatus
+    detailUrl
+    rcpUrl
+    noticeUrl
+    prixPublicMinTnd
+    prixPublicMaxTnd
+    tarifReferenceMaxTnd
+    categorieRemboursement
+    sourceReference
+    sourcesPresentes
+  }
+}
+
+query GetMedicament($id: UUID!) @auth(level: PUBLIC, insecureReason: "Public medication reference catalogue; no patient data.") {
+  medicament(id: $id) {
+    id
+    idMedicament
+    nomMedicament
+    dciRaw
+    dosage
+    forme
+    presentation
+    laboratoire
+    pays
+    amm
+    classeTherapeutique
+    sousClasseTherapeutique
+  }
+}
+
+# Complete read model used by the MedCity medicine details screen. The source
+# tables do not currently declare SQL foreign keys, so the connector performs
+# bounded server-side subqueries using the stable TN_Med id and AMM keys.
+query GetMedicamentMedicalDetails($idMedicament: String!, $amm: String!) @auth(level: PUBLIC, insecureReason: "Public medication reference and clinical evidence; no patient data.") {
+  medicaments(where: { idMedicament: { eq: $idMedicament } }, limit: 1) {
+    id
+    idMedicament
+    cleMedicament
+    nomMedicament
+    dciRaw
+    dosage
+    forme
+    presentation
+    laboratoire
+    pays
+    amm
+    dateAmm
+    statutGp
+    classeTherapeutique
+    sousClasseTherapeutique
+    tableau
+    veicStatus
+    dureeConservation
+    conditionnementPrimaire
+    specificationConditionnement
+    indicationsRaw
+    detailUrl
+    rcpUrl
+    noticeUrl
+    prixPublicMinTnd
+    prixPublicMaxTnd
+    tarifReferenceMinTnd
+    tarifReferenceMaxTnd
+    categorieRemboursement
+    sourceReference
+    sourcesPresentes
+  }
+  classifications: medicamentClassifications(where: { idMedicament: { eq: $idMedicament } }, limit: 10) {
+    idClasse
+    idSousClasse
+    classeTherapeutique
+    sousClasseTherapeutique
+    sourceClassification
+  }
+  substances: medicamentSubstances(where: { idMedicament: { eq: $idMedicament } }, limit: 20) {
+    idSubstance
+    ordreSubstance
+    dciSource
+    estCombinaison
+  }
+  indications: indicationsMedicaments(where: { idMedicament: { eq: $idMedicament } }, limit: 20) {
+    indicationsRaw
+    typeIndication
+    statutValidation
+  }
+  documents: documentsMedicaments(where: { idMedicament: { eq: $idMedicament } }, limit: 10) {
+    detailUrl
+    rcpUrl
+    noticeUrl
+    hasDetail
+    hasRcp
+    hasNotice
+  }
+  prices: prixRemboursements(where: { idMedicament: { eq: $idMedicament } }, limit: 50) {
+    sourceName
+    prixNumerique
+    prixPublicNumerique
+    tarifReferenceNumerique
+    rembourse
+    rembourseNumerique
+    tauxRemboursementNumerique
+    categorie
+  }
+  posologies: reglesPosologies(where: { amm: { eq: $amm } }, limit: 50) {
+    population
+    voieAdministration
+    valeurDose
+    uniteDose
+    frequence
+    duree
+    actionRecommandee
+    recommandation
+    niveauAutorite
+    niveauQualite
+    accepteUsageClinique
+    sourceSystem
+    citationPreuve
+  }
+  contraindications: reglesContreIndicationss(where: { amm: { eq: $amm } }, limit: 50) {
+    conditionOuFacteur
+    population
+    gravite
+    actionRecommandee
+    recommandation
+    niveauAutorite
+    niveauQualite
+    accepteUsageClinique
+    sourceSystem
+    citationPreuve
+  }
+  adverseEffects: reglesEffetsIndesirabless(where: { amm: { eq: $amm } }, limit: 100) {
+    conditionOuFacteur
+    population
+    gravite
+    actionRecommandee
+    recommandation
+    mecanisme
+    effetClinique
+    niveauAutorite
+    niveauQualite
+    accepteUsageClinique
+    sourceSystem
+    citationPreuve
+    statutRevision
+  }
+  interactions: reglesInteractionss(where: { amm: { eq: $amm } }, limit: 100) {
+    conditionOuFacteur
+    population
+    gravite
+    actionRecommandee
+    recommandation
+    mecanisme
+    effetClinique
+    medicamentOuSubstanceCible
+    niveauAutorite
+    niveauQualite
+    accepteUsageClinique
+    sourceSystem
+    citationPreuve
+    statutRevision
+  }
+  safetyRules: reglesSecurites(where: { amm: { eq: $amm } }, limit: 100) {
+    conditionOuFacteur
+    population
+    gravite
+    actionRecommandee
+    recommandation
+    niveauAutorite
+    niveauQualite
+    accepteUsageClinique
+    sourceSystem
+    citationPreuve
+  }
+  specialPopulations: reglesPopulationsSpecialess(where: { amm: { eq: $amm } }, limit: 100) {
+    conditionOuFacteur
+    population
+    gravite
+    actionRecommandee
+    recommandation
+    niveauAutorite
+    niveauQualite
+    accepteUsageClinique
+    sourceSystem
+    citationPreuve
+  }
+  overdoseEvidence: surdosageBruts(where: { amm: { eq: $amm } }, limit: 20) {
+    titreSection
+    textePreuve
+    langue
+    sourceSystem
+    sourceFile
+    niveauAutorite
+    confiance
+    rangPreuve
+    niveauQualite
+    accepteUsageClinique
+    statutRevision
+  }
+}

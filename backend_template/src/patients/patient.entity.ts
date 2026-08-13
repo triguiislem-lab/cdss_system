@@ -14,6 +14,9 @@ import { Gender } from '../common/entities/enums';
 import { DoctorProfile } from '../doctors/doctor-profile.entity';
 import { PharmacyDispatch } from '../pharmacy/pharmacy-dispatch.entity';
 import { Prescription } from '../prescriptions/prescription.entity';
+import type { PatientMedication } from './patient-medications';
+
+export type PatientPregnancyStatus = 'not_pregnant' | 'pregnant' | 'unknown';
 
 @Entity('patients')
 export class Patient {
@@ -60,7 +63,7 @@ export class Patient {
   allergies?: string[];
 
   @Column({ name: 'current_medications', type: 'simple-json', nullable: true })
-  currentMedications?: Array<{ name: string; dose?: string }>;
+  currentMedications?: PatientMedication[];
 
   @Column({ type: 'simple-json', nullable: true })
   comorbidities?: string[];
@@ -81,6 +84,15 @@ export class Patient {
 
   @Column({ type: 'simple-json', nullable: true })
   flags?: string[];
+
+  /** Response-only flags derived from the current clinical fields. */
+  computedFlags?: string[];
+
+  @Column({ name: 'pregnancy_status', type: 'varchar', nullable: true })
+  pregnancyStatus?: PatientPregnancyStatus | null;
+
+  @Column({ name: 'pregnancy_trimester', type: 'integer', nullable: true })
+  pregnancyTrimester?: number | null;
 
   @Column({ name: 'missing_data', type: 'simple-json', nullable: true })
   missingData?: string[];

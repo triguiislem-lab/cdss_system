@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { User } from '../users/user.entity';
 import { AuthService } from './auth.service';
 import { LoginDto, RefreshDto, RequestPasswordResetDto, ResetPasswordDto } from './dto/auth.dto';
+import { toSafeAuthUser } from './safe-user';
 
 @Controller('auth')
 export class AuthController {
@@ -22,8 +23,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   me(@CurrentUser() user: User) {
-    const { passwordHash: _passwordHash, ...safeUser } = user;
-    return safeUser;
+    return toSafeAuthUser(user);
   }
 
   @Post('refresh')

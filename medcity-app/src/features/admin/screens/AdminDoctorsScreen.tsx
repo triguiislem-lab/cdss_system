@@ -1,8 +1,10 @@
 import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Edit2,
   FilePlus2,
   FileText,
@@ -10,16 +12,16 @@ import {
   Phone,
   RefreshCw,
   Search,
-  Star,
   Trash2,
   Users,
 } from "lucide-react";
 import { MetricCard } from "@/components/molecules/MetricCard";
 import { LoadingState } from "@/components/molecules/LoadingState";
+import { RatingStars } from "@/components/molecules/RatingStars";
 import { CdssModal, FormField as Field } from "@/features/cdss/components/DialogPrimitives";
 import { useToast } from "@/hooks/use-toast";
 import { useI18n } from "@/i18n/I18nProvider";
-import { createDoctor as createDoctorApi, deleteDoctor as deleteDoctorApi, listDoctors, updateDoctor as updateDoctorApi } from "@/lib/backend-api";
+import { createDoctor as createDoctorApi, deleteDoctor as deleteDoctorApi, getDoctorsPage, updateDoctor as updateDoctorApi, updateDoctorStatus } from "@/lib/backend-api";
 
 type DoctorStatus = "actif" | "inactif";
 
@@ -32,14 +34,14 @@ type AdminDoctor = {
   matriculeFiscale?: string;
   specialite: string;
   hopital: string;
+  address?: string;
   ville: string;
   telephone: string;
   password?: string;
   patients: number;
   prescriptions: number;
-  rating: number;
+  rating?: number;
   statut: DoctorStatus;
-  disponible: boolean;
 };
 
 function emptyDoctor(): AdminDoctor {
@@ -52,14 +54,14 @@ function emptyDoctor(): AdminDoctor {
     matriculeFiscale: "",
     specialite: "",
     hopital: "",
+    address: "",
     ville: "",
     telephone: "",
     password: "",
     patients: 0,
     prescriptions: 0,
-    rating: 5,
+    rating: undefined,
     statut: "actif",
-    disponible: true,
   };
 }
 
@@ -73,6 +75,9 @@ export default function AdminDoctors() {
   const { toast } = useToast();
   const [doctors, setDoctors] = useState<AdminDoctor[]>([]);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalDoctors, setTotalDoctors] = useState(0);
   const [editing, setEditing] = useState<AdminDoctor | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminDoctor | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,23 +87,25 @@ export default function AdminDoctors() {
     setLoading(true);
     setError(null);
     try {
-      const apiDoctors = await listDoctors(search);
-      setDoctors(apiDoctors.map((doctor) => ({
+      const result = await getDoctorsPage({ page, limit: 20, search });
+      setDoctors(result.data.map((doctor) => ({
         id: doctor.id,
         prenom: doctor.firstName,
         nom: doctor.lastName,
         email: doctor.email,
         matriculeFiscale: doctor.fiscalNumber,
         specialite: doctor.specialty ?? "",
-        hopital: "MedCity",
+        hopital: doctor.facility ?? "",
+        address: doctor.address ?? "",
         ville: doctor.city ?? "",
         telephone: doctor.phone,
-        patients: 0,
-        prescriptions: 0,
-        rating: 5,
+        patients: doctor.patientsCount ?? 0,
+        prescriptions: doctor.prescriptionsCount ?? 0,
+        rating: doctor.rating,
         statut: doctor.status === "inactive" ? "inactif" : "actif",
-        disponible: doctor.status !== "inactive",
       })));
+      setTotalDoctors(result.meta.total);
+      setTotalPages(result.meta.totalPages);
     } catch (loadError) {
       setDoctors([]);
       setError(loadError instanceof Error ? loadError.message : "Impossible de charger les medecins.");
@@ -108,22 +115,12 @@ export default function AdminDoctors() {
   }
 
   useEffect(() => {
-    void refreshDoctors();
-  }, []);
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return doctors;
-    return doctors.filter((doc) =>
-      [doc.prenom, doc.nom, doc.email, doc.matriculeFiscale, doc.specialite, doc.hopital, doc.ville]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(q)),
-    );
-  }, [doctors, search]);
+    const timer = window.setTimeout(() => void refreshDoctors(), 250);
+    return () => window.clearTimeout(timer);
+  }, [page, search]);
 
   const stats = [
     { label: t("adminDoctors.stats.active"), value: doctors.filter((doc) => doc.statut === "actif").length, icon: CheckCircle2, cls: "text-success" },
-    { label: t("adminDoctors.stats.available"), value: doctors.filter((doc) => doc.disponible).length, icon: Users, cls: "text-info" },
     { label: t("adminDoctors.stats.followedPatients"), value: doctors.reduce((sum, doc) => sum + doc.patients, 0), icon: Users, cls: "text-primary" },
     { label: t("adminDoctors.stats.prescriptions"), value: doctors.reduce((sum, doc) => sum + doc.prescriptions, 0), icon: FileText, cls: "text-warning-foreground" },
   ];
@@ -138,13 +135,23 @@ export default function AdminDoctors() {
           phone: nextDoctor.telephone,
           fiscalNumber: nextDoctor.matriculeFiscale || `MF-${Date.now()}`,
           specialty: nextDoctor.specialite,
+          facility: nextDoctor.hopital || undefined,
+          rating: nextDoctor.rating,
+          address: nextDoctor.address || undefined,
           city: nextDoctor.ville,
         };
         const exists = doctors.some((doc) => doc.id === nextDoctor.id);
         if (exists) {
           await updateDoctorApi(nextDoctor.id, payload);
+          const previousDoctor = doctors.find((doc) => doc.id === nextDoctor.id);
+          if (previousDoctor?.statut !== nextDoctor.statut) {
+            await updateDoctorStatus(nextDoctor.id, nextDoctor.statut === "inactif" ? "inactive" : "active");
+          }
         } else {
           const created = await createDoctorApi({ ...payload, password: nextDoctor.password ?? "" });
+          if (nextDoctor.statut === "inactif") {
+            await updateDoctorStatus(created.id, "inactive");
+          }
           if (created.credentialEmail?.status === "sent") {
             toast({
               title: "Identifiants envoyes",
@@ -179,7 +186,7 @@ export default function AdminDoctors() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">{t("adminDoctors.title")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("adminDoctors.subtitle", { count: doctors.length })}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t("adminDoctors.subtitle", { count: totalDoctors })}</p>
         </div>
         <button
           onClick={() => setEditing(emptyDoctor())}
@@ -190,7 +197,7 @@ export default function AdminDoctors() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
         {stats.map((stat) => (
           <MetricCard key={stat.label} label={stat.label} value={stat.value} icon={stat.icon} iconClassName={stat.cls} />
         ))}
@@ -202,7 +209,10 @@ export default function AdminDoctors() {
             <Search className="h-4 w-4 text-muted-foreground" />
             <input
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+              }}
               placeholder={t("adminDoctors.searchPlaceholder")}
               className="flex-1 bg-transparent outline-none"
             />
@@ -234,11 +244,11 @@ export default function AdminDoctors() {
           <div className="p-4">
             <LoadingState title="Chargement des medecins" subtitle="Recuperation des profils docteurs depuis le backend..." />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : doctors.length === 0 ? (
           <div className="p-12 text-center text-sm text-muted-foreground">{t("adminDoctors.empty")}</div>
         ) : (
           <ul className="grid gap-0 divide-y divide-border">
-            {filtered.map((doc) => {
+            {doctors.map((doc) => {
               const initials = doctorDisplayName(doc)
                 .split(" ")
                 .filter((part) => part !== "Dr.")
@@ -264,15 +274,10 @@ export default function AdminDoctors() {
                           >
                             {doc.statut === "actif" ? t("adminDoctors.active") : t("adminDoctors.inactive")}
                           </span>
-                          {doc.disponible && (
-                            <span className="inline-flex items-center gap-1 rounded-full border border-info/30 bg-info-soft px-2 py-0.5 text-[11px] font-semibold text-info">
-                              <CheckCircle2 className="h-3 w-3" /> {t("adminDoctors.available")}
-                            </span>
-                          )}
                         </div>
                         <p className="text-sm text-primary font-medium mt-0.5">{doc.specialite}</p>
                         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {doc.hopital} - {doc.ville}</span>
+                          <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" /> {[doc.hopital, doc.address || doc.ville].filter(Boolean).join(" - ")}</span>
                           <span className="inline-flex items-center gap-1"><Phone className="h-3 w-3" /> {doc.telephone}</span>
                         </div>
                       </div>
@@ -288,8 +293,8 @@ export default function AdminDoctors() {
                         <strong>{doc.prescriptions}</strong> Rx
                       </span>
                       <span className="inline-flex items-center gap-1 rounded-lg bg-warning-soft px-2.5 py-1.5 text-warning-foreground">
-                        <Star className="h-3.5 w-3.5 fill-current" />
-                        <strong>{doc.rating}</strong>
+                        {typeof doc.rating === "number" && <RatingStars rating={doc.rating} sizeClassName="h-3 w-3" />}
+                        <strong>{typeof doc.rating === "number" ? doc.rating.toFixed(1) : "—"}</strong>
                       </span>
                       <button
                         onClick={() => setEditing(doc)}
@@ -311,6 +316,20 @@ export default function AdminDoctors() {
           </ul>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm">
+          <span className="text-muted-foreground">Page {page} / {totalPages}</span>
+          <div className="flex gap-2">
+            <button disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="inline-flex items-center gap-1 rounded-lg border border-input px-3 py-2 font-semibold disabled:opacity-40">
+              <ChevronLeft className="h-4 w-4" /> Précédent
+            </button>
+            <button disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="inline-flex items-center gap-1 rounded-lg border border-input px-3 py-2 font-semibold disabled:opacity-40">
+              Suivant <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {editing && (
         <DoctorModal
@@ -391,6 +410,9 @@ function DoctorModal({
         <Field label={t("adminDoctors.facility")}>
           <input required value={form.hopital} onChange={(event) => update("hopital", event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
         </Field>
+        <Field label={t("patients.address")}>
+          <input value={form.address ?? ""} onChange={(event) => update("address", event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+        </Field>
         <Field label={t("adminDoctors.city")}>
           <input required value={form.ville} onChange={(event) => update("ville", event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
         </Field>
@@ -411,20 +433,25 @@ function DoctorModal({
             <option value="inactif">{t("adminDoctors.inactive")}</option>
           </select>
         </Field>
-        <Field label={t("adminDoctors.patients")}>
-          <input type="number" min={0} value={form.patients} onChange={(event) => update("patients", Number(event.target.value))} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
-        </Field>
-        <Field label={t("adminDoctors.prescriptions")}>
-          <input type="number" min={0} value={form.prescriptions} onChange={(event) => update("prescriptions", Number(event.target.value))} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
-        </Field>
+        {!isNew && (
+          <div className="sm:col-span-2 rounded-lg border border-border bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <span><strong className="text-foreground">{form.patients}</strong> {t("adminDoctors.patients")}</span>
+              <span><strong className="text-foreground">{form.prescriptions}</strong> {t("adminDoctors.prescriptions")}</span>
+            </div>
+            <p className="mt-1 text-xs">Compteurs calculés depuis les relations patients et ordonnances.</p>
+          </div>
+        )}
         <Field label={t("adminDoctors.rating")}>
-          <input type="number" min={0} max={5} step="0.1" value={form.rating} onChange={(event) => update("rating", Number(event.target.value))} className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
-        </Field>
-        <Field label={t("adminDoctors.availability")}>
-          <label className="inline-flex h-10 items-center gap-2 rounded-lg border border-input bg-background px-3 text-sm">
-            <input type="checkbox" checked={form.disponible} onChange={(event) => update("disponible", event.target.checked)} className="h-4 w-4 rounded border-input" />
-            {t("adminDoctors.availableNow")}
-          </label>
+          <input
+            type="number"
+            min={0}
+            max={5}
+            step="0.1"
+            value={form.rating ?? ""}
+            onChange={(event) => update("rating", event.target.value === "" ? undefined : Number(event.target.value))}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+          />
         </Field>
         <div className="sm:col-span-2 mt-2 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="rounded-lg border border-input bg-card px-4 py-2 text-sm font-semibold hover:bg-muted transition-smooth">

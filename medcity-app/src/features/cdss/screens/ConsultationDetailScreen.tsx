@@ -134,6 +134,7 @@ export default function ConsultationDetailPage({ basePath = "/doctor" }: { baseP
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
+  const localAudioObjectUrlRef = useRef<string | null>(null);
 
   async function refresh() {
     if (!params.consultationId) return;
@@ -166,6 +167,10 @@ export default function ConsultationDetailPage({ basePath = "/doctor" }: { baseP
       if (timerRef.current) window.clearInterval(timerRef.current);
       if (mediaRef.current?.state === "recording") mediaRef.current.stop();
       mediaRef.current?.stream.getTracks().forEach((track) => track.stop());
+      if (localAudioObjectUrlRef.current) {
+        URL.revokeObjectURL(localAudioObjectUrlRef.current);
+        localAudioObjectUrlRef.current = null;
+      }
     };
   }, []);
 
@@ -202,7 +207,7 @@ export default function ConsultationDetailPage({ basePath = "/doctor" }: { baseP
     ]);
   };
 
-  const runAudioPipeline = async (audioFile: File, duration: number, localAudioUrl: string) => {
+  const runAudioPipeline = async (audioFile: File, duration: number) => {
     setPipelineBusy(true);
     setRecordingError(null);
     setPipelineLogs([]);
@@ -215,7 +220,6 @@ export default function ConsultationDetailPage({ basePath = "/doctor" }: { baseP
       setPipelineNotice("Audio stocke. Lancement du traitement Kaggle...");
 
       let updated = await updateConsultation(consultation.id, {
-        recordingUrl: localAudioUrl,
         recordingDurationSec: duration,
         endedAt: new Date().toISOString(),
         status: "completed",
@@ -237,36 +241,62 @@ export default function ConsultationDetailPage({ basePath = "/doctor" }: { baseP
       setConsultation(updated);
 
       let completed = false;
+      let output: Awaited<ReturnType<typeof fetchKaggleAudioOutput>> | null = null;
+      let lastOutputMismatch: Error | null = null;
       for (let attempt = 0; attempt < MAX_STATUS_POLLS; attempt += 1) {
         const status = await getKaggleAudioStatus();
-        const output = `${status.stdout}\n${status.stderr}`;
-        if (/ERROR|CANCELLED|FAILED/i.test(output)) {
-          throw new Error(output.trim() || "Le notebook Kaggle a echoue");
+        const statusOutput = `${status.stdout}\n${status.stderr}`;
+        if (/ERROR|CANCELLED|FAILED/i.test(statusOutput)) {
+          throw new Error(statusOutput.trim() || "Le notebook Kaggle a echoue");
         }
-        if (/COMPLETE|COMPLETED|SUCCEEDED|SUCCESS/i.test(output)) {
-          completed = true;
-          break;
+        if (/COMPLETE|COMPLETED|SUCCEEDED|SUCCESS/i.test(statusOutput)) {
+          try {
+            output = await fetchKaggleAudioOutput(consultation.id);
+            if (output.staleOutput) {
+              lastOutputMismatch = new Error(
+                `Le résultat Kaggle appartient à ${output.resultConsultationId || "une ancienne consultation"}`,
+              );
+              if (attempt === 0) {
+                addPipelineLog("Le résultat Kaggle disponible appartient à une ancienne consultation. Nouvelle vérification en cours.");
+              }
+              setPipelineNotice("Résultat Kaggle obsolète détecté. Attente du résultat de cette consultation...");
+              await sleep(POLL_INTERVAL_MS);
+              continue;
+            }
+            completed = true;
+            break;
+          } catch (error) {
+            if (!(error instanceof Error) || !/ne correspond pas/i.test(error.message)) {
+              throw error;
+            }
+            lastOutputMismatch = error;
+            if (attempt === 0) {
+              addPipelineLog("Le résultat Kaggle disponible appartient à une ancienne consultation. Nouvelle vérification en cours.");
+            }
+            setPipelineNotice("Résultat Kaggle obsolète détecté. Attente du résultat de cette consultation...");
+            await sleep(POLL_INTERVAL_MS);
+            continue;
+          }
         }
         setPipelineNotice(`Kaggle traite l'audio... tentative ${attempt + 1}/${MAX_STATUS_POLLS}`);
         await sleep(POLL_INTERVAL_MS);
       }
 
       if (!completed) {
-        throw new Error("Le traitement Kaggle n'a pas termine dans le delai configure");
+        throw lastOutputMismatch ?? new Error("Le traitement Kaggle n'a pas termine dans le delai configure");
       }
 
       addPipelineLog("Notebook Kaggle termine, recuperation du resultat", "success");
       setPipelineNotice("Recuperation de la transcription...");
-      const output = await fetchKaggleAudioOutput();
-      const resultJson = output.resultJson ?? null;
+      const resultJson = output?.resultJson ?? null;
       const finalTranscript = String(resultJson?.final_transcript || resultJson?.transcript || "");
       const nextNotes = notes.trim() ? notes : finalTranscript;
       const audioProcessingResult: Record<string, unknown> = resultJson ?? {
-        command: output.command,
-        stdout: output.stdout,
-        stderr: output.stderr,
-        outputDir: output.outputDir,
-        datasetPersistence: output.datasetPersistence,
+        command: output?.command,
+        stdout: output?.stdout,
+        stderr: output?.stderr,
+        outputDir: output?.outputDir,
+        datasetPersistence: output?.datasetPersistence,
       };
 
       updated = await updateConsultation(consultation.id, {
@@ -283,7 +313,8 @@ export default function ConsultationDetailPage({ basePath = "/doctor" }: { baseP
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur pendant le traitement audio";
       setRecordingError(message);
-      setPipelineNotice("Traitement audio en erreur");
+      const gpuQuotaUnavailable = /quota GPU|quota GPU hebdomadaire|Infrastructure Kaggle indisponible/i.test(message);
+      setPipelineNotice(gpuQuotaUnavailable ? message : "Traitement audio en erreur");
       addPipelineLog(message, "error");
       updateConsultation(consultation.id, { audioProcessingStatus: "error" })
         .then(setConsultation)
@@ -307,6 +338,8 @@ export default function ConsultationDetailPage({ basePath = "/doctor" }: { baseP
         const recordingMimeType = recorder.mimeType || mimeType || chunksRef.current[0]?.type || "audio/webm";
         const blob = new Blob(chunksRef.current, { type: recordingMimeType });
         const url = URL.createObjectURL(blob);
+        if (localAudioObjectUrlRef.current) URL.revokeObjectURL(localAudioObjectUrlRef.current);
+        localAudioObjectUrlRef.current = url;
         const duration = Math.round((Date.now() - startedAtRef.current) / 1000);
         const extension = extensionForMimeType(recordingMimeType);
         const audioFile = new File([blob], `${consultation.id}-recording.${extension}`, {
@@ -314,14 +347,13 @@ export default function ConsultationDetailPage({ basePath = "/doctor" }: { baseP
         });
         setAudioUrl(url);
         void updateConsultation(consultation.id, {
-          recordingUrl: url,
           recordingDurationSec: duration,
           endedAt: new Date().toISOString(),
           status: "completed",
         })
           .then(setConsultation)
           .finally(() => {
-            void runAudioPipeline(audioFile, duration, url);
+            void runAudioPipeline(audioFile, duration);
           });
         stream.getTracks().forEach((track) => track.stop());
       };
@@ -423,7 +455,7 @@ export default function ConsultationDetailPage({ basePath = "/doctor" }: { baseP
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setLocation(`${basePath}/prescription/new?patientId=${encodeURIComponent(consultation.patientId)}`)}
+            onClick={() => setLocation(`${basePath}/prescription/new?patientId=${encodeURIComponent(consultation.patientId)}&consultationId=${encodeURIComponent(consultation.id)}`)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
           >
             <FilePlus2 className="h-4 w-4" /> {t("consultation.prescribe")}

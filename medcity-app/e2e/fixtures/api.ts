@@ -124,6 +124,7 @@ const prescriptions = [
     id: "rx-2087",
     prescriptionNumber: "RX-2087",
     patientId: "patient-1042",
+    patient: patients[0],
     diagnosis: "Community-acquired pneumonia",
     status: "pending_review",
     risk: "high",
@@ -133,6 +134,7 @@ const prescriptions = [
       {
         id: "med-1",
         medicineName: "Amoxicillin-clavulanate",
+        dci: "Amoxicilline + acide clavulanique",
         dosage: "875/125 mg",
         route: "PO",
         frequency: "BID",
@@ -160,6 +162,7 @@ const prescriptions = [
     id: "rx-2084",
     prescriptionNumber: "RX-2084",
     patientId: "patient-1043",
+    patient: patients[1],
     diagnosis: "Hypertension follow-up",
     status: "validated",
     risk: "low",
@@ -216,6 +219,8 @@ const doctors = [
     phone: "+216 71 000 010",
     fiscalNumber: "MF-001",
     specialty: "Medecine generale",
+    facility: "Clinique Test",
+    rating: 4.5,
     cnamCode: "CNAM-001",
     city: "Tunis",
     status: "active",
@@ -232,13 +237,15 @@ const medicines = [
     forms: ["500 mg cp"],
     laboratories: ["MedCity Test"],
     reimbursement: "70%",
-    indication: "Pain and fever",
+    indication: "Indication non exposée par le connecteur Firebase.",
     contraindications: ["Severe hepatic impairment"],
     posologyAdult: "500 mg to 1 g every 6 hours.",
-    pregnancy: "Autorise",
+    pregnancy: "Precaution",
     renalAdjust: false,
     hepaticAdjust: true,
     priceTndApprox: 3.2,
+    sourceSystems: ["liste_amm_xls", "medicaments_with_detail_and_rcp", "tunisia_master"],
+    sourceReference: "uploaded file: liste_amm (1).xls",
   },
 ];
 
@@ -282,6 +289,7 @@ const audits = [
     recommendation: "Review high-risk interaction",
     doctorModification: "Pending",
     alertsOverridden: 0,
+    prescriptionNumber: "RX-2087",
     finalStatus: "pending_review",
     timestamp: "2026-05-30 09:10",
   },
@@ -394,6 +402,36 @@ export async function mockMedcityApi(page: Page) {
     });
   });
 
+  const dashboardSummary = {
+    generatedAt: "2026-05-30T09:00:00.000Z",
+    source: "NestJS aggregate queries",
+    patients: { total: 2 },
+    prescriptions: { total: 2, drafts: 0, pendingReview: 1, validated: 1, rejected: 0, highRisk: 1 },
+    consultations: { total: 1, scheduled: 1, upcoming: 1, inProgress: 0, completed: 0, cancelled: 0 },
+  };
+  await page.route(/\/api\/dashboard\/doctor$/, (route) => fulfillJson(route, dashboardSummary));
+  await page.route(/\/api\/dashboard\/admin$/, (route) => fulfillJson(route, {
+    ...dashboardSummary,
+    doctors: { total: 1, active: 1, inactive: 0 },
+    medicines: { total: 1, source: "Firebase", available: true },
+    contributions: { pending: 1, validated: 0, refused: 0 },
+    auditEntries: 1,
+    cms: { published: 1, draft: 0, archived: 0 },
+    contactMessages: { total: 0, new: 0 },
+    newsletter: { total: 0, active: 0 },
+  }));
+  await page.route(/\/api\/audit\/summary$/, (route) => fulfillJson(route, {
+    generatedAt: "2026-05-30T09:00:00.000Z",
+    source: "PostgreSQL audit_entries via NestJS",
+    total: 1,
+    drafts: 0,
+    pendingReview: 1,
+    validated: 0,
+    rejected: 0,
+    overridden: 0,
+    latestAt: "2026-05-30T09:10:00.000Z",
+  }));
+
   await page.route(/\/api\/patients(?:\?.*)?$/, (route) => fulfillJson(route, paginated(patients)));
   await page.route(/\/api\/patients\/[^/]+$/, (route) => {
     const id = route.request().url().split("/").pop() ?? "";
@@ -485,6 +523,7 @@ export async function mockMedcityApi(page: Page) {
   await page.route(/\/api\/cms\/why-features$/, (route) => fulfillJson(route, cmsHome.whyFeatures));
   await page.route(/\/api\/cms\/contact-messages$/, (route) => fulfillJson(route, paginated([])));
   await page.route(/\/api\/cms\/newsletter-subscriptions$/, (route) => fulfillJson(route, paginated([])));
+  await page.route(/\/api\/public\/medicines(?:\?.*)?$/, (route) => fulfillJson(route, paginated(medicines)));
   await page.route(/\/api\/medicines(?:\?.*)?$/, (route) => fulfillJson(route, paginated(medicines)));
   await page.route(/\/api\/medicines\/classes$/, (route) => fulfillJson(route, ["Antalgique"]));
   await page.route(/\/api\/medicines\/[^/]+$/, (route) => {

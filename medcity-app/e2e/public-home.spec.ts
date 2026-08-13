@@ -13,6 +13,23 @@ test("loads CMS-managed public home sections from the backend contract", async (
   await expect(page.getByText("Pharmacie Centrale de Tunisie")).toBeVisible();
 });
 
+test("shows a professional fallback for unavailable public medicine details", async ({ page }) => {
+  await mockMedcityApi(page);
+
+  await page.goto("/");
+  await page.getByRole("button", { name: /Medicines|Medicaments|Médicaments/i }).click();
+  await page.getByPlaceholder(/Medicine name|Nom du médicament|Nom du mÃ©dicament/i).fill("Paracetamol");
+  await page.getByRole("button", { name: /Paracetamol/i }).click();
+
+  await expect(page.getByText(/Non renseigné|Not provided/).first()).toBeVisible();
+  await expect(page.getByText("Indication non exposée par le connecteur Firebase.")).not.toBeVisible();
+  await expect(page.getByText("liste_amm_xls")).not.toBeVisible();
+  await expect(page.getByText("medicaments_with_detail_and_rcp")).not.toBeVisible();
+  await expect(page.getByText("tunisia_master")).not.toBeVisible();
+  await expect(page.getByText("uploaded file: liste_amm (1).xls")).not.toBeVisible();
+  await expect(page.getByText("Précaution")).not.toBeVisible();
+});
+
 test("opens a CMS article detail from the public NestJS endpoint", async ({ page }) => {
   await mockMedcityApi(page);
 
@@ -30,8 +47,10 @@ test("loads public doctors directory from the NestJS public endpoint", async ({ 
   await page.goto("/doctors");
 
   await expect(page.getByText("Dr. Ahmed Ben Ali")).toBeVisible();
-  await expect(page.getByText("Medecine generale")).toBeVisible();
-  await expect(page.getByText("Cabinet MedCity")).toBeVisible();
+  await expect(page.getByText("Medecine generale").last()).toBeVisible();
+  await expect(page.getByText("Clinique Test")).toBeVisible();
+  await expect(page.getByText("4.5")).toBeVisible();
+  await expect(page.getByText("Tunis", { exact: true }).last()).toBeVisible();
 });
 
 test("submits the public newsletter form to the NestJS endpoint", async ({ page }) => {

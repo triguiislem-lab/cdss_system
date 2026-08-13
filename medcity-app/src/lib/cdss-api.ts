@@ -173,11 +173,11 @@ function mapPatientContext(
     ageYears: patient.age,
     weightKg: overrides.weightKg ?? patient.weightKg,
     allergies: patient.allergies,
-    currentMedications: patient.currentMedications.map((med) => `${med.name} ${med.dose}`.trim()),
+    currentMedications: patient.currentMedications.map((med) => [med.name, med.dose].filter(Boolean).join(" ")),
     chronicConditions: patient.comorbidities,
     egfr: patient.renal.gfr,
-    renalImpairment: patient.renal.status !== "normal",
-    hepaticImpairment: patient.liver.status !== "normal",
+    renalImpairment: ["mild", "moderate", "severe"].includes(patient.renal.status),
+    hepaticImpairment: patient.liver.status === "impaired",
     pregnant: patient.flags.some((flag) => flag.toLowerCase().includes("pregnan")),
     pregnancyStatus: patient.flags.some((flag) => flag.toLowerCase().includes("pregnan"))
       ? "pregnant"

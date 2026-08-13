@@ -1,17 +1,18 @@
 ﻿import { Link, useLocation } from "wouter";
 
-import { useEffect, useMemo, useState } from "react";
-import { Search, AlertTriangle, FilePlus2, Plus, Pencil, Trash2, Eye, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Search, AlertTriangle, FilePlus2, Plus, Pencil, Trash2, Eye, RefreshCw, ChevronLeft, ChevronRight } from "lucide-react";
 import { PatientFormDialog } from "@/features/cdss/components/PatientFormDialog";
 import type { Patient } from "@/lib/mock-data";
-import { getPatientAge, getPatientFullName, getPatientGenderLabel, getPatientInitials, getPatientSearchText } from "@/lib/mock-data";
+import { getPatientAge, getPatientFullName, getPatientGenderLabel, getPatientInitials } from "@/lib/mock-data";
 import { useI18n } from "@/i18n/I18nProvider";
-import { deletePatient, listPatients } from "@/lib/backend-api";
+import { deletePatient, getPatientsPage } from "@/lib/backend-api";
 import { useToast } from "@/hooks/use-toast";
 import { CardSkeletonGrid } from "@/components/molecules/LoadingState";
 
 
 function PatientsPage() {
+  const PAGE_SIZE = 20;
   const { t } = useI18n();
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -19,6 +20,9 @@ function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalPatients, setTotalPatients] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Patient | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Patient | null>(null);
@@ -26,7 +30,10 @@ function PatientsPage() {
   async function refreshPatients() {
     setLoading(true);
     try {
-      setPatients(await listPatients());
+      const result = await getPatientsPage({ page, limit: PAGE_SIZE, search: query });
+      setPatients(result.data);
+      setTotalPatients(result.meta.total);
+      setTotalPages(result.meta.totalPages);
     } catch (error) {
       toast({
         title: "Patients indisponibles",
@@ -38,21 +45,16 @@ function PatientsPage() {
   }
 
   useEffect(() => {
-    void refreshPatients();
-  }, []);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return patients;
-    return patients.filter((p) => getPatientSearchText(p).includes(q));
-  }, [patients, query]);
+    const timer = window.setTimeout(() => void refreshPatients(), 250);
+    return () => window.clearTimeout(timer);
+  }, [page, query]);
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">{t("nav.patients")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("patients.panelCount", { count: patients.length })}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t("patients.panelCount", { count: totalPatients })}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm w-full sm:w-72">
@@ -70,13 +72,13 @@ function PatientsPage() {
 
       {loading ? (
         <CardSkeletonGrid />
-      ) : filtered.length === 0 ? (
+      ) : patients.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <p className="text-sm text-muted-foreground">{t("patients.empty")}</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((p) => (
+          {patients.map((p) => (
             <div key={p.id} className="rounded-xl border border-border bg-card p-5 shadow-card transition-smooth hover:shadow-elevated">
               <div className="flex items-start justify-between">
                 <Link href={`/doctor/patients/${p.id}`} className="flex items-center gap-3 group">
@@ -133,6 +135,20 @@ function PatientsPage() {
         </div>
       )}
 
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm">
+          <span className="text-muted-foreground">Page {page} / {totalPages}</span>
+          <div className="flex gap-2">
+            <button disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="inline-flex items-center gap-1 rounded-lg border border-input px-3 py-2 font-semibold disabled:opacity-40">
+              <ChevronLeft className="h-4 w-4" /> Précédent
+            </button>
+            <button disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="inline-flex items-center gap-1 rounded-lg border border-input px-3 py-2 font-semibold disabled:opacity-40">
+              Suivant <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <PatientFormDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
@@ -144,6 +160,7 @@ function PatientsPage() {
               ? current.map((patient) => (patient.id === saved.id ? saved : patient))
               : [saved, ...current];
           });
+          void refreshPatients();
         }}
       />
 

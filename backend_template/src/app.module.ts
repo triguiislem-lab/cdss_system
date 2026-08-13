@@ -9,6 +9,7 @@ import { AuditModule } from './audit/audit.module';
 import { CdssModule } from './cdss/cdss.module';
 import { CmsModule } from './cms/cms.module';
 import { ConsultationsModule } from './consultations/consultations.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { DoctorsModule } from './doctors/doctors.module';
 import { HealthModule } from './health/health.module';
 import { InteractionsModule } from './interactions/interactions.module';
@@ -18,6 +19,7 @@ import { MonitoringModule } from './monitoring/monitoring.module';
 import { PatientsModule } from './patients/patients.module';
 import { PharmacyModule } from './pharmacy/pharmacy.module';
 import { PrescriptionsModule } from './prescriptions/prescriptions.module';
+import { SearchModule } from './search/search.module';
 import { TranslationModule } from './translation/translation.module';
 import { UsersModule } from './users/users.module';
 
@@ -28,7 +30,7 @@ import { UsersModule } from './users/users.module';
       inject: [ConfigService],
       useFactory: (config: ConfigService): TypeOrmModuleOptions => {
         const synchronize =
-          config.get<string>('DATABASE_SYNC', 'true') === 'true';
+          config.get<string>('DATABASE_SYNC', 'false') === 'true';
         const databaseType = config.get<string>('DATABASE_TYPE', 'sqlite');
         const databaseSsl =
           config.get<string>('DATABASE_SSL', 'false') === 'true';
@@ -72,7 +74,9 @@ import { UsersModule } from './users/users.module';
     DoctorsModule,
     PatientsModule,
     ConsultationsModule,
+    DashboardModule,
     PrescriptionsModule,
+    SearchModule,
     PharmacyModule,
     MedicinesModule,
     MedicineContributionsModule,

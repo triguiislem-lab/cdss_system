@@ -17,6 +17,9 @@
     "test:clinical-crud": "ts-node -r tsconfig-paths/register test/clinical-crud.e2e.ts",
     "test:external-integrations": "ts-node -r tsconfig-paths/register test/external-integrations.e2e.ts",
     "seed": "ts-node -r tsconfig-paths/register src/database/seed.ts",
+    "refresh:demo-clinical": "ts-node -r tsconfig-paths/register src/database/refresh-demo-clinical.ts",
+    "migrate:patient-pregnancy": "ts-node -r tsconfig-paths/register src/database/migrate-patient-pregnancy.ts",
+    "migrate:prescription-medicine-source": "ts-node -r tsconfig-paths/register src/database/migrate-prescription-medicine-source.ts",
     "import:tn-med": "ts-node -r tsconfig-paths/register src/database/import-tn-med.ts",
     "import:tn-med:prod": "node dist/database/import-tn-med.js"
   },

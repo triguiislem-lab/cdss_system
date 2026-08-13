@@ -24,9 +24,21 @@ type PatientFormState = {
   profession: string;
   internalCode: string;
   address: string;
+  weightKg: string;
+  heightCm: string;
+  renalGfr: string;
+  renalStatus: Patient["renal"]["status"];
+  liverStatus: Patient["liver"]["status"];
+  liverNote: string;
+  heartRate: string;
+  bloodPressure: string;
+  temperature: string;
+  oxygenSaturation: string;
   allergiesText: string;
   currentMedicationsText: string;
   comorbiditiesText: string;
+  pregnancyStatus: NonNullable<Patient["pregnancyStatus"]>;
+  pregnancyTrimester: "" | "1" | "2" | "3";
 };
 
 const emptyForm: PatientFormState = {
@@ -40,9 +52,21 @@ const emptyForm: PatientFormState = {
   profession: "",
   internalCode: "",
   address: "",
+  weightKg: "",
+  heightCm: "",
+  renalGfr: "",
+  renalStatus: "unknown",
+  liverStatus: "unknown",
+  liverNote: "",
+  heartRate: "",
+  bloodPressure: "",
+  temperature: "",
+  oxygenSaturation: "",
   allergiesText: "",
   currentMedicationsText: "",
   comorbiditiesText: "",
+  pregnancyStatus: "unknown",
+  pregnancyTrimester: "",
 };
 
 function splitLegacyName(name: string) {
@@ -60,16 +84,28 @@ function formFromPatient(patient?: Patient | null): PatientFormState {
     firstName: patient.firstName ?? legacy.firstName,
     lastName: patient.lastName ?? legacy.lastName,
     birthDate: patient.birthDate ?? "",
-    gender: patient.gender ?? (patient.sex === "M" ? "male" : "female"),
+    gender: patient.gender ?? (patient.sex === "M" ? "male" : patient.sex === "F" ? "female" : "other"),
     phone1: patient.phone1 ?? "",
     phone2: patient.phone2 ?? "",
     phone3: patient.phone3 ?? "",
     profession: patient.profession ?? "",
     internalCode: patient.internalCode ?? "",
     address: patient.address ?? "",
+    weightKg: patient.weightKg ? String(patient.weightKg) : "",
+    heightCm: patient.heightCm ? String(patient.heightCm) : "",
+    renalGfr: patient.renal?.gfr ? String(patient.renal.gfr) : "",
+    renalStatus: patient.renal?.status ?? "unknown",
+    liverStatus: patient.liver?.status ?? "unknown",
+    liverNote: patient.liver?.note ?? "",
+    heartRate: patient.vitals.hr ? String(patient.vitals.hr) : "",
+    bloodPressure: patient.vitals.bp ?? "",
+    temperature: patient.vitals.temp ? String(patient.vitals.temp) : "",
+    oxygenSaturation: patient.vitals.spo2 ? String(patient.vitals.spo2) : "",
     allergiesText: patient.allergies.join("\n"),
     currentMedicationsText: patient.currentMedications.map((medication) => [medication.name, medication.dose].filter(Boolean).join(" | ")).join("\n"),
     comorbiditiesText: patient.comorbidities.join("\n"),
+    pregnancyStatus: patient.pregnancyStatus ?? "unknown",
+    pregnancyTrimester: patient.pregnancyTrimester ? String(patient.pregnancyTrimester) as "1" | "2" | "3" : "",
   };
 }
 
@@ -80,17 +116,26 @@ function parseLineList(value: string) {
     .filter(Boolean);
 }
 
-function parseMedicationLines(value: string) {
+function optionalNumber(value: string) {
+  const parsed = Number(value);
+  return value.trim() && Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseMedicationLines(value: string, previousMedications: Patient["currentMedications"] = []) {
   return value
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
       const [name, ...doseParts] = line.split("|").map((part) => part.trim());
-      return {
+      const medication = {
         name,
         dose: doseParts.join(" | "),
       };
+      const previous = previousMedications.find(
+        (candidate) => candidate.name.trim().toLowerCase() === name.toLowerCase(),
+      );
+      return previous ? { ...previous, ...medication } : medication;
     })
     .filter((medication) => medication.name);
 }
@@ -131,16 +176,25 @@ export function PatientFormDialog({ open, onClose, editing, onSaved }: Props) {
       profession: form.profession.trim() || undefined,
       internalCode: form.internalCode.trim() || undefined,
       address: form.address.trim() || undefined,
+      weightKg: optionalNumber(form.weightKg),
+      heightCm: optionalNumber(form.heightCm),
       allergies: parseLineList(form.allergiesText),
-      currentMedications: parseMedicationLines(form.currentMedicationsText),
+      currentMedications: parseMedicationLines(form.currentMedicationsText, editing?.currentMedications),
       comorbidities: parseLineList(form.comorbiditiesText),
-      renal: editing?.renal ?? { gfr: 90, status: "normal" },
-      liver: editing?.liver ?? { status: "normal" },
-      vitalsSnapshot: editing?.vitals ?? { hr: 0, bp: "", temp: 0, spo2: 0 },
-      flags: editing?.flags ?? [],
+      renal: { gfr: optionalNumber(form.renalGfr), status: form.renalStatus },
+      liver: { status: form.liverStatus, note: form.liverNote.trim() || "" },
+      vitalsSnapshot: {
+        hr: optionalNumber(form.heartRate),
+        bp: form.bloodPressure.trim() || undefined,
+        temp: optionalNumber(form.temperature),
+        spo2: optionalNumber(form.oxygenSaturation),
+      },
+      pregnancyStatus: form.gender === "female" ? form.pregnancyStatus : "not_pregnant",
+      pregnancyTrimester:
+        form.gender === "female" && form.pregnancyStatus === "pregnant" && form.pregnancyTrimester
+          ? Number(form.pregnancyTrimester) as 1 | 2 | 3
+          : undefined,
       missingData: editing?.missingData,
-      weightKg: editing?.weightKg ?? 0,
-      heightCm: editing?.heightCm ?? 0,
     };
 
     setSaving(true);
@@ -246,6 +300,85 @@ export function PatientFormDialog({ open, onClose, editing, onSaved }: Props) {
               </Field>
             </div>
           </section>
+
+          <section className="mt-4 rounded-xl border border-border bg-muted/20 p-4">
+            <h3 className="text-sm font-semibold">Mesures et fonctions d’organe</h3>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Poids (kg)">
+                <input type="number" min="0" step="0.1" value={form.weightKg} onChange={(event) => update("weightKg", event.target.value)} className={input} />
+              </Field>
+              <Field label="Taille (cm)">
+                <input type="number" min="0" step="0.1" value={form.heightCm} onChange={(event) => update("heightCm", event.target.value)} className={input} />
+              </Field>
+              <Field label="DFG / GFR">
+                <input type="number" min="0" step="0.1" value={form.renalGfr} onChange={(event) => update("renalGfr", event.target.value)} className={input} />
+              </Field>
+              <Field label="Fonction rénale">
+                <select value={form.renalStatus} onChange={(event) => update("renalStatus", event.target.value as PatientFormState["renalStatus"])} className={input}>
+                  <option value="unknown">Non renseignée</option>
+                  <option value="normal">Normale</option>
+                  <option value="mild">Légère</option>
+                  <option value="moderate">Modérée</option>
+                  <option value="severe">Sévère</option>
+                </select>
+              </Field>
+              <Field label="Fonction hépatique">
+                <select value={form.liverStatus} onChange={(event) => update("liverStatus", event.target.value as PatientFormState["liverStatus"])} className={input}>
+                  <option value="unknown">Non renseignée</option>
+                  <option value="normal">Normale</option>
+                  <option value="impaired">Altérée</option>
+                </select>
+              </Field>
+              <Field label="Note hépatique">
+                <input value={form.liverNote} onChange={(event) => update("liverNote", event.target.value)} className={input} />
+              </Field>
+              <Field label="Fréquence cardiaque">
+                <input type="number" min="0" value={form.heartRate} onChange={(event) => update("heartRate", event.target.value)} className={input} />
+              </Field>
+              <Field label="Tension artérielle">
+                <input value={form.bloodPressure} onChange={(event) => update("bloodPressure", event.target.value)} placeholder="120/80" className={input} />
+              </Field>
+              <Field label="Température (°C)">
+                <input type="number" min="0" step="0.1" value={form.temperature} onChange={(event) => update("temperature", event.target.value)} className={input} />
+              </Field>
+              <Field label="SpO₂ (%)">
+                <input type="number" min="0" max="100" step="0.1" value={form.oxygenSaturation} onChange={(event) => update("oxygenSaturation", event.target.value)} className={input} />
+              </Field>
+            </div>
+          </section>
+
+          {form.gender === "female" && (
+            <section className="mt-4 rounded-xl border border-border bg-muted/20 p-4">
+              <h3 className="text-sm font-semibold">Grossesse</h3>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Field label="Statut de grossesse">
+                  <select
+                    value={form.pregnancyStatus}
+                    onChange={(event) => update("pregnancyStatus", event.target.value as PatientFormState["pregnancyStatus"])}
+                    className={input}
+                  >
+                    <option value="unknown">Non renseigné</option>
+                    <option value="not_pregnant">Pas enceinte</option>
+                    <option value="pregnant">Enceinte</option>
+                  </select>
+                </Field>
+                {form.pregnancyStatus === "pregnant" && (
+                  <Field label="Trimestre">
+                    <select
+                      value={form.pregnancyTrimester}
+                      onChange={(event) => update("pregnancyTrimester", event.target.value as PatientFormState["pregnancyTrimester"])}
+                      className={input}
+                    >
+                      <option value="">Sélectionner</option>
+                      <option value="1">T1</option>
+                      <option value="2">T2</option>
+                      <option value="3">T3</option>
+                    </select>
+                  </Field>
+                )}
+              </div>
+            </section>
+          )}
 
           <p className="mt-3 rounded-lg border border-info/20 bg-info-soft px-3 py-2 text-xs text-info">
             {t("patients.vitalsNote")}

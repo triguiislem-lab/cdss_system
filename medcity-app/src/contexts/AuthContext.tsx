@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { getCurrentUserApi, loginApi } from "@/lib/backend-api";
+import { getCurrentUserApi, loginApi, type ApiAuthUser } from "@/lib/backend-api";
 import { useLocation } from "wouter";
 
 export type UserRole = "admin" | "doctor";
@@ -35,12 +35,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [location, setLocation] = useLocation();
 
-  function toAuthUser(input: { id: string; email: string; role: UserRole }): AuthUser {
+  function toAuthUser(input: ApiAuthUser): AuthUser {
+    const profile = input.doctorProfile;
     return {
       id: input.id,
       email: input.email,
       role: input.role,
-      nom: input.email.split("@")[0],
+      prenom: profile?.firstName,
+      nom: profile?.lastName || input.email.split("@")[0],
+      telephone: profile?.phone,
+      matriculeFiscale: profile?.fiscalNumber,
+      specialite: profile?.specialty,
+      numeroCNOM: profile?.cnamCode,
     };
   }
 

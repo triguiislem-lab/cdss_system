@@ -6,13 +6,18 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcryptjs';
-import { ILike, Repository } from 'typeorm';
+import { Brackets, ILike, Repository } from 'typeorm';
 import { PaginationQueryDto, toPaginated } from '../common/dto/pagination.dto';
 import { DoctorStatus, UserRole } from '../common/entities/enums';
 import { EmailService } from '../email/email.service';
 import { User } from '../users/user.entity';
 import { CreateDoctorDto, UpdateDoctorDto } from './dto/doctors.dto';
 import { DoctorProfile } from './doctor-profile.entity';
+
+type DoctorWithCounts = DoctorProfile & {
+  patientsCount?: number;
+  prescriptionsCount?: number;
+};
 
 @Injectable()
 export class DoctorsService {
@@ -27,22 +32,40 @@ export class DoctorsService {
   async findAll(query: PaginationQueryDto) {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const activeOnly = { status: DoctorStatus.Active };
-    const where = query.search
-      ? [
-          { ...activeOnly, firstName: ILike(`%${query.search}%`) },
-          { ...activeOnly, lastName: ILike(`%${query.search}%`) },
-          { ...activeOnly, email: ILike(`%${query.search}%`) },
-        ]
-      : activeOnly;
-    const [data, total] = await this.doctorsRepository.findAndCount({
-      where,
-      relations: { user: true },
-      skip: (page - 1) * limit,
-      take: limit,
-      order: { createdAt: 'DESC' },
-    });
-    return toPaginated(data, total, page, limit);
+    const qb = this.doctorsRepository
+      .createQueryBuilder('doctor')
+      .loadRelationCountAndMap('doctor.patientsCount', 'doctor.patients')
+      .loadRelationCountAndMap('doctor.prescriptionsCount', 'doctor.prescriptions');
+
+    if (query.search?.trim()) {
+      const search = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        new Brackets((where) => {
+          where
+            .where('LOWER(doctor.firstName) LIKE :search')
+            .orWhere('LOWER(doctor.lastName) LIKE :search')
+            .orWhere('LOWER(doctor.email) LIKE :search')
+            .orWhere('LOWER(doctor.specialty) LIKE :search')
+            .orWhere('LOWER(doctor.facility) LIKE :search')
+            .orWhere('LOWER(doctor.city) LIKE :search');
+        }),
+      ).setParameter('search', search);
+    }
+
+    const [data, total] = await qb
+      .orderBy('doctor.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+    return toPaginated(
+      (data as DoctorWithCounts[]).map((doctor) => ({
+        ...doctor,
+        rating: normalizeRating(doctor.rating),
+      })),
+      total,
+      page,
+      limit,
+    );
   }
 
   async findPublic(query: PaginationQueryDto) {
@@ -69,6 +92,8 @@ export class DoctorsService {
         lastName: doctor.lastName,
         phone: doctor.phone,
         specialty: doctor.specialty,
+        facility: doctor.facility,
+        rating: normalizeRating(doctor.rating),
         city: doctor.city,
         address: doctor.address,
         status: doctor.status,
@@ -80,25 +105,19 @@ export class DoctorsService {
   }
 
   async getById(id: string) {
-    const doctor = await this.doctorsRepository.findOne({
-      where: { id },
-      relations: { user: true },
-    });
+    const doctor = await this.findDoctorEntity(id);
     if (!doctor) {
       throw new NotFoundException('Doctor not found');
     }
-    return doctor;
+    return this.presentDoctor(doctor);
   }
 
   async getByUserId(userId: string) {
-    const doctor = await this.doctorsRepository.findOne({
-      where: { userId },
-      relations: { user: true },
-    });
+    const doctor = await this.findDoctorEntityByUserId(userId);
     if (!doctor) {
       throw new NotFoundException('Doctor profile not found');
     }
-    return doctor;
+    return this.presentDoctor(doctor);
   }
 
   async create(dto: CreateDoctorDto) {
@@ -120,6 +139,7 @@ export class DoctorsService {
       const doctor = existing.doctorProfile
         ? Object.assign(existing.doctorProfile, {
             ...profileData,
+            rating: normalizeRating(dto.rating),
             email,
             userId: existing.id,
             status: DoctorStatus.Active,
@@ -158,6 +178,7 @@ export class DoctorsService {
     const doctor = await this.doctorsRepository.save(
       this.doctorsRepository.create({
         ...profileData,
+        rating: normalizeRating(dto.rating),
         email,
         userId: user.id,
         status: DoctorStatus.Active,
@@ -176,7 +197,8 @@ export class DoctorsService {
   }
 
   async update(id: string, dto: UpdateDoctorDto) {
-    const doctor = await this.getById(id);
+    const doctor = await this.findDoctorEntity(id);
+    if (!doctor) throw new NotFoundException('Doctor not found');
     const { password, email, ...profileData } = dto;
     const normalizedEmail = email ? this.normalizeEmail(email) : undefined;
     let shouldSaveUser = false;
@@ -192,6 +214,9 @@ export class DoctorsService {
       shouldSaveUser = true;
     }
     Object.assign(doctor, profileData);
+    if ('rating' in dto) {
+      doctor.rating = normalizeRating(dto.rating);
+    }
     if (password) {
       doctor.user.passwordHash = await bcrypt.hash(password, 12);
       shouldSaveUser = true;
@@ -204,7 +229,8 @@ export class DoctorsService {
   }
 
   async updateOwnProfile(userId: string, dto: UpdateDoctorDto) {
-    const doctor = await this.getByUserId(userId);
+    const doctor = await this.findDoctorEntityByUserId(userId);
+    if (!doctor) throw new NotFoundException('Doctor profile not found');
     if ('password' in dto) {
       throw new ForbiddenException('Password changes are managed by admin');
     }
@@ -223,6 +249,9 @@ export class DoctorsService {
       shouldSaveUser = true;
     }
     Object.assign(doctor, profileData);
+    if ('rating' in dto) {
+      doctor.rating = normalizeRating(dto.rating);
+    }
     if (shouldSaveUser) {
       await this.usersRepository.save(doctor.user);
     }
@@ -231,7 +260,8 @@ export class DoctorsService {
   }
 
   async updateStatus(id: string, status: DoctorStatus) {
-    const doctor = await this.getById(id);
+    const doctor = await this.findDoctorEntity(id);
+    if (!doctor) throw new NotFoundException('Doctor not found');
     doctor.status = status;
     doctor.user.isActive = status === DoctorStatus.Active;
     await this.usersRepository.save(doctor.user);
@@ -239,7 +269,8 @@ export class DoctorsService {
   }
 
   async remove(id: string) {
-    const doctor = await this.getById(id);
+    const doctor = await this.findDoctorEntity(id);
+    if (!doctor) throw new NotFoundException('Doctor not found');
     doctor.status = DoctorStatus.Inactive;
     doctor.user.isActive = false;
     await this.usersRepository.save(doctor.user);
@@ -247,7 +278,31 @@ export class DoctorsService {
     return { ok: true };
   }
 
+  private findDoctorEntity(id: string) {
+    return this.doctorsRepository.findOne({
+      where: { id },
+      relations: { user: true },
+    });
+  }
+
+  private findDoctorEntityByUserId(userId: string) {
+    return this.doctorsRepository.findOne({
+      where: { userId },
+      relations: { user: true },
+    });
+  }
+
+  private presentDoctor(doctor: DoctorProfile) {
+    const { user: _user, ...profile } = doctor;
+    return { ...profile, rating: normalizeRating(profile.rating) };
+  }
+
   private normalizeEmail(email: string) {
     return email.trim().toLowerCase();
   }
+}
+
+function normalizeRating(value?: number) {
+  if (value === undefined || value === null) return value;
+  return Math.round(Math.max(0, Math.min(5, Number(value))) * 10) / 10;
 }

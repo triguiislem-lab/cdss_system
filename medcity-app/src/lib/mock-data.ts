@@ -1,12 +1,25 @@
 ﻿export type Severity = "critical" | "major" | "moderate" | "minor" | "info";
 export type RiskLevel = "high" | "medium" | "low";
-export type PrescriptionStatus = "draft" | "pending_review" | "validated" | "rejected" | "needs_data";
+export type PrescriptionStatus = "draft" | "pending_review" | "validated" | "rejected" | "cancelled";
+
+export interface PatientMedication {
+  name: string;
+  dci?: string;
+  dose?: string;
+  route?: string;
+  frequency?: string;
+  duration?: string;
+  startedAt?: string;
+  endsAt?: string;
+  prescriptionId?: string;
+  medicineId?: string;
+}
 
 export interface Patient {
   id: string;
   name: string;
-  age: number;
-  sex: "M" | "F";
+  age?: number;
+  sex: "M" | "F" | "O";
   firstName?: string;
   lastName?: string;
   birthDate?: string;
@@ -17,15 +30,18 @@ export interface Patient {
   profession?: string;
   internalCode?: string;
   address?: string;
-  weightKg: number;
-  heightCm: number;
+  weightKg?: number;
+  heightCm?: number;
   allergies: string[];
-  currentMedications: { name: string; dose: string }[];
+  currentMedications: PatientMedication[];
   comorbidities: string[];
-  renal: { gfr: number; status: "normal" | "mild" | "moderate" | "severe" };
-  liver: { status: "normal" | "impaired"; note?: string };
-  vitals: { hr: number; bp: string; temp: number; spo2: number };
+  renal: { gfr?: number; status: "normal" | "mild" | "moderate" | "severe" | "unknown" };
+  liver: { status: "normal" | "impaired" | "unknown"; note?: string };
+  vitals: { hr?: number; bp?: string; temp?: number; spo2?: number };
   flags: string[];
+  computedFlags?: string[];
+  pregnancyStatus?: "not_pregnant" | "pregnant" | "unknown";
+  pregnancyTrimester?: 1 | 2 | 3;
   missingData?: string[];
 }
 
@@ -55,7 +71,7 @@ export function getPatientInitials(patient: Patient): string {
     .toUpperCase();
 }
 
-export function getPatientAge(patient: Patient): number {
+export function getPatientAge(patient: Patient): number | undefined {
   return calculateAge(patient.birthDate) ?? patient.age;
 }
 
@@ -88,27 +104,41 @@ export function getPatientSearchText(patient: Patient): string {
 export interface Medication {
   id: string;
   medicineId?: string;
+  dci?: string;
   name: string;
   dose: string;
   route: string;
   frequency: string;
   duration: string;
   indication: string;
+  instructions?: string;
   confidence: number; // 0-100
   status: "ai_proposed" | "edited" | "validated" | "rejected";
 }
 
 export interface PrescriptionCase {
   id: string;
+  prescriptionNumber?: string;
   patientId: string;
   patient?: Patient;
   diagnosis: string;
   status: PrescriptionStatus;
-  risk: RiskLevel;
+  risk: RiskLevel | null;
+  riskAssessed?: boolean;
   lastUpdate: string;
   doctor: string;
   medications: Medication[];
   notes?: string;
+  safetyAlerts?: SafetyAlert[];
+  doctorId?: string;
+  consultationId?: string;
+  aiTraceId?: string;
+  aiStatus?: string;
+  aiBlocked?: boolean;
+  aiReviewRequired?: boolean;
+  aiPayload?: unknown;
+  validatedAt?: string;
+  printedAt?: string;
 }
 
 export interface SafetyAlert {
@@ -137,6 +167,7 @@ export interface InteractionResult {
 export interface AuditEntry {
   id: string;
   prescriptionId: string;
+  prescriptionNumber?: string;
   patient: string;
   doctor: string;
   modelVersion: string;
@@ -200,7 +231,9 @@ export const patients: Patient[] = [
     renal: { gfr: 102, status: "normal" },
     liver: { status: "normal" },
     vitals: { hr: 84, bp: "118/74", temp: 37.1, spo2: 99 },
-    flags: ["Pregnancy (T2)"],
+    flags: [],
+    pregnancyStatus: "pregnant",
+    pregnancyTrimester: 2,
     missingData: ["Recent TSH"],
   },
   {
@@ -271,7 +304,7 @@ export const prescriptions: PrescriptionCase[] = [
     id: "RX-2085",
     patientId: "P-1046",
     diagnosis: "Migraine prophylaxis",
-    status: "needs_data",
+    status: "draft",
     risk: "low",
     lastUpdate: "1 h ago",
     doctor: "Dr. Chen",

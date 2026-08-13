@@ -1,7 +1,8 @@
 import { Link, useLocation } from "wouter";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   CalendarClock,
+  ChevronLeft,
   ChevronRight,
   Mic,
   Pencil,
@@ -13,7 +14,7 @@ import {
 
 import { ConsultationFormDialog } from "@/features/cdss/components/ConsultationFormDialog";
 import { useI18n } from "@/i18n/I18nProvider";
-import { deleteConsultation, listConsultations } from "@/lib/backend-api";
+import { deleteConsultation, getConsultationsPage } from "@/lib/backend-api";
 import type { Consultation, ConsultationStatus } from "@/lib/stores/consultation-store";
 import { CardSkeletonGrid } from "@/components/molecules/LoadingState";
 
@@ -25,42 +26,53 @@ const statusMeta: Record<ConsultationStatus, { labelKey: string; cls: string }> 
 };
 
 export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?: "/doctor" }) {
+  const PAGE_SIZE = 20;
   const { t } = useI18n();
   const [, setLocation] = useLocation();
   const [consultations, setConsultations] = useState<Consultation[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ConsultationStatus | "all">("all");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalConsultations, setTotalConsultations] = useState(0);
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function refresh() {
     setLoading(true);
+    setLoadError(null);
     try {
-      setConsultations(await listConsultations());
+      const result = await getConsultationsPage({
+        page,
+        limit: PAGE_SIZE,
+        search: query,
+        status: filter === "all" ? undefined : filter,
+      });
+      setConsultations(result.data);
+      setTotalConsultations(result.meta.total);
+      setTotalPages(result.meta.totalPages);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Impossible de charger les consultations.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    void refresh();
-  }, []);
-
-  const filtered = useMemo(() => consultations.filter((consultation) => {
-    if (filter !== "all" && consultation.status !== filter) return false;
-    const needle = query.trim().toLowerCase();
-    if (!needle) return true;
-    return (
-      consultation.patientName.toLowerCase().includes(needle) ||
-      consultation.reason.toLowerCase().includes(needle)
-    );
-  }), [consultations, filter, query]);
+    const timer = window.setTimeout(() => void refresh(), 250);
+    return () => window.clearTimeout(timer);
+  }, [page, query, filter]);
 
   async function handleDelete(id: string) {
-    await deleteConsultation(id);
-    setConfirmDelete(null);
-    await refresh();
+    try {
+      await deleteConsultation(id);
+      setConfirmDelete(null);
+      await refresh();
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : "Impossible de supprimer la consultation.");
+    }
   }
 
   return (
@@ -68,7 +80,7 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">{t("consultations.title")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("consultations.subtitle")}</p>
+          <p className="text-sm text-muted-foreground mt-1">{t("consultations.subtitle")} · {totalConsultations}</p>
         </div>
         <button
           onClick={() => setEditing("new")}
@@ -79,12 +91,16 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
       </div>
 
       <div className="rounded-xl border border-border bg-card shadow-card">
+        {loadError && <div className="m-3 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">{loadError}</div>}
         <div className="flex flex-wrap items-center gap-2 p-3 border-b border-border">
           <div className="flex flex-1 min-w-[220px] items-center gap-2 rounded-lg border border-input bg-background px-3 py-2 text-sm">
             <Search className="h-4 w-4 text-muted-foreground" />
             <input
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
               placeholder={t("consultations.searchPlaceholder")}
               className="flex-1 bg-transparent outline-none"
             />
@@ -93,7 +109,10 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
             {(["all", "scheduled", "in_progress", "completed", "cancelled"] as const).map((status) => (
               <button
                 key={status}
-                onClick={() => setFilter(status)}
+                onClick={() => {
+                  setFilter(status);
+                  setPage(1);
+                }}
                 className={`rounded-md px-2.5 py-1.5 text-xs font-medium transition-smooth ${
                   filter === status ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
                 }`}
@@ -108,14 +127,14 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
           <div className="p-4">
             <CardSkeletonGrid />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : consultations.length === 0 ? (
           <div className="p-12 text-center text-sm text-muted-foreground">
             <Stethoscope className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
             {t("consultations.empty")}
           </div>
         ) : (
           <ul className="divide-y divide-border">
-            {filtered.map((consultation) => {
+            {consultations.map((consultation) => {
               const status = statusMeta[consultation.status];
               const detailHref = `${basePath}/consultations/${consultation.id}`;
 
@@ -157,6 +176,20 @@ export default function ConsultationsPage({ basePath = "/doctor" }: { basePath?:
           </ul>
         )}
       </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm">
+          <span className="text-muted-foreground">Page {page} / {totalPages}</span>
+          <div className="flex gap-2">
+            <button disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="inline-flex items-center gap-1 rounded-lg border border-input px-3 py-2 font-semibold disabled:opacity-40">
+              <ChevronLeft className="h-4 w-4" /> Précédent
+            </button>
+            <button disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="inline-flex items-center gap-1 rounded-lg border border-input px-3 py-2 font-semibold disabled:opacity-40">
+              Suivant <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {editing !== null && (
         <ConsultationFormDialog

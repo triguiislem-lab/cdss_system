@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { toPaginated } from '../common/dto/pagination.dto';
@@ -11,6 +16,7 @@ import {
 } from '../common/entities/enums';
 import { DoctorsService } from '../doctors/doctors.service';
 import { Medicine } from '../medicines/medicine.entity';
+import { FirebaseMedicinesCatalog } from '../medicines/firebase-medicines.catalog';
 import { User } from '../users/user.entity';
 import {
   ContributionQueryDto,
@@ -27,6 +33,7 @@ export class MedicineContributionsService {
     @InjectRepository(Medicine)
     private readonly medicinesRepository: Repository<Medicine>,
     private readonly doctorsService: DoctorsService,
+    private readonly firebaseCatalog: FirebaseMedicinesCatalog,
   ) {}
 
   async findAll(query: ContributionQueryDto, user: User) {
@@ -63,7 +70,7 @@ export class MedicineContributionsService {
     return toPaginated(data, total, page, limit);
   }
 
-  async getById(id: string) {
+  async getById(id: string, user?: User) {
     const contribution = await this.contributionsRepository.findOne({
       where: { id },
       relations: { author: true, targetMedicine: true },
@@ -71,6 +78,7 @@ export class MedicineContributionsService {
     if (!contribution) {
       throw new NotFoundException('Medicine contribution not found');
     }
+    await this.assertContributionAccess(contribution, user);
     return contribution;
   }
 
@@ -81,20 +89,34 @@ export class MedicineContributionsService {
           where: { id: dto.targetMedicineId },
         })
       : undefined;
+    const firebaseTarget =
+      dto.targetMedicineId && this.firebaseCatalog.enabled()
+        ? await this.firebaseCatalog.get(dto.targetMedicineId)
+        : undefined;
     return this.contributionsRepository.save(
       this.contributionsRepository.create({
         ...dto,
         authorDoctorId: doctor.id,
         authorEmail: doctor.email,
         authorName: `${doctor.firstName} ${doctor.lastName}`,
-        targetMedicineDci: targetMedicine?.dci,
+        targetMedicineDci:
+          targetMedicine?.dci || firebaseTarget?.dciRaw || firebaseTarget?.nomMedicament,
         status: ContributionStatus.Pending,
       }),
     );
   }
 
   async validate(id: string, reviewer: User) {
-    const contribution = await this.getById(id);
+    const contribution = await this.getById(id, reviewer);
+    this.assertPending(contribution);
+    if (
+      this.firebaseCatalog.enabled() &&
+      [ContributionKind.NewMedicine, ContributionKind.Correction].includes(contribution.kind)
+    ) {
+      throw new ConflictException(
+        'The Firebase medicine catalogue is read-only. Corrections and new medicines require an approved Firebase ingestion workflow.',
+      );
+    }
     contribution.status = ContributionStatus.Validated;
     contribution.reviewerAdminId = reviewer.id;
     contribution.reviewerEmail = reviewer.email;
@@ -129,7 +151,8 @@ export class MedicineContributionsService {
   }
 
   async refuse(id: string, reviewer: User, dto: RefuseContributionDto) {
-    const contribution = await this.getById(id);
+    const contribution = await this.getById(id, reviewer);
+    this.assertPending(contribution);
     contribution.status = ContributionStatus.Refused;
     contribution.reviewerAdminId = reviewer.id;
     contribution.reviewerEmail = reviewer.email;
@@ -139,10 +162,32 @@ export class MedicineContributionsService {
     return this.contributionsRepository.save(contribution);
   }
 
-  async remove(id: string) {
-    const contribution = await this.getById(id);
+  async remove(id: string, user: User) {
+    const contribution = await this.getById(id, user);
+    if (user.role === UserRole.Doctor) {
+      this.assertPending(contribution);
+    }
     await this.contributionsRepository.remove(contribution);
     return { ok: true };
+  }
+
+  private async assertContributionAccess(
+    contribution: MedicineContribution,
+    user?: User,
+  ) {
+    if (!user || user.role !== UserRole.Doctor) return;
+    const doctor = await this.doctorsService.getByUserId(user.id);
+    if (contribution.authorDoctorId !== doctor.id) {
+      throw new NotFoundException('Medicine contribution not found');
+    }
+  }
+
+  private assertPending(contribution: MedicineContribution) {
+    if (contribution.status !== ContributionStatus.Pending) {
+      throw new BadRequestException(
+        'Only pending medicine contributions can be reviewed or deleted',
+      );
+    }
   }
 }
 

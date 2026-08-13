@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { DrugClass, TunisianMedicine } from "@/lib/tunisia-medicines";
 import { useI18n } from "@/i18n/I18nProvider";
-import { listMedicineClasses, listMedicines } from "@/lib/backend-api";
+import { getMedicine, listMedicineClasses, listMedicinesPage } from "@/lib/backend-api";
 
 const pregMeta: Record<TunisianMedicine["pregnancy"], string> = {
   Autorisé: "bg-success-soft text-success border-success/30",
@@ -27,8 +27,14 @@ function MedicinesPage() {
   const [q, setQ] = useState("");
   const [klass, setKlass] = useState<DrugClass | "all">("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedMedicine, setSelectedMedicine] = useState<TunisianMedicine | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [medicines, setMedicines] = useState<TunisianMedicine[]>([]);
   const [drugClasses, setDrugClasses] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,22 +44,28 @@ function MedicinesPage() {
       setLoading(true);
       setError(null);
       void Promise.all([
-        listMedicines({
+        listMedicinesPage({
           search: q,
           drugClass: klass === "all" ? undefined : klass,
-          limit: 100,
+          page,
+          limit: 25,
         }),
         listMedicineClasses(),
       ])
-        .then(([apiMedicines, apiClasses]) => {
+        .then(([medicinePage, apiClasses]) => {
           if (cancelled) return;
+          const apiMedicines = medicinePage.data;
           setMedicines(apiMedicines);
           setDrugClasses(apiClasses);
-          setSelectedId((current) =>
-            current && !apiMedicines.some((medicine) => medicine.id === current)
-              ? null
-              : current,
-          );
+          setTotal(medicinePage.meta.total);
+          setTotalPages(medicinePage.meta.totalPages);
+          setSelectedId((current) => {
+            if (current && !apiMedicines.some((medicine) => medicine.id === current)) {
+              setSelectedMedicine(null);
+              return null;
+            }
+            return current;
+          });
         })
         .catch((apiError: unknown) => {
           if (!cancelled) {
@@ -70,16 +82,43 @@ function MedicinesPage() {
       cancelled = true;
       window.clearTimeout(timeout);
     };
+  }, [klass, page, q]);
+
+  useEffect(() => {
+    setPage(1);
   }, [klass, q]);
 
-  const selected = medicines.find((m) => m.id === selectedId) ?? null;
+  const selected =
+    selectedMedicine ?? medicines.find((medicine) => medicine.id === selectedId) ?? null;
+
+  async function openMedicine(medicine: TunisianMedicine) {
+    setSelectedId(medicine.id);
+    setSelectedMedicine(medicine);
+    setDetailLoading(true);
+    setDetailError(null);
+    try {
+      setSelectedMedicine(await getMedicine(medicine.id));
+    } catch (apiError) {
+      setDetailError(
+        apiError instanceof Error ? apiError.message : "Détails médicaux indisponibles",
+      );
+    } finally {
+      setDetailLoading(false);
+    }
+  }
+
+  function closeMedicine() {
+    setSelectedId(null);
+    setSelectedMedicine(null);
+    setDetailError(null);
+  }
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">{t("medicines.title")}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          {t("medicines.subtitle", { count: medicines.length })}
+          {t("medicines.subtitle", { count: total })}
         </p>
       </div>
 
@@ -117,11 +156,12 @@ function MedicinesPage() {
             {t("medicines.empty")}
           </div>
         ) : (
-          <ul className="divide-y divide-border">
+          <>
+            <ul className="divide-y divide-border">
             {medicines.map((m) => (
               <li key={m.id}>
                 <button
-                  onClick={() => setSelectedId(m.id)}
+                  onClick={() => void openMedicine(m)}
                   className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-muted/40 transition-smooth text-left"
                 >
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary-soft text-primary flex-none">
@@ -146,14 +186,14 @@ function MedicinesPage() {
                         </span>
                       )}
                       <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${pregMeta[m.pregnancy]}`}>
-                        {t("medicines.pregnancy")}: {m.pregnancy}
+                        {lowerLabel(t("medicines.pregnancy"))}: {m.pregnancy}
                       </span>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                    <div className="text-xs text-muted-foreground mt-0.5 whitespace-normal break-words">
                       <span className="text-foreground">{m.dci}</span>
                       {suffixInline([m.dosage, m.form, m.presentation])}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                    <div className="text-xs text-muted-foreground mt-0.5 whitespace-normal break-words">
                       {formatInline([m.drugClass, m.therapeuticSubclass, labsLabel(m), priceLabel(m)])}
                     </div>
                   </div>
@@ -161,7 +201,31 @@ function MedicinesPage() {
                 </button>
               </li>
             ))}
-          </ul>
+            </ul>
+            <div className="flex items-center justify-between gap-3 border-t border-border px-5 py-3 text-sm">
+              <span className="text-muted-foreground">
+                Page {page} sur {totalPages} · {total} médicaments
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={page <= 1 || loading}
+                  onClick={() => setPage((current) => Math.max(1, current - 1))}
+                  className="rounded-md border border-border px-3 py-1.5 font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Précédent
+                </button>
+                <button
+                  type="button"
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                  className="rounded-md border border-border px-3 py-1.5 font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Suivant
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -171,14 +235,14 @@ function MedicinesPage() {
           role="dialog"
           aria-modal="true"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setSelectedId(null);
+            if (event.target === event.currentTarget) closeMedicine();
           }}
         >
           <div className="w-full sm:max-w-3xl rounded-t-xl sm:rounded-xl border border-border bg-card shadow-elevated max-h-[92vh] overflow-y-auto">
             <div className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 py-4 border-b border-border bg-card">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-bold text-lg truncate">{medicineTitle(selected)}</h3>
+                  <h3 className="font-bold text-lg whitespace-normal break-words">{medicineTitle(selected)}</h3>
                   {selected.amm && (
                     <span className="font-mono text-xs text-muted-foreground">
                       AMM {selected.amm}
@@ -189,12 +253,22 @@ function MedicinesPage() {
                   {formatInline([selected.dci, selected.drugClass, selected.therapeuticSubclass])}
                 </p>
               </div>
-              <button onClick={() => setSelectedId(null)} className="rounded-md p-2 hover:bg-muted" aria-label={t("common.close")}>
+              <button onClick={closeMedicine} className="rounded-md p-2 hover:bg-muted" aria-label={t("common.close")}>
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="p-5 space-y-5">
+              {detailLoading && (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                  Chargement des détails médicaux Firebase…
+                </div>
+              )}
+              {detailError && (
+                <div className="rounded-lg border border-warning/40 bg-warning-soft p-3 text-sm text-warning-foreground">
+                  {detailError}. Les informations du catalogue restent affichées.
+                </div>
+              )}
               <div className="grid sm:grid-cols-2 gap-3">
                 <InfoCard label="Statut" value={selected.genericStatus} />
                 <InfoCard label="VEIC" value={selected.veicStatus} />
@@ -212,24 +286,28 @@ function MedicinesPage() {
               </Section>
 
               <Section icon={Building2} title={t("medicines.labsTitle")}>
-                <div className="text-sm">{labsLabel(selected) || "Non renseigné"}</div>
+                <div className="text-sm">{labsLabel(selected) || "non renseigné"}</div>
               </Section>
 
               <Section icon={FileText} title={t("medicines.indication")}>
-                <p className="text-sm whitespace-pre-line">{selected.indication}</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                  {selected.indication || "non renseigné"}
+                </p>
               </Section>
 
               <Section icon={Activity} title={t("medicines.adultDosage")}>
-                <p className="text-sm">{selected.posologyAdult}</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                  {selected.posologyAdult || "non renseigné"}
+                </p>
                 <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
                   {selected.renalAdjust && (
                     <span className="rounded-full border border-warning/40 bg-warning-soft text-warning-foreground px-2 py-0.5 font-semibold">
-                      {t("medicines.renalAdjust")}
+                      {lowerLabel(t("medicines.renalAdjust"))}
                     </span>
                   )}
                   {selected.hepaticAdjust && (
                     <span className="rounded-full border border-warning/40 bg-warning-soft text-warning-foreground px-2 py-0.5 font-semibold">
-                      {t("medicines.hepaticAdjust")}
+                      {lowerLabel(t("medicines.hepaticAdjust"))}
                     </span>
                   )}
                 </div>
@@ -239,13 +317,48 @@ function MedicinesPage() {
                 {selected.contraindications.length > 0 ? (
                   <ul className="text-sm space-y-1">
                     {selected.contraindications.map((c) => (
-                      <li key={c} className="text-critical">
+                      <li key={c} className="text-critical break-words">
                         - {c}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Non renseigné</p>
+                  <p className="text-sm text-muted-foreground">non renseigné</p>
+                )}
+              </Section>
+
+              <Section icon={AlertTriangle} title="effets indésirables">
+                <DetailList values={selected.adverseEffects} />
+              </Section>
+
+              <Section icon={ShieldCheck} title="interactions médicamenteuses">
+                <DetailList values={selected.interactions} />
+              </Section>
+
+              <Section icon={AlertTriangle} title="mises en garde et précautions">
+                <DetailList values={selected.warnings} />
+              </Section>
+
+              <Section icon={Baby} title="populations spéciales">
+                <DetailList values={selected.specialPopulations} />
+              </Section>
+
+              <Section icon={Activity} title="surdosage">
+                <DetailList values={selected.overdose} />
+              </Section>
+
+              <Section icon={FileText} title="documents réglementaires">
+                {toHttpUrl(selected.rcpUrl) ? (
+                  <a
+                    href={toHttpUrl(selected.rcpUrl)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex rounded-md border border-primary/30 bg-primary-soft px-3 py-2 text-sm font-semibold text-primary hover:underline"
+                  >
+                    Consulter le RCP
+                  </a>
+                ) : (
+                  <p className="text-sm text-muted-foreground">RCP non disponible en lien direct</p>
                 )}
               </Section>
 
@@ -263,15 +376,6 @@ function MedicinesPage() {
                   <InfoCard label="Tarif référence" value={moneyLabel(selected.referenceTariffTnd)} />
                 </div>
               </Section>
-
-              <div className="rounded-lg bg-muted/40 border border-border p-3 text-xs text-muted-foreground">
-                {formatInline([
-                  selected.sourceReference,
-                  selected.sourceSystems?.join(", "),
-                  selected.rcpUrl ? `RCP: ${selected.rcpUrl}` : "",
-                  selected.noticeUrl ? `Notice: ${selected.noticeUrl}` : "",
-                ]) || t("medicines.priceSource", { price: selected.priceTndApprox.toFixed(2) })}
-              </div>
             </div>
           </div>
         </div>
@@ -299,8 +403,8 @@ function LoadingRows() {
 function Section({ icon: Icon, title, children }: { icon: React.ComponentType<{ className?: string }>; title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="flex items-center gap-2 mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        <Icon className="h-3.5 w-3.5" /> {title}
+      <div className="flex items-center gap-2 mb-2 text-xs font-semibold text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" /> {lowerLabel(title)}
       </div>
       {children}
     </div>
@@ -310,8 +414,8 @@ function Section({ icon: Icon, title, children }: { icon: React.ComponentType<{ 
 function InfoCard({ label, value }: { label: string; value?: string | number }) {
   return (
     <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
-      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-sm font-semibold">{value || "Non renseigné"}</div>
+      <div className="text-[11px] font-semibold text-muted-foreground">{lowerLabel(label)}</div>
+      <div className="mt-0.5 text-sm font-semibold">{value || "non renseigné"}</div>
     </div>
   );
 }
@@ -320,10 +424,37 @@ function Row({ label, value }: { label: string; value?: string }) {
   if (!value) return null;
   return (
     <div>
-      <span className="font-semibold">{label}: </span>
+      <span className="font-semibold">{lowerLabel(label)}: </span>
       {value}
     </div>
   );
+}
+
+function DetailList({ values }: { values?: string[] }) {
+  if (!values?.length) {
+    return <p className="text-sm text-muted-foreground">non renseigné</p>;
+  }
+  return (
+    <ul className="space-y-2 text-sm">
+      {values.map((value) => (
+        <li key={value} className="whitespace-pre-wrap break-words">
+          - {value}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function toHttpUrl(value?: string) {
+  const candidate = value?.trim();
+  if (!candidate) return undefined;
+  if (/^https?:\/\//i.test(candidate)) return candidate;
+  if (/^www\./i.test(candidate)) return `https://${candidate}`;
+  return undefined;
+}
+
+function lowerLabel(value: string) {
+  return value.toLocaleLowerCase();
 }
 
 function medicineTitle(medicine: TunisianMedicine) {

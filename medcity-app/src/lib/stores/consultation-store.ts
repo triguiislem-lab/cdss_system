@@ -22,6 +22,7 @@ export interface Consultation {
   endedAt?: string;
   diagnosis?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export type ConsultationInput = Omit<Consultation, "id" | "createdAt"> & { id?: string };

@@ -5,7 +5,7 @@ import {
   Star, MessageSquare, Calendar, FileText, Users,
   Network, LayoutDashboard, Lightbulb, TrendingUp, Shield, Stethoscope,
   Pill, MapPin, X, ChevronRight, AlertTriangle, Zap,
-  Eye, Activity, Baby, BookMarked, Globe, CheckCircle, type LucideIcon,
+  Eye, Activity, Baby, BookMarked, Globe, CheckCircle, Building2, type LucideIcon,
 } from "lucide-react";
 import { Input } from "@/components/atoms/input";
 import { Button } from "@/components/atoms/button";
@@ -13,9 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/atoms/car
 import { Badge } from "@/components/atoms/badge";
 import { useCms } from "@/contexts/CmsContext";
 import { useI18n } from "@/i18n/I18nProvider";
-import { listPublicDoctors, listPublicMedicines, type ApiPublicDoctor } from "@/lib/backend-api";
+import { getPublicMedicine, listPublicDoctors, listPublicMedicines, type ApiPublicDoctor } from "@/lib/backend-api";
 import type { TunisianMedicine } from "@/lib/tunisia-medicines";
 import { LoadingState } from "@/components/molecules/LoadingState";
+import { RatingStars } from "@/components/molecules/RatingStars";
 
 type SearchMode = "medecins" | "medicaments";
 
@@ -191,12 +192,15 @@ const HOME_ICON_MAP: Record<string, LucideIcon> = {
 
 export default function Home() {
   const { t } = useI18n();
+  const notProvided = t("common.notProvided");
   const { specialties, testimonials, partners, whyFeatures, loading: cmsLoading } = useCms();
   const [, setLocation] = useLocation();
   const [searchMode, setSearchMode] = useState<SearchMode>("medecins");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedMedicine, setSelectedMedicine] = useState<TunisianMedicine | null>(null);
+  const [medicineDetailLoading, setMedicineDetailLoading] = useState(false);
+  const [medicineDetailError, setMedicineDetailError] = useState<string | null>(null);
   const [selectedDoctor, setSelectedDoctor] = useState<ApiPublicDoctor | null>(null);
   const [doctorResults, setDoctorResults] = useState<ApiPublicDoctor[]>([]);
   const [medicineResults, setMedicineResults] = useState<TunisianMedicine[]>([]);
@@ -264,6 +268,27 @@ export default function Home() {
     };
   }, [searchMode, searchQuery]);
 
+  async function openMedicine(medicine: TunisianMedicine) {
+    setSelectedMedicine(medicine);
+    setMedicineDetailLoading(true);
+    setMedicineDetailError(null);
+    try {
+      setSelectedMedicine(await getPublicMedicine(medicine.id));
+    } catch (error) {
+      setMedicineDetailError(
+        error instanceof Error ? error.message : "Détails médicaux indisponibles",
+      );
+    } finally {
+      setMedicineDetailLoading(false);
+    }
+  }
+
+  function closeMedicine() {
+    setSelectedMedicine(null);
+    setMedicineDetailLoading(false);
+    setMedicineDetailError(null);
+  }
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = searchQuery.trim();
@@ -277,7 +302,7 @@ export default function Home() {
     }
 
     const first = medicineResults[0];
-    if (first) setSelectedMedicine(first);
+    if (first) void openMedicine(first);
   };
 
   const setHeroSuggestion = (term: string) => {
@@ -396,10 +421,10 @@ export default function Home() {
                           </span>
                           <span className="flex-1 min-w-0">
                             <span className="block font-semibold text-foreground text-sm">Dr. {doctor.firstName} {doctor.lastName}</span>
-                            <span className="block text-xs text-muted-foreground">{doctor.specialty || "Specialite non renseignee"}</span>
+                            <span className="block text-xs text-muted-foreground">{doctor.specialty || notProvided}</span>
                             <span className="mt-1 flex flex-wrap items-center gap-3 text-xs">
                               <span className="flex items-center gap-1 text-muted-foreground">
-                                <MapPin className="h-3 w-3" /> {doctor.city || "Ville non renseignee"}
+                                <MapPin className="h-3 w-3" /> {doctor.city || notProvided}
                               </span>
                               {doctor.address && (
                                 <span className="truncate text-muted-foreground">{doctor.address}</span>
@@ -438,7 +463,7 @@ export default function Home() {
                           key={medicine.id}
                           type="button"
                           onClick={() => {
-                            setSelectedMedicine(medicine);
+                            void openMedicine(medicine);
                             setShowSuggestions(false);
                           }}
                           className="flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-muted/50 transition-colors border-b last:border-0"
@@ -673,31 +698,29 @@ export default function Home() {
                   {selectedDoctor.firstName[0]}{selectedDoctor.lastName[0]}
                 </div>
                 <div>
-                  <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">{selectedDoctor.specialty || "Specialite non renseignee"}</p>
+                  <p className="text-white/60 text-xs font-semibold uppercase tracking-widest mb-1">{selectedDoctor.specialty || notProvided}</p>
                   <h2 className="text-2xl font-extrabold text-white">Dr. {selectedDoctor.firstName} {selectedDoctor.lastName}</h2>
                   <p className="mt-2 text-sm text-white/70">{formatInline([selectedDoctor.city, selectedDoctor.address])}</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 mt-4">
-                <span className="text-xs font-bold px-3 py-1 rounded-full bg-green-400/20 text-green-300 border border-green-400/30">
-                  Profil actif
+                <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                  selectedDoctor.status === "active"
+                    ? "bg-green-400/20 text-green-300 border-green-400/30"
+                    : "bg-white/10 text-white/70 border-white/20"
+                }`}>
+                  {selectedDoctor.status === "active" ? "Profil actif" : "Profil inactif"}
                 </span>
               </div>
             </div>
 
             <div className="px-7 py-6 space-y-6">
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{t("home.doctorModal.presentation")}</p>
-                <p className="text-sm text-slate-600 leading-relaxed">
-                  Profil professionnel issu de la base MedCity Connect.
-                </p>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[
                   { icon: MapPin, label: t("home.doctorModal.address"), value: selectedDoctor.address },
                   { icon: MapPin, label: "Ville", value: selectedDoctor.city },
                   { icon: FileText, label: "Specialite", value: selectedDoctor.specialty },
+                  { icon: Building2, label: "Etablissement", value: selectedDoctor.facility },
                   { icon: FileText, label: "Telephone", value: selectedDoctor.phone },
                 ].map(({ icon: Icon, label, value }) => (
                   <div key={label} className="bg-slate-50 rounded-2xl p-4">
@@ -705,9 +728,21 @@ export default function Home() {
                       <Icon className="h-4 w-4 text-primary" />
                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{label}</p>
                     </div>
-                    <p className="text-sm text-slate-700 font-medium">{value || "Non renseigne"}</p>
+                    <p className="text-sm text-slate-700 font-medium">{value || notProvided}</p>
                   </div>
                 ))}
+                {typeof selectedDoctor.rating === "number" && (
+                  <div className="bg-slate-50 rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <Star className="h-4 w-4 text-amber-500" />
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Note</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RatingStars rating={selectedDoctor.rating} />
+                      <span className="text-sm text-slate-700 font-medium">{selectedDoctor.rating.toFixed(1)} / 5</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -718,7 +753,7 @@ export default function Home() {
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-4"
           style={{ background: "rgba(10,20,40,0.65)", backdropFilter: "blur(6px)" }}
-          onClick={() => setSelectedMedicine(null)}
+          onClick={closeMedicine}
         >
           <div
             className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200"
@@ -731,12 +766,12 @@ export default function Home() {
                     <Pill className="h-5 w-5 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-extrabold text-slate-900">{medicineTitle(selectedMedicine)}</h2>
+                    <h2 className="text-xl font-extrabold text-slate-900 whitespace-normal break-words">{medicineTitle(selectedMedicine)}</h2>
                     <p className="text-xs text-slate-400">
                       {formatInline([
                         selectedMedicine.dci,
                         selectedMedicine.amm ? `AMM ${selectedMedicine.amm}` : undefined,
-                      ]) || "Donnees TN Med"}
+                      ]) || notProvided}
                     </p>
                   </div>
                 </div>
@@ -753,12 +788,22 @@ export default function Home() {
                   )}
                 </div>
               </div>
-              <button onClick={() => setSelectedMedicine(null)} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors" aria-label={t("common.close")}>
+              <button onClick={closeMedicine} className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors" aria-label={t("common.close")}>
                 <X className="h-4 w-4 text-slate-500" />
               </button>
             </div>
 
             <div className="px-7 py-6 space-y-6">
+              {medicineDetailLoading && (
+                <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  Chargement des détails complets du médicament…
+                </div>
+              )}
+              {medicineDetailError && (
+                <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  {medicineDetailError}. Les informations disponibles du catalogue restent affichées.
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[
                   { label: "AMM", value: selectedMedicine.amm },
@@ -776,7 +821,7 @@ export default function Home() {
                 ].map(({ label, value }) => (
                   <div key={label} className="rounded-2xl bg-slate-50 p-4">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{label}</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-800">{value || "Non renseigne"}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-800 whitespace-pre-wrap break-words">{value || notProvided}</p>
                   </div>
                 ))}
               </div>
@@ -794,7 +839,7 @@ export default function Home() {
                   ].map(({ label, value }) => (
                     <div key={label}>
                       <p className="text-xs font-semibold text-slate-400">{label}</p>
-                      <p className="font-medium text-slate-700">{value || "Non renseigne"}</p>
+                      <p className="font-medium text-slate-700 whitespace-pre-wrap break-words">{value || notProvided}</p>
                     </div>
                   ))}
                 </div>
@@ -802,8 +847,8 @@ export default function Home() {
 
               <div>
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">{t("home.medicineModal.indication")}</p>
-                <p className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800">
-                  {selectedMedicine.indication || "Non renseigne"}
+                <p className="rounded-2xl border border-green-100 bg-green-50 px-4 py-3 text-sm text-green-800 whitespace-pre-wrap break-words">
+                  {medicineDisplayValue(selectedMedicine.indication, notProvided)}
                 </p>
               </div>
 
@@ -811,34 +856,29 @@ export default function Home() {
                 <div className="contents">
                   <div className="rounded-2xl bg-slate-50 p-4">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">{t("home.medicineModal.adultDosage")}</p>
-                    <p className="text-sm text-slate-700">{selectedMedicine.posologyAdult || "Non renseigne"}</p>
+                    <p className="text-sm text-slate-700 whitespace-pre-wrap break-words">{medicineDisplayValue(selectedMedicine.posologyAdult, notProvided)}</p>
                   </div>
                   <div className="rounded-2xl bg-red-50 p-4">
                     <p className="text-xs font-bold text-red-400 uppercase tracking-widest mb-2">{t("home.medicineModal.contraindications")}</p>
                     {selectedMedicine.contraindications.map((contraindication) => (
-                      <p key={contraindication} className="text-sm text-red-700">• {contraindication}</p>
+                      <p key={contraindication} className="text-sm text-red-700 whitespace-pre-wrap break-words">• {contraindication}</p>
                     ))}
                     {selectedMedicine.contraindications.length === 0 && (
-                      <p className="text-sm text-red-700">Non renseigne</p>
+                      <p className="text-sm text-red-700">{notProvided}</p>
                     )}
                   </div>
                 </div>
               </div>
 
+              <MedicineDetailList title="Effets indésirables" values={selectedMedicine.adverseEffects} />
+              <MedicineDetailList title="Interactions médicamenteuses" values={selectedMedicine.interactions} />
+              <MedicineDetailList title="Mises en garde et précautions" values={selectedMedicine.warnings} />
+              <MedicineDetailList title="Populations spéciales" values={selectedMedicine.specialPopulations} />
+              <MedicineDetailList title="Surdosage" values={selectedMedicine.overdose} />
+
               <div className="flex flex-wrap gap-2">
                 {selectedMedicine.renalAdjust && <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 text-blue-700 px-3 py-1 text-xs font-semibold"><Shield className="h-3 w-3" /> {t("home.medicineModal.renalAdjust")}</span>}
                 {selectedMedicine.hepaticAdjust && <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 text-orange-700 px-3 py-1 text-xs font-semibold"><AlertTriangle className="h-3 w-3" /> {t("home.medicineModal.hepaticAdjust")}</span>}
-                {selectedMedicine.pregnancy && <span className="inline-flex items-center gap-1 rounded-full bg-muted text-muted-foreground px-3 py-1 text-xs font-semibold">{selectedMedicine.pregnancy}</span>}
-                {selectedMedicine.sourceSystems?.map((source) => (
-                  <span key={source} className="inline-flex items-center gap-1 rounded-full bg-cyan-50 text-cyan-700 px-3 py-1 text-xs font-semibold">
-                    {source}
-                  </span>
-                ))}
-                {selectedMedicine.sourceReference && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-semibold">
-                    Ref. {selectedMedicine.sourceReference}
-                  </span>
-                )}
               </div>
             </div>
           </div>
@@ -850,6 +890,34 @@ export default function Home() {
 
 function medicineTitle(medicine: TunisianMedicine) {
   return medicine.localProductName || medicine.brands[0] || medicine.dci;
+}
+
+function MedicineDetailList({ title, values }: { title: string; values?: string[] }) {
+  if (!values?.length) return null;
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-5">
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">{title}</p>
+      <div className="space-y-2 text-sm text-slate-700">
+        {values.map((value) => (
+          <p key={value} className="whitespace-pre-wrap break-words">• {value}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function medicineDisplayValue(value: string | undefined, fallback: string) {
+  const normalized = value?.trim();
+  if (!normalized) return fallback;
+
+  const technicalIndicationPlaceholder = [
+    "indication non exposée par le connecteur firebase",
+  ];
+  if (normalized.toLocaleLowerCase().includes("indication non expos") || normalized.toLocaleLowerCase().startsWith("non renseign")) {
+    return fallback;
+  }
+
+  return normalized;
 }
 
 function formatInline(values: Array<string | undefined>) {

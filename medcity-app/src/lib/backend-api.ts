@@ -39,12 +39,30 @@ type Paginated<T> = {
   };
 };
 
+export type ApiAuthUser = {
+  id: string;
+  email: string;
+  role: "admin" | "doctor";
+  isActive?: boolean;
+  doctorProfile?: {
+    firstName?: string;
+    lastName?: string;
+    phone?: string;
+    fiscalNumber?: string;
+    specialty?: string;
+    cnamCode?: string;
+  };
+};
+
 type ApiPatient = Partial<Patient> & {
   id: string;
   firstName: string;
   lastName: string;
   birthDate: string;
   gender: "male" | "female" | "other";
+  computedFlags?: string[];
+  pregnancyStatus?: Patient["pregnancyStatus"];
+  pregnancyTrimester?: Patient["pregnancyTrimester"];
   vitalsSnapshot?: Patient["vitals"];
   createdAt?: string;
   updatedAt?: string;
@@ -54,14 +72,18 @@ type ApiPatient = Partial<Patient> & {
 type ApiMedication = {
   id: string;
   medicineId?: string;
+  dci?: string;
+  medicine?: { dci?: string; localProductName?: string };
   medicineName: string;
   dosage: string;
   route?: string;
   frequency: string;
   duration?: string;
   indication?: string;
+  instructions?: string;
   confidence?: number;
   status?: Medication["status"];
+  sortOrder?: number;
 };
 
 type ApiPrescription = {
@@ -69,15 +91,44 @@ type ApiPrescription = {
   prescriptionNumber?: string;
   patientId: string;
   patient?: ApiPatient;
-  doctor?: { firstName?: string; lastName?: string; email?: string };
+  doctor?: { id?: string; firstName?: string; lastName?: string; email?: string; specialty?: string; facility?: string };
+  doctorId?: string;
+  consultationId?: string;
+  consultation?: ApiConsultation;
   diagnosis?: string;
   status?: PrescriptionCase["status"];
   risk?: RiskLevel;
   notes?: string;
   medications?: ApiMedication[];
   safetyAlerts?: SafetyAlert[];
+  pharmacyDispatches?: ApiDispatch[];
+  printSnapshot?: ApiPrintSnapshot;
+  aiTraceId?: string;
+  aiStatus?: string;
+  aiBlocked?: boolean;
+  aiReviewRequired?: boolean;
+  aiPayload?: unknown;
+  validatedAt?: string;
+  printedAt?: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+type ApiPrintSnapshot = {
+  id: string;
+  prescriptionId: string;
+  doctorFirstName: string;
+  doctorLastName: string;
+  doctorSpecialty?: string;
+  doctorCnamCode?: string;
+  doctorFiscalNumber?: string;
+  doctorPhone?: string;
+  patientFirstName: string;
+  patientLastName: string;
+  patientBirthDate?: string;
+  patientGender?: string;
+  footerNumber?: string;
+  printedAt: string;
 };
 
 type ApiMedicine = Omit<TunisianMedicine, "pregnancy" | "drugClass"> & {
@@ -112,6 +163,7 @@ type ApiConsultation = {
   startedAt?: string;
   endedAt?: string;
   createdAt: string;
+  updatedAt?: string;
 };
 
 type ApiVitals = {
@@ -147,9 +199,18 @@ type ApiDoctor = {
   phone: string;
   fiscalNumber?: string;
   specialty?: string;
+  facility?: string;
+  rating?: number;
   cnamCode?: string;
+  gsm?: string;
+  address?: string;
   city?: string;
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
   status?: "active" | "inactive";
+  patientsCount?: number;
+  prescriptionsCount?: number;
   credentialEmail?: {
     status: "sent" | "skipped" | "failed";
     id?: string;
@@ -161,6 +222,58 @@ export type ApiDoctorProfile = ApiDoctor & {
   cnamCode?: string;
   gsm?: string;
   address?: string;
+};
+
+export type AdminDashboardSummary = {
+  generatedAt: string;
+  source: string;
+  doctors: { total: number; active: number; inactive: number };
+  patients: { total: number };
+  medicines: { total: number | null; source: "Firebase" | "PostgreSQL"; available: boolean };
+  prescriptions: {
+    total: number;
+    drafts: number;
+    pendingReview: number;
+    validated: number;
+    rejected: number;
+    cancelled: number;
+    highRisk: number;
+  };
+  consultations: { total: number; scheduled: number; upcoming: number; inProgress: number; completed: number; cancelled: number };
+  contributions: { pending: number; validated: number; refused: number };
+  auditEntries: number;
+  cms: { published: number; draft: number; archived: number };
+  contactMessages: { total: number; new: number };
+  newsletter: { total: number; active: number };
+};
+
+export type DoctorDashboardSummary = {
+  generatedAt: string;
+  source: string;
+  patients: { total: number };
+  prescriptions: {
+    total: number;
+    drafts: number;
+    pendingReview: number;
+    validated: number;
+    rejected: number;
+    cancelled: number;
+    highRisk: number;
+  };
+  consultations: { total: number; scheduled: number; upcoming: number; inProgress: number; completed: number; cancelled: number };
+};
+
+export type AuditSummary = {
+  generatedAt: string;
+  source: string;
+  total: number;
+  drafts: number;
+  pendingReview: number;
+  validated: number;
+  rejected: number;
+  cancelled: number;
+  overridden: number;
+  latestAt: string | null;
 };
 
 export type NewsletterCampaignResult = {
@@ -182,6 +295,8 @@ export type ApiPublicDoctor = {
   lastName: string;
   phone: string;
   specialty?: string;
+  facility?: string;
+  rating?: number;
   city?: string;
   address?: string;
   status: "active" | "inactive";
@@ -308,6 +423,10 @@ export type KaggleAudioStatusResult = {
 
 export type KaggleAudioOutputResult = KaggleAudioStatusResult & {
   outputDir?: string;
+  status?: string;
+  staleOutput?: boolean;
+  consultationId?: string;
+  resultConsultationId?: string | null;
   resultJson?: KaggleAudioResultJson | null;
   datasetPersistence?: unknown;
 };
@@ -331,7 +450,8 @@ export type PatientPayload = Pick<
   | "comorbidities"
   | "renal"
   | "liver"
-  | "flags"
+  | "pregnancyStatus"
+  | "pregnancyTrimester"
   | "missingData"
 > & {
   vitalsSnapshot?: Patient["vitals"];
@@ -341,12 +461,20 @@ export async function loginApi(email: string, password: string) {
   return apiRequest<{
     accessToken: string;
     refreshToken: string;
-    user: { id: string; email: string; role: "admin" | "doctor" };
+    user: ApiAuthUser;
   }>("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
     auth: false,
   });
+}
+
+export async function getAdminDashboardSummary() {
+  return apiRequest<AdminDashboardSummary>("/api/dashboard/admin");
+}
+
+export async function getDoctorDashboardSummary() {
+  return apiRequest<DoctorDashboardSummary>("/api/dashboard/doctor");
 }
 
 export async function requestPasswordResetApi(email: string) {
@@ -366,14 +494,30 @@ export async function resetPasswordApi(token: string, password: string) {
 }
 
 export async function getCurrentUserApi() {
-  return apiRequest<{ id: string; email: string; role: "admin" | "doctor" }>("/api/auth/me");
+  return apiRequest<ApiAuthUser>("/api/auth/me");
 }
 
-export async function listPatients(search?: string) {
-  const params = new URLSearchParams({ limit: "100" });
-  if (search?.trim()) params.set("search", search.trim());
+export type PatientListOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  gender?: "male" | "female" | "other";
+};
+
+export async function getPatientsPage(options: PatientListOptions = {}) {
+  const params = new URLSearchParams({
+    page: String(options.page ?? 1),
+    limit: String(options.limit ?? 20),
+  });
+  if (options.search?.trim()) params.set("search", options.search.trim());
+  if (options.gender) params.set("gender", options.gender);
   const result = await apiRequest<Paginated<ApiPatient>>(`/api/patients?${params}`);
-  return result.data.map(mapPatient);
+  return { ...result, data: result.data.map(mapPatient) };
+}
+
+export async function listPatients(searchOrOptions?: string | PatientListOptions) {
+  const options = typeof searchOrOptions === "string" ? { search: searchOrOptions } : searchOrOptions;
+  return (await getPatientsPage({ limit: 100, ...options })).data;
 }
 
 export async function getPatient(id: string) {
@@ -398,12 +542,32 @@ export async function deletePatient(id: string) {
   return apiRequest<{ ok: boolean }>(`/api/patients/${id}`, { method: "DELETE" });
 }
 
-export async function listPrescriptions(options: { patientId?: string; status?: string } = {}) {
-  const params = new URLSearchParams({ limit: "100" });
+export type PrescriptionListOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  patientId?: string;
+  status?: string;
+  reviewable?: boolean;
+  risk?: RiskLevel;
+};
+
+export async function getPrescriptionsPage(options: PrescriptionListOptions = {}) {
+  const params = new URLSearchParams({
+    page: String(options.page ?? 1),
+    limit: String(options.limit ?? 20),
+  });
+  if (options.search?.trim()) params.set("search", options.search.trim());
   if (options.patientId) params.set("patientId", options.patientId);
   if (options.status) params.set("status", options.status);
+  if (options.reviewable) params.set("reviewable", "true");
+  if (options.risk) params.set("risk", options.risk);
   const result = await apiRequest<Paginated<ApiPrescription>>(`/api/prescriptions?${params}`);
-  return result.data.map(mapPrescription);
+  return { ...result, data: result.data.map(mapPrescription) };
+}
+
+export async function listPrescriptions(options: PrescriptionListOptions = {}) {
+  return (await getPrescriptionsPage({ limit: 100, ...options })).data;
 }
 
 export async function getPrescription(id: string) {
@@ -412,24 +576,30 @@ export async function getPrescription(id: string) {
 
 export async function savePrescription(input: {
   patientId: string;
+  consultationId?: string;
   diagnosis?: string;
   notes?: string;
   medications: Medication[];
+  safetyAlerts?: SafetyAlert[];
 }) {
   return mapPrescription(await apiRequest<ApiPrescription>("/api/prescriptions", {
     method: "POST",
     body: JSON.stringify({
       patientId: input.patientId,
+      consultationId: input.consultationId,
       diagnosis: input.diagnosis,
       notes: input.notes,
+      safetyAlerts: input.safetyAlerts?.map(mapSafetyAlertForApi),
       medications: input.medications.map((med, index) => ({
         medicineName: med.name,
         medicineId: med.medicineId,
+        dci: med.dci,
         dosage: med.dose,
         route: med.route,
         frequency: med.frequency,
         duration: med.duration,
         indication: med.indication,
+        instructions: med.instructions,
         confidence: med.confidence,
         status: med.status,
         sortOrder: index,
@@ -440,30 +610,69 @@ export async function savePrescription(input: {
 
 export async function updatePrescription(id: string, input: {
   patientId: string;
+  consultationId?: string;
   diagnosis?: string;
   notes?: string;
   medications: Medication[];
+  safetyAlerts?: SafetyAlert[];
 }) {
   return mapPrescription(await apiRequest<ApiPrescription>(`/api/prescriptions/${id}`, {
     method: "PATCH",
     body: JSON.stringify({
       patientId: input.patientId,
+      consultationId: input.consultationId,
       diagnosis: input.diagnosis,
       notes: input.notes,
+      safetyAlerts: input.safetyAlerts?.map(mapSafetyAlertForApi),
       medications: input.medications.map((med, index) => ({
         medicineName: med.name,
         medicineId: med.medicineId,
+        dci: med.dci,
         dosage: med.dose,
         route: med.route,
         frequency: med.frequency,
         duration: med.duration,
         indication: med.indication,
+        instructions: med.instructions,
         confidence: med.confidence,
         status: med.status,
         sortOrder: index,
       })),
     }),
   }));
+}
+
+export type PrescriptionSafetyAction = "replace" | "adjust_dose" | "monitor" | "override";
+
+export async function recordPrescriptionSafetyAction(
+  id: string,
+  input: {
+    action: PrescriptionSafetyAction;
+    alertTitle: string;
+    recommendation?: string;
+    reason?: string;
+  },
+) {
+  return apiRequest<{ ok: boolean; action: PrescriptionSafetyAction; auditId: string }>(
+    `/api/prescriptions/${id}/safety-actions`,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+function mapSafetyAlertForApi(alert: SafetyAlert) {
+  return {
+    severity: alert.severity,
+    title: alert.title,
+    drugsInvolved: alert.drugsInvolved,
+    explanation: alert.explanation,
+    recommendedAction: alert.recommendedAction,
+    alternative: alert.alternative,
+    evidence: alert.evidence,
+    evidenceUrl: alert.evidenceUrl,
+  };
 }
 
 export async function validatePrescription(id: string) {
@@ -474,23 +683,40 @@ export async function rejectPrescription(id: string) {
   return mapPrescription(await apiRequest<ApiPrescription>(`/api/prescriptions/${id}/reject`, { method: "POST" }));
 }
 
-export async function listAuditEntries() {
-  const result = await apiRequest<Paginated<{
-    id: string;
-    prescriptionId: string;
-    patientName?: string;
-    doctorName?: string;
-    modelVersion?: string;
-    recommendation?: string;
-    doctorModification?: string;
-    alertsOverridden?: number;
-    overrideReason?: string;
-    finalStatus?: AuditEntry["finalStatus"];
-    timestamp?: string;
-  }>>("/api/audit?limit=100");
-  return result.data.map((entry) => ({
+export async function cancelPrescription(id: string) {
+  return mapPrescription(await apiRequest<ApiPrescription>(`/api/prescriptions/${id}/cancel`, { method: "POST" }));
+}
+
+type AuditEntryApi = {
+  id: string;
+  prescriptionId: string;
+  prescriptionNumber?: string | null;
+  prescription?: { prescriptionNumber?: string };
+  patientName?: string;
+  doctorName?: string;
+  modelVersion?: string;
+  recommendation?: string;
+  doctorModification?: string;
+  alertsOverridden?: number;
+  overrideReason?: string;
+  finalStatus?: AuditEntry["finalStatus"];
+  timestamp?: string;
+};
+
+type AuditEntriesQuery = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: AuditEntry["finalStatus"];
+  from?: string;
+  to?: string;
+};
+
+function mapAuditEntry(entry: AuditEntryApi): AuditEntry {
+  return {
     id: entry.id,
     prescriptionId: entry.prescriptionId,
+    prescriptionNumber: entry.prescriptionNumber ?? entry.prescription?.prescriptionNumber,
     patient: entry.patientName ?? "",
     doctor: entry.doctorName ?? "",
     modelVersion: entry.modelVersion ?? "CDSS",
@@ -500,10 +726,37 @@ export async function listAuditEntries() {
     overrideReason: entry.overrideReason,
     finalStatus: entry.finalStatus ?? "draft",
     timestamp: entry.timestamp ?? "",
-  }));
+  };
+}
+
+export async function getAuditEntriesPage(options: AuditEntriesQuery = {}) {
+  const params = new URLSearchParams({
+    page: String(options.page ?? 1),
+    limit: String(options.limit ?? 20),
+  });
+  if (options.search?.trim()) params.set("search", options.search.trim());
+  if (options.status) params.set("status", options.status);
+  if (options.from) params.set("from", options.from);
+  if (options.to) params.set("to", options.to);
+
+  const result = await apiRequest<Paginated<AuditEntryApi>>(`/api/audit?${params}`);
+  return { ...result, data: result.data.map(mapAuditEntry) };
+}
+
+export async function getAuditSummary() {
+  return apiRequest<AuditSummary>("/api/audit/summary");
+}
+
+export async function listAuditEntries(options: AuditEntriesQuery = {}) {
+  const result = await getAuditEntriesPage({ limit: 100, ...options });
+  return result.data;
 }
 
 export async function listMedicines(options: string | MedicineListOptions = {}) {
+  return (await listMedicinesPage(options)).data;
+}
+
+export async function listMedicinesPage(options: string | MedicineListOptions = {}) {
   const resolved = typeof options === "string" ? { search: options } : options;
   const params = new URLSearchParams({
     page: String(resolved.page ?? 1),
@@ -512,7 +765,10 @@ export async function listMedicines(options: string | MedicineListOptions = {}) 
   if (resolved.search?.trim()) params.set("search", resolved.search.trim());
   if (resolved.drugClass?.trim()) params.set("drugClass", resolved.drugClass.trim());
   const result = await apiRequest<Paginated<ApiMedicine>>(`/api/medicines?${params}`);
-  return result.data.map(mapMedicine);
+  return {
+    data: result.data.map(mapMedicine),
+    meta: result.meta,
+  };
 }
 
 export async function getMedicine(id: string) {
@@ -530,6 +786,10 @@ export async function listPublicMedicines(search?: string, limit = 5) {
   return result.data.map(mapMedicine);
 }
 
+export async function getPublicMedicine(id: string) {
+  return mapMedicine(await apiRequest<ApiMedicine>(`/api/public/medicines/${id}`, { auth: false }));
+}
+
 export async function getOrdonnance(id: string) {
   return apiRequest<{
     prescriptionNumber: string;
@@ -538,7 +798,17 @@ export async function getOrdonnance(id: string) {
     diagnosis?: string;
     notes?: string;
     printedAt?: string;
-    doctor?: { firstName?: string; lastName?: string; specialty?: string; phone?: string };
+    doctor?: {
+      firstName?: string;
+      lastName?: string;
+      specialty?: string;
+      facility?: string;
+      address?: string;
+      city?: string;
+      phone?: string;
+      cnamCode?: string;
+      fiscalNumber?: string;
+    };
     patient?: ApiPatient;
     medications: ApiMedication[];
     footerNumber?: string;
@@ -572,9 +842,28 @@ export async function sendPrescriptionToTarget(input: {
   );
 }
 
-export async function listDispatches() {
-  const result = await apiRequest<Paginated<ApiDispatch>>("/api/pharmacy/dispatches?limit=100");
-  return result.data.map(mapDispatch);
+export type DispatchListOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: DispatchStatus;
+  target?: DispatchTarget;
+};
+
+export async function getDispatchesPage(options: DispatchListOptions = {}) {
+  const params = new URLSearchParams({
+    page: String(options.page ?? 1),
+    limit: String(options.limit ?? 20),
+  });
+  if (options.search?.trim()) params.set("search", options.search.trim());
+  if (options.status) params.set("status", options.status);
+  if (options.target) params.set("target", options.target);
+  const result = await apiRequest<Paginated<ApiDispatch>>(`/api/pharmacy/dispatches?${params}`);
+  return { ...result, data: result.data.map(mapDispatch) };
+}
+
+export async function listDispatches(options: DispatchListOptions = {}) {
+  return (await getDispatchesPage({ limit: 100, ...options })).data;
 }
 
 export async function updateDispatchStatus(id: string, status: DispatchStatus) {
@@ -585,7 +874,6 @@ export async function updateDispatchStatus(id: string, status: DispatchStatus) {
 }
 
 export async function updateDispatch(id: string, input: {
-  prescriptionId?: string;
   target?: DispatchTarget;
   recipient?: string;
   channel?: DispatchChannel;
@@ -602,12 +890,30 @@ export async function deleteDispatch(id: string) {
   return apiRequest<{ ok: boolean }>(`/api/pharmacy/dispatches/${id}`, { method: "DELETE" });
 }
 
-export async function listConsultations(options: { patientId?: string; status?: ConsultationStatus } = {}) {
-  const params = new URLSearchParams({ limit: "100" });
+export type ConsultationListOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  patientId?: string;
+  doctorId?: string;
+  status?: ConsultationStatus;
+};
+
+export async function getConsultationsPage(options: ConsultationListOptions = {}) {
+  const params = new URLSearchParams({
+    page: String(options.page ?? 1),
+    limit: String(options.limit ?? 20),
+  });
+  if (options.search?.trim()) params.set("search", options.search.trim());
   if (options.patientId) params.set("patientId", options.patientId);
+  if (options.doctorId) params.set("doctorId", options.doctorId);
   if (options.status) params.set("status", options.status);
   const result = await apiRequest<Paginated<ApiConsultation>>(`/api/consultations?${params}`);
-  return result.data.map(mapConsultation);
+  return { ...result, data: result.data.map(mapConsultation) };
+}
+
+export async function listConsultations(options: ConsultationListOptions = {}) {
+  return (await getConsultationsPage({ limit: 100, ...options })).data;
 }
 
 export async function getConsultation(id: string) {
@@ -692,18 +998,35 @@ export async function getKaggleAudioStatus() {
   return apiRequest<KaggleAudioStatusResult>("/api/kaggle/status");
 }
 
-export async function fetchKaggleAudioOutput() {
+export async function fetchKaggleAudioOutput(consultationId?: string) {
   return apiRequest<KaggleAudioOutputResult>("/api/kaggle/fetch-output", {
     method: "POST",
+    body: JSON.stringify({ consultationId }),
   });
 }
 
-export async function listMedicineContributions(options: { status?: ContributionStatus; kind?: ContributionKind } = {}) {
-  const params = new URLSearchParams({ limit: "100" });
+export type ContributionListOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: ContributionStatus;
+  kind?: ContributionKind;
+};
+
+export async function getMedicineContributionsPage(options: ContributionListOptions = {}) {
+  const params = new URLSearchParams({
+    page: String(options.page ?? 1),
+    limit: String(options.limit ?? 20),
+  });
+  if (options.search?.trim()) params.set("search", options.search.trim());
   if (options.status) params.set("status", options.status);
   if (options.kind) params.set("kind", options.kind);
   const result = await apiRequest<Paginated<ApiContribution>>(`/api/medicine-contributions?${params}`);
-  return result.data.map(mapContribution);
+  return { ...result, data: result.data.map(mapContribution) };
+}
+
+export async function listMedicineContributions(options: ContributionListOptions = {}) {
+  return (await getMedicineContributionsPage({ limit: 100, ...options })).data;
 }
 
 export async function createMedicineContribution(input: {
@@ -737,11 +1060,25 @@ export async function deleteMedicineContribution(id: string) {
   return apiRequest<{ ok: boolean }>(`/api/medicine-contributions/${id}`, { method: "DELETE" });
 }
 
-export async function listDoctors(search?: string) {
-  const params = new URLSearchParams({ limit: "100" });
-  if (search?.trim()) params.set("search", search.trim());
+export type DoctorListOptions = {
+  page?: number;
+  limit?: number;
+  search?: string;
+};
+
+export async function getDoctorsPage(options: DoctorListOptions = {}) {
+  const params = new URLSearchParams({
+    page: String(options.page ?? 1),
+    limit: String(options.limit ?? 20),
+  });
+  if (options.search?.trim()) params.set("search", options.search.trim());
   const result = await apiRequest<Paginated<ApiDoctor>>(`/api/doctors?${params}`);
-  return result.data;
+  return { ...result, data: result.data };
+}
+
+export async function listDoctors(searchOrOptions?: string | DoctorListOptions) {
+  const options = typeof searchOrOptions === "string" ? { search: searchOrOptions } : searchOrOptions;
+  return (await getDoctorsPage({ limit: 100, ...options })).data;
 }
 
 export async function listPublicDoctors(search?: string) {
@@ -758,6 +1095,9 @@ export async function createDoctor(input: {
   phone: string;
   fiscalNumber: string;
   specialty?: string;
+  facility?: string;
+  rating?: number;
+  address?: string;
   cnamCode?: string;
   city?: string;
   password: string;
@@ -775,13 +1115,23 @@ export async function updateDoctor(id: string, input: Partial<{
   phone: string;
   fiscalNumber: string;
   specialty: string;
+  facility: string;
+  rating?: number;
   cnamCode: string;
+  address?: string;
   city: string;
   password: string;
 }>) {
   return apiRequest<ApiDoctor>(`/api/doctors/${id}`, {
     method: "PATCH",
     body: JSON.stringify(input),
+  });
+}
+
+export async function updateDoctorStatus(id: string, status: "active" | "inactive") {
+  return apiRequest<ApiDoctor>(`/api/doctors/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
   });
 }
 
@@ -983,15 +1333,17 @@ type ApiDispatch = {
   status: DispatchStatus;
   note?: string;
   sentAt?: string;
+  updatedAt?: string;
 };
 
 export function mapPatient(patient: ApiPatient): Patient {
   const age = calculateAge(patient.birthDate);
+  const computedFlags = patient.computedFlags ?? [];
   return {
     id: patient.id,
     name: `${patient.firstName} ${patient.lastName}`.trim(),
     age,
-    sex: patient.gender === "male" ? "M" : "F",
+    sex: patient.gender === "male" ? "M" : patient.gender === "female" ? "F" : "O",
     firstName: patient.firstName,
     lastName: patient.lastName,
     birthDate: patient.birthDate?.slice(0, 10),
@@ -1002,15 +1354,18 @@ export function mapPatient(patient: ApiPatient): Patient {
     profession: patient.profession,
     internalCode: patient.internalCode,
     address: patient.address,
-    weightKg: Number(patient.weightKg ?? 0),
-    heightCm: Number(patient.heightCm ?? 0),
+    weightKg: patient.weightKg == null ? undefined : Number(patient.weightKg),
+    heightCm: patient.heightCm == null ? undefined : Number(patient.heightCm),
     allergies: patient.allergies ?? [],
     currentMedications: patient.currentMedications ?? [],
     comorbidities: patient.comorbidities ?? [],
-    renal: patient.renal ?? { gfr: 90, status: "normal" },
-    liver: patient.liver ?? { status: "normal" },
-    vitals: patient.vitalsSnapshot ?? { hr: 0, bp: "", temp: 0, spo2: 0 },
-    flags: patient.flags ?? [],
+    renal: patient.renal ?? { status: "unknown" },
+    liver: patient.liver ?? { status: "unknown" },
+    vitals: patient.vitalsSnapshot ?? {},
+    flags: [...new Set([...(patient.flags ?? []), ...computedFlags])],
+    computedFlags,
+    pregnancyStatus: patient.pregnancyStatus,
+    pregnancyTrimester: patient.pregnancyTrimester,
     missingData: patient.missingData,
   };
 }
@@ -1018,23 +1373,37 @@ export function mapPatient(patient: ApiPatient): Patient {
 export function mapPrescription(entry: ApiPrescription): PrescriptionCase {
   return {
     id: entry.id,
+    prescriptionNumber: entry.prescriptionNumber,
     patientId: entry.patientId,
     patient: entry.patient ? mapPatient(entry.patient) : undefined,
     diagnosis: entry.diagnosis ?? "",
     status: entry.status ?? "draft",
-    risk: entry.risk ?? inferRisk(entry.safetyAlerts),
+    risk: entry.risk ?? null,
+    riskAssessed: entry.risk !== undefined && entry.risk !== null,
     lastUpdate: formatRelative(entry.updatedAt ?? entry.createdAt),
     doctor: formatDoctor(entry.doctor),
+    doctorId: entry.doctorId,
+    consultationId: entry.consultationId,
+    aiTraceId: entry.aiTraceId,
+    aiStatus: entry.aiStatus,
+    aiBlocked: entry.aiBlocked,
+    aiReviewRequired: entry.aiReviewRequired,
+    aiPayload: entry.aiPayload,
+    validatedAt: entry.validatedAt,
+    printedAt: entry.printedAt,
     notes: entry.notes,
+    safetyAlerts: entry.safetyAlerts ?? [],
     medications: (entry.medications ?? []).map((med) => ({
       id: med.id,
       medicineId: med.medicineId,
+      dci: med.dci ?? med.medicine?.dci,
       name: med.medicineName,
       dose: med.dosage,
       route: med.route ?? "",
       frequency: med.frequency,
       duration: med.duration ?? "",
       indication: med.indication ?? "",
+      instructions: med.instructions ?? "",
       confidence: med.confidence ?? 0,
       status: med.status ?? "ai_proposed",
     })),
@@ -1051,7 +1420,17 @@ function mapMedicine(medicine: ApiMedicine): TunisianMedicine {
     referenceTariffTnd: optionalNumber(medicine.referenceTariffTnd),
     publicPriceMinTnd: optionalNumber(medicine.publicPriceMinTnd),
     publicPriceMaxTnd: optionalNumber(medicine.publicPriceMaxTnd),
+    indication: normalizeMedicineText(medicine.indication),
+    posologyAdult: normalizeMedicineText(medicine.posologyAdult),
   };
+}
+
+function normalizeMedicineText(value?: string) {
+  const normalized = value?.trim();
+  if (!normalized) return "Non renseigne";
+  const lower = normalized.toLocaleLowerCase();
+  if (lower.includes("indication non expos") || lower.startsWith("non renseign")) return "Non renseigne";
+  return normalized;
 }
 
 function mapDispatch(dispatch: ApiDispatch): PharmacyDispatch {
@@ -1066,7 +1445,7 @@ function mapDispatch(dispatch: ApiDispatch): PharmacyDispatch {
     status: dispatch.status,
     note: dispatch.note,
     sentAt: dispatch.sentAt ?? new Date().toISOString(),
-    updatedAt: dispatch.sentAt ?? new Date().toISOString(),
+    updatedAt: dispatch.updatedAt ?? dispatch.sentAt ?? new Date().toISOString(),
   };
 }
 
@@ -1092,6 +1471,7 @@ function mapConsultation(consultation: ApiConsultation): Consultation {
     startedAt: consultation.startedAt,
     endedAt: consultation.endedAt,
     createdAt: consultation.createdAt,
+    updatedAt: consultation.updatedAt,
   };
 }
 
@@ -1218,12 +1598,6 @@ function formatRelative(value?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toLocaleString();
-}
-
-function inferRisk(alerts?: SafetyAlert[]): RiskLevel {
-  if (alerts?.some((alert) => alert.severity === "critical" || alert.severity === "major")) return "high";
-  if (alerts?.some((alert) => alert.severity === "moderate")) return "medium";
-  return "low";
 }
 
 function optionalNumber(value: unknown) {

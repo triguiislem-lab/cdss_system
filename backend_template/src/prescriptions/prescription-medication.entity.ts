@@ -6,7 +6,6 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { MedicationStatus } from '../common/entities/enums';
-import { Medicine } from '../medicines/medicine.entity';
 import { Prescription } from './prescription.entity';
 
 @Entity('prescription_medications')
@@ -23,14 +22,15 @@ export class PrescriptionMedication {
   @JoinColumn({ name: 'prescription_id' })
   prescription: Prescription;
 
+  /**
+   * Catalogue identifier. It may reference Firebase Data Connect or the
+   * legacy local catalogue, so it must not be a FK to the local medicines table.
+   */
   @Column({ name: 'medicine_id', nullable: true })
   medicineId?: string;
 
-  @ManyToOne(() => Medicine, (medicine) => medicine.prescriptionMedications, {
-    nullable: true,
-  })
-  @JoinColumn({ name: 'medicine_id' })
-  medicine?: Medicine;
+  @Column({ name: 'medicine_dci', nullable: true })
+  dci?: string;
 
   @Column({ name: 'medicine_name' })
   medicineName: string;

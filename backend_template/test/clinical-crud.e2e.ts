@@ -44,6 +44,7 @@ process.env.API_PREFIX = 'api';
 process.env.DATABASE_TYPE = 'sqlite';
 process.env.SQLITE_DATABASE = dbPath;
 process.env.DATABASE_SYNC = 'true';
+process.env.MEDICINE_CATALOG_SOURCE = 'database';
 process.env.JWT_SECRET = 'clinical-crud-secret';
 process.env.JWT_REFRESH_SECRET = 'clinical-crud-refresh-secret';
 process.env.EMAIL_ENABLED = 'false';
@@ -133,6 +134,7 @@ async function main() {
     await verifyDoctorsCrud(baseUrl, adminAuth.accessToken, doctorAuth.accessToken);
     const context = await verifyMedicinesCrud(baseUrl, adminAuth.accessToken, doctorAuth.accessToken);
     await verifyPrescriptionsAndPharmacy(baseUrl, doctorAuth.accessToken, adminAuth.accessToken, context);
+    await verifyDashboardSummaries(baseUrl, adminAuth.accessToken, doctorAuth.accessToken);
     await verifyMedicineContributions(baseUrl, doctorAuth.accessToken, adminAuth.accessToken, context.medicine);
     await verifyInteractions(baseUrl, doctorAuth.accessToken);
     await verifyCdssAdapter(baseUrl, doctorAuth.accessToken, context.patient.id);
@@ -147,6 +149,38 @@ async function main() {
     await cdssServer.close();
     rmSync(dbPath, { force: true });
   }
+}
+
+async function verifyDashboardSummaries(
+  baseUrl: string,
+  adminToken: string,
+  doctorToken: string,
+) {
+  const admin = await request<{
+    doctors: { total: number; active: number };
+    patients: { total: number };
+    prescriptions: { total: number; pendingReview: number; highRisk: number };
+    medicines: { total: number | null; source: string; available: boolean };
+    generatedAt: string;
+  }>(baseUrl, '/api/dashboard/admin', { headers: authHeaders(adminToken) });
+  assert.ok(admin.generatedAt);
+  assert.ok(admin.doctors.total >= admin.doctors.active);
+  assert.ok(admin.patients.total >= 1);
+  assert.ok(admin.prescriptions.total >= 1);
+  assert.equal(admin.medicines.source, 'PostgreSQL');
+  assert.equal(admin.medicines.available, true);
+
+  const doctor = await request<{
+    patients: { total: number };
+    prescriptions: { total: number; pendingReview: number };
+    consultations: { total: number; upcoming: number };
+  }>(baseUrl, '/api/dashboard/doctor', { headers: authHeaders(doctorToken) });
+  assert.ok(doctor.patients.total >= 1);
+  assert.ok(doctor.prescriptions.total >= 1);
+  assert.ok(doctor.consultations.total >= doctor.consultations.upcoming);
+
+  await expectStatus(baseUrl, '/api/dashboard/admin', 403, doctorToken);
+  await expectStatus(baseUrl, '/api/dashboard/doctor', 403, adminToken);
 }
 
 async function seedClinicalData(dataSource: DataSource): Promise<DoctorSeed> {
@@ -293,7 +327,8 @@ async function verifyDoctorsCrud(
     { headers: authHeaders(adminToken) },
   );
   assertPaginated(afterDelete);
-  assert.ok(!afterDelete.data.some((doctor) => doctor.id === created.id));
+  const deactivated = afterDelete.data.find((doctor) => doctor.id === created.id);
+  assert.equal(deactivated?.status, DoctorStatus.Inactive);
 
   const recreated = await request<DoctorProfile>(
     baseUrl,
@@ -494,6 +529,78 @@ async function verifyPrescriptionsAndPharmacy(
   );
   assert.ok(alertList.length >= 1);
 
+  const persistedAlert = await request<Prescription>(
+    baseUrl,
+    `/api/prescriptions/${prescription.id}`,
+    {
+      method: 'PATCH',
+      headers: authHeaders(doctorToken),
+      body: JSON.stringify({
+        safetyAlerts: [
+          {
+            severity: AlertSeverity.Major,
+            title: 'Clinical test alert',
+            drugsInvolved: ['Paracetamol Clinical'],
+            explanation: 'Clinical test explanation',
+            recommendedAction: 'Review before validation',
+            alternative: 'Clinical test alternative',
+            evidence: 'Clinical test source',
+          },
+        ],
+      }),
+    },
+  );
+  assert.equal(persistedAlert.safetyAlerts?.[0]?.title, 'Clinical test alert');
+
+  const reloadedWithAlert = await request<Prescription>(
+    baseUrl,
+    `/api/prescriptions/${prescription.id}`,
+    { headers: authHeaders(doctorToken) },
+  );
+  assert.equal(reloadedWithAlert.safetyAlerts?.[0]?.evidence, 'Clinical test source');
+
+  const safetyAction = await request<{ ok: boolean; action: string; auditId: string }>(
+    baseUrl,
+    `/api/prescriptions/${prescription.id}/safety-actions`,
+    {
+      method: 'POST',
+      headers: authHeaders(doctorToken),
+      body: JSON.stringify({
+        action: 'monitor',
+        alertTitle: 'Clinical test alert',
+        recommendation: 'Review before validation',
+      }),
+    },
+    201,
+  );
+  assert.equal(safetyAction.ok, true);
+  assert.equal(safetyAction.action, 'monitor');
+  assert.ok(safetyAction.auditId);
+
+  await expectStatus(
+    baseUrl,
+    `/api/prescriptions/${prescription.id}/safety-actions`,
+    400,
+    doctorToken,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'override',
+        alertTitle: 'Clinical test alert',
+        reason: 'Too short',
+      }),
+    },
+  );
+
+  const validated = await request<Prescription>(
+    baseUrl,
+    `/api/prescriptions/${prescription.id}/validate`,
+    { method: 'POST', headers: authHeaders(doctorToken) },
+    201,
+  );
+  assert.equal(validated.status, PrescriptionStatus.Validated);
+  assert.ok(validated.validatedAt);
+
   const snapshot = await request<Prescription>(
     baseUrl,
     `/api/prescriptions/${prescription.id}/print-snapshot`,
@@ -599,15 +706,6 @@ async function verifyPrescriptionsAndPharmacy(
   );
   assert.equal(removedDispatch.ok, true);
 
-  const validated = await request<Prescription>(
-    baseUrl,
-    `/api/prescriptions/${prescription.id}/validate`,
-    { method: 'POST', headers: authHeaders(doctorToken) },
-    201,
-  );
-  assert.equal(validated.status, PrescriptionStatus.Validated);
-  assert.ok(validated.validatedAt);
-
   const auditEntries = await request<Paginated<AuditEntry>>(
     baseUrl,
     '/api/audit?limit=50',
@@ -647,9 +745,24 @@ async function verifyPrescriptionsAndPharmacy(
   );
   assert.equal(rejected.status, PrescriptionStatus.Rejected);
 
-  const deleted = await request<{ ok: boolean }>(
+  await expectStatus(
     baseUrl,
     `/api/prescriptions/${secondPrescription.id}`,
+    400,
+    doctorToken,
+    { method: 'DELETE' },
+  );
+
+  const draftToDelete = await createPrescription(
+    baseUrl,
+    doctorToken,
+    patient.id,
+    undefined,
+    1,
+  );
+  const deleted = await request<{ ok: boolean }>(
+    baseUrl,
+    `/api/prescriptions/${draftToDelete.id}`,
     { method: 'DELETE', headers: authHeaders(doctorToken) },
   );
   assert.equal(deleted.ok, true);

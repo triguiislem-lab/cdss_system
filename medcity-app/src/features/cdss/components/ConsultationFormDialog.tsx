@@ -4,6 +4,7 @@ import { getPatientFullName, type Patient } from "@/lib/mock-data";
 import { useI18n } from "@/i18n/I18nProvider";
 import { useAuth } from "@/contexts/AuthContext";
 import { createConsultation, getConsultation, listDoctors, listPatients, updateConsultation } from "@/lib/backend-api";
+import { useToast } from "@/hooks/use-toast";
 
 interface Props {
   open: boolean;
@@ -14,6 +15,7 @@ interface Props {
 export function ConsultationFormDialog({ open, onClose, editingId }: Props) {
   const { t } = useI18n();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [doctors, setDoctors] = useState<Array<{ id: string; firstName: string; lastName: string; specialty?: string }>>([]);
   const [patientId, setPatientId] = useState("");
@@ -27,26 +29,35 @@ export function ConsultationFormDialog({ open, onClose, editingId }: Props) {
   useEffect(() => {
     if (!open) return;
     void (async () => {
-      const [apiPatients, apiDoctors] = await Promise.all([
-        listPatients(),
-        user?.role === "admin" ? listDoctors() : Promise.resolve([]),
-      ]);
-      setPatients(apiPatients);
-      setDoctors(apiDoctors);
-      if (!editingId && apiPatients[0]) setPatientId(apiPatients[0].id);
-      if (!editingId && apiDoctors[0]) {
-        setDoctorId(apiDoctors[0].id);
-        setDoctor(`${apiDoctors[0].firstName} ${apiDoctors[0].lastName}`.trim());
+      try {
+        const [apiPatients, apiDoctors] = await Promise.all([
+          listPatients(),
+          user?.role === "admin" ? listDoctors() : Promise.resolve([]),
+        ]);
+        setPatients(apiPatients);
+        setDoctors(apiDoctors);
+        if (!editingId) {
+          setPatientQuery("");
+          setReason("");
+          setScheduledAt(new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16));
+          setPatientId(apiPatients[0]?.id ?? "");
+          if (user?.role === "admin") {
+            setDoctorId(apiDoctors[0]?.id ?? "");
+            setDoctor(apiDoctors[0] ? `${apiDoctors[0].firstName} ${apiDoctors[0].lastName}`.trim() : "MedCity");
+          }
+          return;
+        }
+        const existing = await getConsultation(editingId);
+        setPatientId(existing.patientId);
+        setPatientQuery(existing.patientName);
+        setReason(existing.reason);
+        setDoctor(existing.doctor);
+        setScheduledAt(new Date(existing.scheduledAt).toISOString().slice(0, 16));
+      } catch (error) {
+        toast({ title: "Consultation indisponible", description: error instanceof Error ? error.message : "Impossible de charger la consultation." });
       }
-      if (!editingId) return;
-      const existing = await getConsultation(editingId);
-      setPatientId(existing.patientId);
-      setPatientQuery(existing.patientName);
-      setReason(existing.reason);
-      setDoctor(existing.doctor);
-      setScheduledAt(new Date(existing.scheduledAt).toISOString().slice(0, 16));
     })();
-  }, [editingId, open, user?.role]);
+  }, [editingId, open, toast, user?.role]);
 
   if (!open) return null;
 
@@ -54,12 +65,16 @@ export function ConsultationFormDialog({ open, onClose, editingId }: Props) {
     event.preventDefault();
     const iso = new Date(scheduledAt).toISOString();
     void (async () => {
-      if (editingId) {
-        await updateConsultation(editingId, { patientId, doctorId: doctorId || undefined, reason, scheduledAt: iso });
-      } else {
-        await createConsultation({ patientId, doctorId: doctorId || undefined, reason, scheduledAt: iso, notes: "" });
+      try {
+        if (editingId) {
+          await updateConsultation(editingId, { patientId, doctorId: doctorId || undefined, reason, scheduledAt: iso });
+        } else {
+          await createConsultation({ patientId, doctorId: doctorId || undefined, reason, scheduledAt: iso, notes: "" });
+        }
+        onClose();
+      } catch (error) {
+        toast({ title: "Consultation non enregistrée", description: error instanceof Error ? error.message : "Impossible d'enregistrer la consultation." });
       }
-      onClose();
     })();
   };
 

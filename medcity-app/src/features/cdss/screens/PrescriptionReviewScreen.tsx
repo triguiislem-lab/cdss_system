@@ -1,16 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "wouter";
-import { AlertCircle, ArrowRight, FilePlus2, Filter, RefreshCw } from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, FilePlus2, Filter, RefreshCw, Search } from "lucide-react";
 import { getPatientAge, getPatientFullName, type Patient, type PrescriptionCase } from "@/lib/mock-data";
-import { riskMeta, statusMeta } from "@/lib/clinical-ui";
+import { notAssessedRiskMeta, riskMeta, statusMeta } from "@/lib/clinical-ui";
 import { useI18n } from "@/i18n/I18nProvider";
-import { listPatients, listPrescriptions } from "@/lib/backend-api";
+import { getPrescriptionsPage, listPatients } from "@/lib/backend-api";
+
+const PAGE_SIZE = 10;
 
 export default function PrescriptionReview({ basePath = "/admin/cdss" }: { basePath?: string }) {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
+  const filterLabels = language === "fr"
+    ? { status: "Statut", review: "À traiter", all: "Tous les statuts", draft: "Brouillons", pending: "À revoir", validated: "Validées", rejected: "Rejetées" }
+    : language === "ar"
+      ? { status: "الحالة", review: "قيد المعالجة", all: "كل الحالات", draft: "المسودات", pending: "قيد المراجعة", validated: "تم التحقق", rejected: "مرفوضة" }
+      : { status: "Status", review: "To review", all: "All statuses", draft: "Drafts", pending: "Pending review", validated: "Validated", rejected: "Rejected" };
   const [patients, setPatients] = useState<Patient[]>([]);
   const [prescriptions, setPrescriptions] = useState<PrescriptionCase[]>([]);
   const [showHighRiskOnly, setShowHighRiskOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<"review" | "all" | PrescriptionCase["status"]>("review");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalPrescriptions, setTotalPrescriptions] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,12 +32,27 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
     try {
       const [patientsResult, prescriptionsResult] = await Promise.allSettled([
         listPatients(),
-        listPrescriptions(),
+        getPrescriptionsPage({
+          page,
+          limit: PAGE_SIZE,
+          search: query,
+          status: statusFilter === "all" || statusFilter === "review" ? undefined : statusFilter,
+          reviewable: statusFilter === "review",
+          risk: showHighRiskOnly ? "high" : undefined,
+        }),
       ]);
       const nextPatients = patientsResult.status === "fulfilled" ? patientsResult.value : [];
-      const nextPrescriptions = prescriptionsResult.status === "fulfilled" ? prescriptionsResult.value : [];
+      const nextPrescriptions = prescriptionsResult.status === "fulfilled" ? prescriptionsResult.value.data : [];
       setPatients(nextPatients);
       setPrescriptions(nextPrescriptions);
+      if (prescriptionsResult.status === "fulfilled") {
+        setTotalPrescriptions(prescriptionsResult.value.meta.total);
+        setTotalPages(prescriptionsResult.value.meta.totalPages);
+        if (page > prescriptionsResult.value.meta.totalPages) setPage(prescriptionsResult.value.meta.totalPages);
+      } else {
+        setTotalPrescriptions(0);
+        setTotalPages(1);
+      }
       const errors = [
         patientsResult.status === "rejected" ? "patients" : null,
         prescriptionsResult.status === "rejected" ? "prescriptions" : null,
@@ -34,17 +61,15 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, query, showHighRiskOnly, statusFilter]);
 
   useEffect(() => {
-    void loadQueue();
+    const timer = window.setTimeout(() => void loadQueue(), 250);
+    return () => window.clearTimeout(timer);
   }, [loadQueue]);
 
-  const visiblePrescriptions = useMemo(
-    () => prescriptions.filter((entry) => (showHighRiskOnly ? entry.risk === "high" : true)),
-    [prescriptions, showHighRiskOnly],
-  );
-  const hasAnyPrescriptions = prescriptions.length > 0;
+  const visiblePrescriptions = prescriptions;
+  const hasAnyPrescriptions = totalPrescriptions > 0;
 
   return (
     <div className="p-4 lg:p-8 space-y-6">
@@ -54,6 +79,38 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
           <p className="text-sm text-muted-foreground mt-1">{t("prescriptions.reviewSubtitle")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm w-full sm:w-72">
+            <Search className="h-4 w-4 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Rechercher référence, patient, diagnostic, médicament"
+              aria-label="Rechercher dans les prescriptions"
+              className="flex-1 bg-transparent outline-none"
+            />
+          </div>
+          <label className="inline-flex items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold">
+            <span className="text-xs text-muted-foreground">{filterLabels.status}</span>
+            <select
+              value={statusFilter}
+              onChange={(event) => {
+                setStatusFilter(event.target.value as typeof statusFilter);
+                setPage(1);
+              }}
+              className="bg-transparent text-sm font-semibold outline-none"
+              aria-label="Prescription status filter"
+            >
+              <option value="review">{filterLabels.review}</option>
+              <option value="all">{filterLabels.all}</option>
+              <option value="draft">{filterLabels.draft}</option>
+              <option value="pending_review">{filterLabels.pending}</option>
+              <option value="validated">{filterLabels.validated}</option>
+              <option value="rejected">{filterLabels.rejected}</option>
+            </select>
+          </label>
           <button
             onClick={() => void loadQueue()}
             disabled={loading}
@@ -62,7 +119,10 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> {t("common.refresh")}
           </button>
           <button
-            onClick={() => setShowHighRiskOnly((value) => !value)}
+            onClick={() => {
+              setShowHighRiskOnly((value) => !value);
+              setPage(1);
+            }}
             className="inline-flex items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted transition-smooth"
           >
             <Filter className="h-4 w-4" /> {t("prescriptions.filters")}
@@ -146,11 +206,12 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
           </div>
         </div>
       ) : (
+        <>
         <div className="grid gap-4 lg:grid-cols-2">
           {visiblePrescriptions.map((entry) => {
             const patient = entry.patient ?? patients.find((item) => item.id === entry.patientId);
             const status = statusMeta[entry.status] ?? statusMeta.draft;
-            const risk = riskMeta[entry.risk] ?? riskMeta.low;
+            const risk = entry.riskAssessed && entry.risk ? riskMeta[entry.risk] : notAssessedRiskMeta;
             const diagnosisText =
               entry.diagnosis ||
               Array.from(new Set(entry.medications.map((med) => med.indication?.trim()).filter(Boolean))).join(", ") ||
@@ -197,6 +258,32 @@ export default function PrescriptionReview({ basePath = "/admin/cdss" }: { baseP
             );
           })}
         </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm">
+          <span className="text-muted-foreground">
+            {totalPrescriptions} prescription{totalPrescriptions === 1 ? "" : "s"} · Page {page} sur {totalPages}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Page précédente"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 font-semibold hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ArrowLeft className="h-4 w-4" /> Précédent
+            </button>
+            <button
+              type="button"
+              aria-label="Page suivante"
+              disabled={page >= totalPages || loading}
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-1.5 font-semibold hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Suivant <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        </>
       )}
     </div>
   );

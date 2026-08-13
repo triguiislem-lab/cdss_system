@@ -9,9 +9,22 @@ import { LoadingState } from "@/components/molecules/LoadingState";
 
 type OrdonnanceData = {
   prescriptionNumber: string;
+  status: string;
+  footerNumber?: string;
+  printedAt?: string;
   diagnosis?: string;
   notes?: string;
-  doctor?: { firstName?: string; lastName?: string };
+  doctor?: {
+    firstName?: string;
+    lastName?: string;
+    specialty?: string;
+    facility?: string;
+    address?: string;
+    city?: string;
+    phone?: string;
+    cnamCode?: string;
+    fiscalNumber?: string;
+  };
   patient?: Patient;
   medications: Medication[];
 };
@@ -36,8 +49,11 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
       setLoading(true);
       setError(null);
       try {
-        await createPrintSnapshot(params.rxId);
-        const data = await getOrdonnance(params.rxId);
+        let data = await getOrdonnance(params.rxId);
+        if (data.status === "validated" && !data.printedAt) {
+          await createPrintSnapshot(params.rxId);
+          data = await getOrdonnance(params.rxId);
+        }
         const resolvedPatientId = data.patient?.id ?? data.patientId ?? patientIdFromQuery ?? "";
         const mappedPatient = data.patient
           ? mapPatient({ ...data.patient, id: resolvedPatientId })
@@ -47,6 +63,9 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
         setPatient(mappedPatient);
         setRx({
           prescriptionNumber: data.prescriptionNumber,
+          status: data.status,
+          footerNumber: data.footerNumber,
+          printedAt: data.printedAt,
           diagnosis: data.diagnosis,
           notes: data.notes,
           doctor: data.doctor,
@@ -54,11 +73,13 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
           medications: data.medications.map((med) => ({
             id: med.id,
             name: med.medicineName,
+            dci: med.dci ?? med.medicine?.dci,
             dose: med.dosage,
             route: med.route ?? "",
             frequency: med.frequency,
             duration: med.duration ?? "",
             indication: med.indication ?? "",
+            instructions: med.instructions ?? "",
             confidence: med.confidence ?? 0,
             status: med.status ?? "validated",
           })),
@@ -100,7 +121,8 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
     );
   }
 
-  const today = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+  const printedDate = formatPrescriptionDate(rx.printedAt);
+  const isValidated = rx.status === "validated";
   const diagnosisText =
     rx.diagnosis?.trim() ||
     Array.from(new Set(rx.medications.map((medication) => medication.indication?.trim()).filter(Boolean))).join(", ");
@@ -113,13 +135,13 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
             <ArrowLeft className="h-4 w-4" /> Back to patient
           </Link>
           <div className="flex flex-wrap items-center gap-2">
-            <button onClick={() => setSendOpen("pharmacist")} className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted">
+            <button disabled={!isValidated} onClick={() => setSendOpen("pharmacist")} className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
               <Building2 className="h-4 w-4" /> Envoyer au pharmacien
             </button>
-            <button onClick={() => setSendOpen("patient")} className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted">
+            <button disabled={!isValidated} onClick={() => setSendOpen("patient")} className="inline-flex items-center gap-1.5 rounded-lg border border-input bg-card px-3 py-2 text-sm font-semibold hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50">
               <UserIcon className="h-4 w-4" /> Envoyer au patient
             </button>
-            <button onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+            <button disabled={!isValidated} onClick={() => window.print()} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
               <Printer className="h-4 w-4" /> Imprimer / PDF
             </button>
           </div>
@@ -133,12 +155,16 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
               </span>
               <div>
                 <div className="text-lg font-bold">MedCity - Ordonnance numerique</div>
-                <div className="text-xs text-muted-foreground">Digital prescription - {rx.prescriptionNumber}</div>
+                <div className="text-xs text-muted-foreground">Prescription numerique - {rx.prescriptionNumber}</div>
               </div>
             </div>
             <div className="text-right text-xs text-muted-foreground">
-              <div>Date: <span className="text-foreground font-semibold">{today}</span></div>
-              <div className="mt-0.5">Prescriber: <span className="text-foreground font-semibold">{doctorName}</span></div>
+              <div>Date d'impression : <span className="text-foreground font-semibold">{printedDate}</span></div>
+              <div className="mt-0.5">Prescripteur : <span className="text-foreground font-semibold">{doctorName}</span></div>
+              {rx.doctor?.specialty && <div className="mt-0.5">Spécialité : <span className="text-foreground font-semibold">{rx.doctor.specialty}</span></div>}
+              {rx.doctor?.facility && <div className="mt-0.5">Etablissement : <span className="text-foreground font-semibold">{rx.doctor.facility}</span></div>}
+              {rx.doctor?.phone && <div className="mt-0.5">Telephone : <span className="text-foreground font-semibold">{rx.doctor.phone}</span></div>}
+              {rx.doctor?.cnamCode && <div className="mt-0.5">CNAM : <span className="text-foreground font-semibold">{rx.doctor.cnamCode}</span></div>}
             </div>
           </header>
 
@@ -147,10 +173,13 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
               <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Patient</div>
               <div className="mt-1 font-semibold">{getPatientFullName(patient)}</div>
               <div className="text-xs text-muted-foreground">{getPatientAge(patient)} ans - {getPatientGenderLabel(patient)}</div>
-              {patient.allergies.length > 0 && <div className="mt-2 text-xs"><span className="font-semibold text-critical">Allergies:</span> {patient.allergies.join(", ")}</div>}
+              {patient.internalCode && <div className="text-xs text-muted-foreground">Code patient : {patient.internalCode}</div>}
+              <div className="text-xs text-muted-foreground">Telephone : {patient.phone1 || "Non renseigne"}</div>
+              <div className="text-xs text-muted-foreground">Adresse : {patient.address || "Non renseignee"}</div>
+              <div className="mt-2 text-xs"><span className="font-semibold text-critical">Allergies :</span> {patient.allergies.length > 0 ? patient.allergies.join(", ") : "Aucune allergie connue"}</div>
             </div>
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Diagnosis / indication</div>
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Diagnostic / indication</div>
               <div className="mt-1 font-medium">{diagnosisText || "Non renseigne"}</div>
               {rx.notes?.trim() && <div className="text-xs text-muted-foreground mt-1">{rx.notes}</div>}
             </div>
@@ -158,27 +187,41 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
 
           <section className="mt-6">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Prescription</div>
-            <ol className="space-y-3">
-              {rx.medications.map((medication, index) => (
-                <li key={medication.id} className="rounded-lg border border-border p-4">
+            {rx.medications.length === 0 ? (
+              <div className="rounded-lg border border-border p-4 text-sm text-muted-foreground">Aucun medicament renseigne.</div>
+            ) : (
+              <ol className="space-y-3">
+                {rx.medications.map((medication, index) => (
+                  <li key={medication.id} className="rounded-lg border border-border p-4 break-inside-avoid">
                   <div className="flex items-baseline justify-between gap-3">
-                    <div className="font-semibold">{index + 1}. {medication.name}</div>
+                    <div className="min-w-0 break-words font-semibold">{index + 1}. {medication.name}</div>
                   </div>
+                  {medication.dci && <div className="mt-1 text-xs text-muted-foreground"><span className="font-semibold text-foreground">DCI :</span> {medication.dci}</div>}
                   <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                     <Cell label="Dose" value={medication.dose} />
-                    <Cell label="Route" value={medication.route} />
-                    <Cell label="Frequency" value={medication.frequency} />
-                    <Cell label="Duration" value={medication.duration} />
+                    <Cell label="Voie" value={medication.route} />
+                    <Cell label="Frequence" value={medication.frequency} />
+                    <Cell label="Duree" value={medication.duration} />
                   </div>
-                </li>
-              ))}
-            </ol>
+                  {medication.indication?.trim() && (
+                    <div className="mt-2 text-xs"><span className="font-semibold">Indication :</span> {medication.indication}</div>
+                  )}
+                  {medication.instructions?.trim() && (
+                    <div className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">Instructions:</span> {medication.instructions}
+                    </div>
+                  )}
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
 
           <footer className="mt-8 border-t border-border pt-5 flex justify-end">
             <div className="text-right">
               <div className="h-12 w-44 border-b border-foreground/40" />
-              <div className="text-[11px] text-muted-foreground mt-1">Signature</div>
+              <div className="text-[11px] text-muted-foreground mt-1">Signature et cachet du prescripteur</div>
+              <div className="mt-1 text-xs font-semibold">{doctorName}</div>
             </div>
           </footer>
         </article>
@@ -198,11 +241,22 @@ export default function OrdonnancePage({ basePath = "/doctor" }: { basePath?: st
   );
 }
 
-function Cell({ label, value }: { label: string; value: string }) {
+function Cell({ label, value }: { label: string; value?: string }) {
   return (
     <div>
       <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
-      <div className="font-medium">{value}</div>
+      <div className="font-medium break-words">{value?.trim() || "Non renseigné"}</div>
     </div>
   );
+}
+
+function formatPrescriptionDate(value?: string) {
+  if (!value) return "Non renseignee";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Non renseignee";
+  return date.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
 }

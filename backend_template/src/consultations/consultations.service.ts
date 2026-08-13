@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,6 +10,7 @@ import { toPaginated } from '../common/dto/pagination.dto';
 import { ConsultationStatus, UserRole } from '../common/entities/enums';
 import { DoctorsService } from '../doctors/doctors.service';
 import { Patient } from '../patients/patient.entity';
+import { Prescription } from '../prescriptions/prescription.entity';
 import { User } from '../users/user.entity';
 import { ConsultationVitals } from './consultation-vitals.entity';
 import { Consultation } from './consultation.entity';
@@ -28,6 +30,8 @@ export class ConsultationsService {
     private readonly vitalsRepository: Repository<ConsultationVitals>,
     @InjectRepository(Patient)
     private readonly patientsRepository: Repository<Patient>,
+    @InjectRepository(Prescription)
+    private readonly prescriptionsRepository: Repository<Prescription>,
     private readonly doctorsService: DoctorsService,
   ) {}
 
@@ -61,6 +65,13 @@ export class ConsultationsService {
     if (query.status) {
       qb.andWhere('consultation.status = :status', { status: query.status });
     }
+    if (query.search?.trim()) {
+      const search = `%${query.search.trim().toLowerCase()}%`;
+      qb.andWhere(
+        '(LOWER(patient.firstName) LIKE :search OR LOWER(patient.lastName) LIKE :search OR LOWER(consultation.reason) LIKE :search OR LOWER(consultation.diagnosis) LIKE :search)',
+        { search },
+      );
+    }
 
     const [data, total] = await qb
       .orderBy('consultation.scheduledAt', 'DESC')
@@ -70,14 +81,15 @@ export class ConsultationsService {
     return toPaginated(data, total, page, limit);
   }
 
-  async getById(id: string) {
+  async getById(id: string, user?: User) {
     const consultation = await this.consultationsRepository.findOne({
       where: { id },
-      relations: { patient: true, doctor: true, vitals: true },
+      relations: { patient: true, doctor: true, vitals: true, prescriptions: true },
     });
     if (!consultation) {
       throw new NotFoundException('Consultation not found');
     }
+    await this.assertConsultationAccess(consultation, user);
     return consultation;
   }
 
@@ -117,48 +129,85 @@ export class ConsultationsService {
     );
   }
 
-  async update(id: string, dto: UpdateConsultationDto) {
-    const consultation = await this.getById(id);
+  async update(id: string, dto: UpdateConsultationDto, user: User) {
+    const consultation = await this.getById(id, user);
+
+    const nextPatientId = dto.patientId ?? consultation.patientId;
+    const nextDoctorId = dto.doctorId ?? consultation.doctorId;
+    const patient = await this.patientsRepository.findOne({
+      where: { id: nextPatientId },
+    });
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
+    await this.doctorsService.getById(nextDoctorId);
+
+    if (user.role === UserRole.Doctor) {
+      const doctor = await this.doctorsService.getByUserId(user.id);
+      if (nextDoctorId !== doctor.id) {
+        throw new BadRequestException(
+          'A doctor cannot reassign a consultation to another doctor',
+        );
+      }
+      if (patient.ownerDoctorId && patient.ownerDoctorId !== doctor.id) {
+        throw new NotFoundException('Patient not found');
+      }
+      if (!patient.ownerDoctorId) {
+        patient.ownerDoctorId = doctor.id;
+        await this.patientsRepository.save(patient);
+      }
+    }
+
     Object.assign(consultation, dto);
+    consultation.patientId = nextPatientId;
+    consultation.doctorId = nextDoctorId;
     return this.consultationsRepository.save(consultation);
   }
 
-  async remove(id: string) {
-    const consultation = await this.getById(id);
+  async remove(id: string, user: User) {
+    const consultation = await this.getById(id, user);
+    const prescriptionCount = await this.prescriptionsRepository.count({
+      where: { consultationId: id },
+    });
+    if (prescriptionCount > 0) {
+      throw new ConflictException(
+        'Cette consultation ne peut pas être supprimée car elle possède des prescriptions. Annulez-la ou archivez-la.',
+      );
+    }
     await this.consultationsRepository.remove(consultation);
     return { ok: true };
   }
 
-  async start(id: string) {
-    const consultation = await this.getById(id);
+  async start(id: string, user: User) {
+    const consultation = await this.getById(id, user);
     consultation.status = ConsultationStatus.InProgress;
     consultation.startedAt = new Date();
     return this.consultationsRepository.save(consultation);
   }
 
-  async complete(id: string) {
-    const consultation = await this.getById(id);
+  async complete(id: string, user: User) {
+    const consultation = await this.getById(id, user);
     consultation.status = ConsultationStatus.Completed;
     consultation.endedAt = new Date();
     return this.consultationsRepository.save(consultation);
   }
 
-  async cancel(id: string) {
-    const consultation = await this.getById(id);
+  async cancel(id: string, user: User) {
+    const consultation = await this.getById(id, user);
     consultation.status = ConsultationStatus.Cancelled;
     return this.consultationsRepository.save(consultation);
   }
 
-  async vitals(id: string) {
-    await this.getById(id);
+  async vitals(id: string, user: User) {
+    await this.getById(id, user);
     return this.vitalsRepository.find({
       where: { consultationId: id },
       order: { measuredAt: 'DESC' },
     });
   }
 
-  async createVitals(id: string, dto: CreateVitalsDto) {
-    const consultation = await this.getById(id);
+  async createVitals(id: string, dto: CreateVitalsDto, user: User) {
+    const consultation = await this.getById(id, user);
     return this.vitalsRepository.save(
       this.vitalsRepository.create({
         ...dto,
@@ -167,5 +216,16 @@ export class ConsultationsService {
         measuredAt: dto.measuredAt ? new Date(dto.measuredAt) : new Date(),
       }),
     );
+  }
+
+  private async assertConsultationAccess(
+    consultation: Consultation,
+    user?: User,
+  ) {
+    if (!user || user.role !== UserRole.Doctor) return;
+    const doctor = await this.doctorsService.getByUserId(user.id);
+    if (consultation.doctorId !== doctor.id) {
+      throw new NotFoundException('Consultation not found');
+    }
   }
 }

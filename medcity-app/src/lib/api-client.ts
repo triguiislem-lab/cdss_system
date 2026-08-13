@@ -115,7 +115,14 @@ export function useGetSearchStats(
 }
 
 export function useSearchArticles(
-  params: { query: string; page?: number; limit?: number; sortBy?: SearchArticlesSortBy },
+  params: {
+    query: string;
+    page?: number;
+    limit?: number;
+    sortBy?: SearchArticlesSortBy;
+    dateFrom?: string;
+    dateTo?: string;
+  },
   options?: OrvalLikeHookOptions<SearchArticlesResponse>,
 ) {
   const query = params.query.trim();
@@ -129,9 +136,11 @@ export function useSearchArticles(
     limit: String(limit),
     sortBy,
   });
+  if (params.dateFrom) qs.set("dateFrom", params.dateFrom);
+  if (params.dateTo) qs.set("dateTo", params.dateTo);
 
   return useQuery({
-    queryKey: ["articles-search", query, page, limit, sortBy] as const,
+    queryKey: ["articles-search", query, page, limit, sortBy, params.dateFrom, params.dateTo] as const,
     queryFn: () => fetchJson<SearchArticlesResponse>(`/api/articles/search?${qs.toString()}`),
     ...applyOrvalQueryOptions(options),
   });
@@ -148,4 +157,3 @@ export function useGetArticle(
     ...applyOrvalQueryOptions(options),
   });
 }
-
