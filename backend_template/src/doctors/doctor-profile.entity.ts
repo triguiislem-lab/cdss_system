@@ -45,6 +45,12 @@ export class DoctorProfile {
   @Column({ nullable: true })
   specialty?: string;
 
+  @Column({ nullable: true })
+  facility?: string;
+
+  @Column({ type: 'real', nullable: true })
+  rating?: number;
+
   @Column({ name: 'cnam_code', nullable: true })
   cnamCode?: string;
 

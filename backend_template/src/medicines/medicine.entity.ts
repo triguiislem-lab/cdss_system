@@ -11,7 +11,6 @@ import {
   ReimbursementRate,
 } from '../common/entities/enums';
 import { MedicineContribution } from '../medicine-contributions/medicine-contribution.entity';
-import { PrescriptionMedication } from '../prescriptions/prescription-medication.entity';
 
 @Entity('medicines')
 export class Medicine {
@@ -141,9 +140,6 @@ export class Medicine {
 
   @OneToMany(() => MedicineContribution, (contribution) => contribution.targetMedicine)
   contributions: MedicineContribution[];
-
-  @OneToMany(() => PrescriptionMedication, (medication) => medication.medicine)
-  prescriptionMedications: PrescriptionMedication[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

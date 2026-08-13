@@ -17,6 +17,11 @@ export class AuditController {
     return this.auditService.findAll(query);
   }
 
+  @Get('summary')
+  summary() {
+    return this.auditService.summary();
+  }
+
   @Get('prescriptions/:prescriptionId')
   prescriptionEntries(@Param('prescriptionId') prescriptionId: string) {
     return this.auditService.prescriptionEntries(prescriptionId);

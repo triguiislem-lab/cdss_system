@@ -67,6 +67,21 @@ test("doctor session survives direct protected-route reload", async ({ page }) =
   await expect(page.locator("body")).not.toContainText(/Patient not found/i);
 });
 
+test("ordonnance print output contains persisted prescription fields", async ({ page }) => {
+  await mockMedcityApi(page);
+  await login(page, "dr.ahmed@medcity.tn", "Medcity123");
+  await expect(page).toHaveURL(/\/doctor$/);
+  await page.goto("/doctor/prescription/rx-2087/ordonnance?patientId=patient-1042");
+  await expect(page.getByText("30 mai 2026")).toBeVisible();
+  await expect(page.getByText("Amoxicilline + acide clavulanique")).toBeVisible();
+  await expect(page.getByText("CAP")).toBeVisible();
+  await expect(page.getByText("875/125 mg")).toBeVisible();
+
+  await page.emulateMedia({ media: "print" });
+  const pdf = await page.pdf();
+  expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
+});
+
 test("admin workspace routes are wired", async ({ page }) => {
   const apiErrors: string[] = [];
   page.on("response", (response) => {

@@ -21,3 +21,9 @@ export class StartAudioProcessingDto {
   @IsString()
   bucketPath: string;
 }
+
+export class FetchKaggleOutputDto {
+  @IsOptional()
+  @IsString()
+  consultationId?: string;
+}

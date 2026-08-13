@@ -32,6 +32,7 @@ venv/
 # Local data and generated runtime artifacts
 data/
 **/.test-data/
+backend_template/runtime/
 **/data/audit/
 **/data/feedback/
 **/*.sqlite

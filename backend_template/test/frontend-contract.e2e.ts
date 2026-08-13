@@ -44,6 +44,7 @@ process.env.API_PREFIX = 'api';
 process.env.DATABASE_TYPE = 'sqlite';
 process.env.SQLITE_DATABASE = dbPath;
 process.env.DATABASE_SYNC = 'true';
+process.env.MEDICINE_CATALOG_SOURCE = 'database';
 process.env.JWT_SECRET = 'frontend-contract-secret';
 process.env.JWT_REFRESH_SECRET = 'frontend-contract-refresh-secret';
 process.env.CDSS_API_BASE_URL = 'http://127.0.0.1:9';
@@ -434,13 +435,34 @@ async function verifyAdminContract(baseUrl: string, accessToken: string) {
   });
   assert.equal(posts[0]?.slug, 'cdss-public-contract-article');
 
-  const audits = await request<Paginated<AuditEntry>>(
+  const audits = await request<Paginated<AuditEntry & { prescriptionNumber?: string }>>(
     baseUrl,
     '/api/audit?limit=100',
     { headers: authHeaders(accessToken) },
   );
   assertPaginated(audits);
   assert.equal(audits.data[0]?.patientName, 'Eleanor Whitfield');
+  assert.match(audits.data[0]?.prescriptionNumber ?? '', /^RX-/);
+
+  const auditSummary = await request<{
+    source: string;
+    total: number;
+    pendingReview: number;
+    validated: number;
+    overridden: number;
+    latestAt: string | null;
+  }>(baseUrl, '/api/audit/summary', { headers: authHeaders(accessToken) });
+  assert.match(auditSummary.source, /audit_entries/);
+  assert.ok(auditSummary.total >= audits.data.length);
+  assert.ok(auditSummary.pendingReview >= 1);
+  assert.equal(typeof auditSummary.overridden, 'number');
+
+  const searchedAudits = await request<Paginated<AuditEntry>>(
+    baseUrl,
+    '/api/audit?search=Eleanor&limit=20',
+    { headers: authHeaders(accessToken) },
+  );
+  assert.ok(searchedAudits.data.length >= 1);
 }
 
 async function login(baseUrl: string, email: string, password: string) {

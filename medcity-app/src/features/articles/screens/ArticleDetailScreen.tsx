@@ -26,6 +26,8 @@ export default function ArticleDetail() {
   const id = params?.id ?? "";
   const [cmsArticle, setCmsArticle] = useState<ApiCmsPost | null>(null);
   const [cmsChecked, setCmsChecked] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState<"citation" | "share" | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,6 +91,26 @@ export default function ArticleDetail() {
         </Button>
       </div>
     );
+  }
+
+  const resolvedArticle = article;
+  const citation = `${resolvedArticle.authors?.join(", ") || "Unknown authors"}. ${resolvedArticle.title}. ${resolvedArticle.journal}. ${resolvedArticle.pubDate}. PMID: ${resolvedArticle.id}`;
+  async function copyText(value: string, kind: "citation" | "share") {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(kind);
+      window.setTimeout(() => setCopied(null), 1600);
+    } catch {
+      setCopied(null);
+    }
+  }
+
+  async function shareArticle() {
+    if (navigator.share) {
+      await navigator.share({ title: resolvedArticle.title, url: window.location.href }).catch(() => undefined);
+      return;
+    }
+    await copyText(window.location.href, "share");
   }
 
   const pubMeta = [
@@ -181,14 +203,14 @@ export default function ArticleDetail() {
                 </Button>
               )}
               <div className="ml-auto flex gap-2">
-                <Button variant="secondary" size="sm" className="h-9">
-                  <BookmarkPlus className="w-4 h-4 mr-2" /> {t("article.save")}
+                <Button variant="secondary" size="sm" className="h-9" onClick={() => setSaved((current) => !current)}>
+                  <BookmarkPlus className="w-4 h-4 mr-2" /> {saved ? "Enregistré" : t("article.save")}
                 </Button>
-                <Button variant="secondary" size="sm" className="h-9">
-                  <Quote className="w-4 h-4 mr-2" /> {t("article.cite")}
+                <Button variant="secondary" size="sm" className="h-9" onClick={() => void copyText(citation, "citation")}>
+                  <Quote className="w-4 h-4 mr-2" /> {copied === "citation" ? "Copié" : t("article.cite")}
                 </Button>
-                <Button variant="secondary" size="sm" className="h-9">
-                  <Share2 className="w-4 h-4 mr-2" /> {t("article.share")}
+                <Button variant="secondary" size="sm" className="h-9" onClick={() => void shareArticle()}>
+                  <Share2 className="w-4 h-4 mr-2" /> {copied === "share" ? "Copié" : t("article.share")}
                 </Button>
               </div>
             </div>

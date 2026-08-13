@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { OmitType, PartialType } from '@nestjs/mapped-types';
 import { IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import {
@@ -26,7 +26,7 @@ export class CreatePharmacyDispatchDto {
 }
 
 export class UpdatePharmacyDispatchDto extends PartialType(
-  CreatePharmacyDispatchDto,
+  OmitType(CreatePharmacyDispatchDto, ['prescriptionId'] as const),
 ) {
   @IsOptional()
   @IsEnum(DispatchStatus)

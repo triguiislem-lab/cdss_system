@@ -19,20 +19,45 @@ export default function SearchResults() {
   const query = searchParams.get("query") || "";
   const pageParam = parseInt(searchParams.get("page") || "1", 10);
   const sortParam = searchParams.get("sortBy") as SearchArticlesSortBy || "relevance";
+  const dateRangeParam = searchParams.get("dateRange") || "any";
 
   const [page, setPage] = useState(pageParam);
   const [sortBy, setSortBy] = useState<SearchArticlesSortBy>(sortParam);
+  const [dateRange, setDateRange] = useState(dateRangeParam);
+  const [customFrom, setCustomFrom] = useState(searchParams.get("dateFrom") || "");
+  const [customTo, setCustomTo] = useState(searchParams.get("dateTo") || "");
+
+  const dateFilters = (() => {
+    const today = new Date();
+    if (dateRange === "lastYear") {
+      const from = new Date(today);
+      from.setFullYear(today.getFullYear() - 1);
+      return { dateFrom: from.toISOString().slice(0, 10), dateTo: today.toISOString().slice(0, 10) };
+    }
+    if (dateRange === "lastFiveYears") {
+      const from = new Date(today);
+      from.setFullYear(today.getFullYear() - 5);
+      return { dateFrom: from.toISOString().slice(0, 10), dateTo: today.toISOString().slice(0, 10) };
+    }
+    if (dateRange === "custom") return { dateFrom: customFrom, dateTo: customTo };
+    return { dateFrom: "", dateTo: "" };
+  })();
 
   // Keep URL in sync with state changes
   useEffect(() => {
     const newParams = new URLSearchParams(window.location.search);
     newParams.set("page", page.toString());
     newParams.set("sortBy", sortBy);
+    newParams.set("dateRange", dateRange);
+    if (dateFilters.dateFrom) newParams.set("dateFrom", dateFilters.dateFrom);
+    else newParams.delete("dateFrom");
+    if (dateFilters.dateTo) newParams.set("dateTo", dateFilters.dateTo);
+    else newParams.delete("dateTo");
     window.history.replaceState(null, "", `?${newParams.toString()}`);
-  }, [page, sortBy]);
+  }, [page, sortBy, dateRange, dateFilters.dateFrom, dateFilters.dateTo]);
 
   const { data: results, isLoading: isLoadingResults, isError } = useSearchArticles(
-    { query, page, limit: 10, sortBy },
+    { query, page, limit: 10, sortBy, ...dateFilters },
     { query: { enabled: !!query, keepPreviousData: true } }
   );
 
@@ -80,22 +105,28 @@ export default function SearchResults() {
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("search.dateRange")}</label>
                 <div className="grid gap-2 text-sm">
-                  <button className="flex items-center justify-between text-left py-1 hover:text-primary transition-colors">
+                  <button type="button" onClick={() => { setDateRange("any"); setPage(1); }} className={`flex items-center justify-between text-left py-1 hover:text-primary transition-colors ${dateRange !== "any" ? "text-muted-foreground" : ""}`}>
                     <span>{t("search.anyTime")}</span>
-                    <div className="w-4 h-4 rounded-full border-4 border-primary bg-background"></div>
+                    <div className={`w-4 h-4 rounded-full ${dateRange === "any" ? "border-4 border-primary" : "border border-input"} bg-background`}></div>
                   </button>
-                  <button className="flex items-center justify-between text-left py-1 text-muted-foreground hover:text-foreground transition-colors">
+                  <button type="button" onClick={() => { setDateRange("lastYear"); setPage(1); }} className={`flex items-center justify-between text-left py-1 hover:text-foreground transition-colors ${dateRange !== "lastYear" ? "text-muted-foreground" : ""}`}>
                     <span>{t("search.lastYear")}</span>
-                    <div className="w-4 h-4 rounded-full border border-input"></div>
+                    <div className={`w-4 h-4 rounded-full ${dateRange === "lastYear" ? "border-4 border-primary" : "border border-input"}`}></div>
                   </button>
-                  <button className="flex items-center justify-between text-left py-1 text-muted-foreground hover:text-foreground transition-colors">
+                  <button type="button" onClick={() => { setDateRange("lastFiveYears"); setPage(1); }} className={`flex items-center justify-between text-left py-1 hover:text-foreground transition-colors ${dateRange !== "lastFiveYears" ? "text-muted-foreground" : ""}`}>
                     <span>{t("search.lastFiveYears")}</span>
-                    <div className="w-4 h-4 rounded-full border border-input"></div>
+                    <div className={`w-4 h-4 rounded-full ${dateRange === "lastFiveYears" ? "border-4 border-primary" : "border border-input"}`}></div>
                   </button>
-                  <button className="flex items-center justify-between text-left py-1 text-muted-foreground hover:text-foreground transition-colors">
+                  <button type="button" onClick={() => { setDateRange("custom"); setPage(1); }} className={`flex items-center justify-between text-left py-1 hover:text-foreground transition-colors ${dateRange !== "custom" ? "text-muted-foreground" : ""}`}>
                     <span>{t("search.customRange")}</span>
-                    <div className="w-4 h-4 rounded-full border border-input"></div>
+                    <div className={`w-4 h-4 rounded-full ${dateRange === "custom" ? "border-4 border-primary" : "border border-input"}`}></div>
                   </button>
+                  {dateRange === "custom" && (
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <input type="date" value={customFrom} onChange={(event) => { setCustomFrom(event.target.value); setPage(1); }} className="rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Date de début" />
+                      <input type="date" value={customTo} onChange={(event) => { setCustomTo(event.target.value); setPage(1); }} className="rounded-md border border-input bg-background px-2 py-1 text-xs" aria-label="Date de fin" />
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>

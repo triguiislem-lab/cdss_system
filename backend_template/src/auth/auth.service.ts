@@ -8,6 +8,7 @@ import { EmailService } from '../email/email.service';
 import { User } from '../users/user.entity';
 import { UsersService } from '../users/users.service';
 import { LoginDto, RequestPasswordResetDto, ResetPasswordDto } from './dto/auth.dto';
+import { toSafeAuthUser } from './safe-user';
 
 @Injectable()
 export class AuthService {
@@ -100,8 +101,7 @@ export class AuthService {
       }),
     ]);
 
-    const { passwordHash: _passwordHash, ...safeUser } = user;
-    return { accessToken, refreshToken, user: safeUser };
+    return { accessToken, refreshToken, user: toSafeAuthUser(user) };
   }
 
   private hashResetToken(token: string) {

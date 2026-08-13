@@ -41,6 +41,7 @@ export function PrescriptionMedicationRow({
       <MedicationField label="Frequency" value={med.frequency} onChange={(value) => onChange({ frequency: value })} placeholder="Ex. 3x/day" />
       <MedicationField label="Duration" value={med.duration} onChange={(value) => onChange({ duration: value })} placeholder="Ex. 7 days" />
       <MedicationField label="Indication" value={med.indication} onChange={(value) => onChange({ indication: value })} placeholder="Ex. Infection" className="col-span-2 sm:col-span-1" />
+      <MedicationField label="Instructions" value={med.instructions ?? ""} onChange={(value) => onChange({ instructions: value })} placeholder="Ex. Avec un grand verre d'eau" className="col-span-2 sm:col-span-3" />
     </>
   );
 

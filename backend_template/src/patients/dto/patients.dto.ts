@@ -3,14 +3,58 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
+  IsIn,
   IsNumber,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { PaginationQueryDto } from '../../common/dto/pagination.dto';
 import { Gender } from '../../common/entities/enums';
+
+export class PatientMedicationDto {
+  @IsString()
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  dci?: string;
+
+  @IsOptional()
+  @IsString()
+  dose?: string;
+
+  @IsOptional()
+  @IsString()
+  route?: string;
+
+  @IsOptional()
+  @IsString()
+  frequency?: string;
+
+  @IsOptional()
+  @IsString()
+  duration?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startedAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endsAt?: string;
+
+  @IsOptional()
+  @IsUUID()
+  prescriptionId?: string;
+
+  @IsOptional()
+  @IsString()
+  medicineId?: string;
+}
 
 export class CreatePatientDto {
   @IsString()
@@ -62,7 +106,9 @@ export class CreatePatientDto {
 
   @IsOptional()
   @IsArray()
-  currentMedications?: Array<{ name: string; dose?: string }>;
+  @ValidateNested({ each: true })
+  @Type(() => PatientMedicationDto)
+  currentMedications?: PatientMedicationDto[];
 
   @IsOptional()
   @IsArray()
@@ -92,6 +138,14 @@ export class CreatePatientDto {
   @IsOptional()
   @IsArray()
   missingData?: string[];
+
+  @IsOptional()
+  @IsIn(['not_pregnant', 'pregnant', 'unknown'])
+  pregnancyStatus?: 'not_pregnant' | 'pregnant' | 'unknown';
+
+  @IsOptional()
+  @IsIn([1, 2, 3])
+  pregnancyTrimester?: 1 | 2 | 3;
 
   @IsOptional()
   @IsUUID()

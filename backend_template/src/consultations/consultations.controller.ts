@@ -32,8 +32,8 @@ export class ConsultationsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.consultationsService.getById(id);
+  findOne(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.consultationsService.getById(id, user);
   }
 
   @Post()
@@ -42,37 +42,45 @@ export class ConsultationsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateConsultationDto) {
-    return this.consultationsService.update(id, dto);
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateConsultationDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.consultationsService.update(id, dto, user);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.consultationsService.remove(id);
+  remove(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.consultationsService.remove(id, user);
   }
 
   @Patch(':id/start')
-  start(@Param('id') id: string) {
-    return this.consultationsService.start(id);
+  start(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.consultationsService.start(id, user);
   }
 
   @Patch(':id/complete')
-  complete(@Param('id') id: string) {
-    return this.consultationsService.complete(id);
+  complete(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.consultationsService.complete(id, user);
   }
 
   @Patch(':id/cancel')
-  cancel(@Param('id') id: string) {
-    return this.consultationsService.cancel(id);
+  cancel(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.consultationsService.cancel(id, user);
   }
 
   @Get(':id/vitals')
-  vitals(@Param('id') id: string) {
-    return this.consultationsService.vitals(id);
+  vitals(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.consultationsService.vitals(id, user);
   }
 
   @Post(':id/vitals')
-  createVitals(@Param('id') id: string, @Body() dto: CreateVitalsDto) {
-    return this.consultationsService.createVitals(id, dto);
+  createVitals(
+    @Param('id') id: string,
+    @Body() dto: CreateVitalsDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.consultationsService.createVitals(id, dto, user);
   }
 }

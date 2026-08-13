@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { toPaginated } from '../common/dto/pagination.dto';
+import { PrescriptionStatus } from '../common/entities/enums';
 import { AuditEntry } from './audit-entry.entity';
 import { AuditQueryDto } from './dto/audit.dto';
 
@@ -29,7 +30,13 @@ export class AuditService {
     }
     if (query.search) {
       qb.andWhere(
-        'LOWER(audit.patientName) LIKE :search OR LOWER(audit.doctorName) LIKE :search',
+        `LOWER(COALESCE(audit.patientName, '')) LIKE :search
+         OR LOWER(COALESCE(audit.doctorName, '')) LIKE :search
+         OR LOWER(COALESCE(prescription.prescriptionNumber, '')) LIKE :search
+         OR LOWER(COALESCE(audit.modelVersion, '')) LIKE :search
+         OR LOWER(COALESCE(audit.recommendation, '')) LIKE :search
+         OR LOWER(COALESCE(audit.doctorModification, '')) LIKE :search
+         OR LOWER(COALESCE(audit.finalStatus, '')) LIKE :search`,
         { search: `%${query.search.toLowerCase()}%` },
       );
     }
@@ -43,12 +50,47 @@ export class AuditService {
         patientId: query.patientId,
       });
     }
-    const [data, total] = await qb
+    const [entries, total] = await qb
       .orderBy('audit.timestamp', 'DESC')
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
+    const data = entries.map((entry) => ({
+      ...entry,
+      prescriptionNumber: entry.prescription?.prescriptionNumber ?? null,
+    }));
     return toPaginated(data, total, page, limit);
+  }
+
+  async summary() {
+    const [total, drafts, pendingReview, validated, rejected, cancelled, overridden, latest] = await Promise.all([
+      this.auditRepository.count(),
+      this.auditRepository.count({ where: { finalStatus: PrescriptionStatus.Draft } }),
+      this.auditRepository.count({ where: { finalStatus: PrescriptionStatus.PendingReview } }),
+      this.auditRepository.count({ where: { finalStatus: PrescriptionStatus.Validated } }),
+      this.auditRepository.count({ where: { finalStatus: PrescriptionStatus.Rejected } }),
+      this.auditRepository.count({ where: { finalStatus: PrescriptionStatus.Cancelled } }),
+      this.auditRepository
+        .createQueryBuilder('audit')
+        .where('audit.alertsOverridden > 0')
+        .getCount(),
+      this.auditRepository
+        .find({ order: { timestamp: 'DESC' }, take: 1 })
+        .then((entries) => entries[0]),
+    ]);
+
+    return {
+      generatedAt: new Date().toISOString(),
+      source: 'PostgreSQL audit_entries via NestJS',
+      total,
+      drafts,
+      pendingReview,
+      validated,
+      rejected,
+      cancelled,
+      overridden,
+      latestAt: latest?.timestamp?.toISOString() ?? null,
+    };
   }
 
   async getById(id: string) {

@@ -1,4 +1,5 @@
 ﻿import type { ReactNode } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { useI18n } from "@/i18n/I18nProvider";
@@ -124,6 +125,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
+  const [globalSearch, setGlobalSearch] = useState("");
   const initials =
     user?.nom
       .split(" ")
@@ -135,6 +137,12 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   function handleLogout() {
     logout();
     setLocation("/login");
+  }
+
+  function submitGlobalSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = globalSearch.trim();
+    if (query) setLocation(`/search?query=${encodeURIComponent(query)}`);
   }
 
   return (
@@ -187,16 +195,18 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             </span>
             MedCity Connect
           </div>
-          <div className="hidden md:flex flex-1 max-w-xl items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm text-muted-foreground">
+          <form onSubmit={submitGlobalSearch} className="hidden md:flex flex-1 max-w-xl items-center gap-2 rounded-lg border border-input bg-card px-3 py-2 text-sm text-muted-foreground">
             <Search className="h-4 w-4" />
             <input
+              value={globalSearch}
+              onChange={(event) => setGlobalSearch(event.target.value)}
               placeholder={t("layout.searchPlaceholder")}
               className="flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
             />
             <kbd className="hidden md:inline-flex rounded border border-border px-1.5 py-0.5 text-[10px] font-mono">
               /
             </kbd>
-          </div>
+          </form>
           <div className="ml-auto" />
         </header>
 

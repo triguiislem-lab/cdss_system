@@ -233,7 +233,7 @@ async function seedPatients(
       renal: { gfr: 42, status: 'moderate' },
       liver: { status: 'normal' },
       vitalsSnapshot: { hr: 78, bp: '138/82', temp: 36.8, spo2: 96 },
-      flags: ['Elderly', 'Polypharmacy', 'Renal impairment'],
+      flags: [],
     },
     {
       internalCode: 'P-1043',
@@ -271,7 +271,9 @@ async function seedPatients(
       renal: { gfr: 102, status: 'normal' },
       liver: { status: 'normal' },
       vitalsSnapshot: { hr: 84, bp: '118/74', temp: 37.1, spo2: 99 },
-      flags: ['Pregnancy T2'],
+      flags: [],
+      pregnancyStatus: 'pregnant',
+      pregnancyTrimester: 2,
       missingData: ['Recent TSH'],
     },
   ];

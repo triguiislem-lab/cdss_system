@@ -2,8 +2,11 @@ import { PartialType } from '@nestjs/mapped-types';
 import {
   IsEmail,
   IsEnum,
+  IsNumber,
   IsOptional,
   IsString,
+  Max,
+  Min,
   MinLength,
 } from 'class-validator';
 import { DoctorStatus } from '../../common/entities/enums';
@@ -27,6 +30,16 @@ export class CreateDoctorDto {
   @IsOptional()
   @IsString()
   specialty?: string;
+
+  @IsOptional()
+  @IsString()
+  facility?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(5)
+  rating?: number;
 
   @IsOptional()
   @IsString()

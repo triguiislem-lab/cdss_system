@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,8 +15,11 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import { Repository } from 'typeorm';
 import { Consultation } from '../consultations/consultation.entity';
+import { UserRole } from '../common/entities/enums';
+import { User } from '../users/user.entity';
 import {
   CreateAudioUploadTargetDto,
+  FetchKaggleOutputDto,
   StartAudioProcessingDto,
 } from './dto/audio-processing.dto';
 
@@ -132,8 +137,8 @@ export class AudioProcessingService {
     private readonly consultations: Repository<Consultation>,
   ) {}
 
-  async createUploadTarget(dto: CreateAudioUploadTargetDto) {
-    const consultationId = await this.resolveConsultationId(dto.consultationId);
+  async createUploadTarget(dto: CreateAudioUploadTargetDto, user: User) {
+    const consultationId = await this.resolveConsultationId(dto.consultationId, user);
     const filename = dto.filename || 'audio.webm';
     const contentType = dto.contentType || 'audio/webm';
 
@@ -154,8 +159,8 @@ export class AudioProcessingService {
     };
   }
 
-  async uploadAudio(input: AudioUploadInput) {
-    const consultationId = await this.resolveConsultationId(input.consultationId);
+  async uploadAudio(input: AudioUploadInput, user?: User) {
+    const consultationId = await this.resolveConsultationId(input.consultationId, user);
     const filename = input.filename || 'audio.webm';
     const contentType = this.firstHeader(input.contentType) || 'audio/webm';
 
@@ -190,8 +195,9 @@ export class AudioProcessingService {
     }
   }
 
-  async startProcessing(dto: StartAudioProcessingDto) {
+  async startProcessing(dto: StartAudioProcessingDto, user: User) {
     const consultationId = this.safeConsultationId(dto.consultationId);
+    await this.assertConsultationAccess(consultationId, user);
     const bucketPath = String(dto.bucketPath || '').trim();
 
     if (!bucketPath) {
@@ -248,8 +254,13 @@ export class AudioProcessingService {
       };
     } catch (error) {
       await this.markConsultation(consultationId, {
-        audioProcessingStatus: 'kaggle_error',
+        audioProcessingStatus: this.isKaggleGpuQuotaError(error)
+          ? 'kaggle_unavailable'
+          : 'kaggle_error',
       });
+      if (this.isKaggleGpuQuotaError(error)) {
+        throw new ServiceUnavailableException(this.kaggleGpuQuotaMessage());
+      }
       throw this.toHttpError(error);
     }
   }
@@ -267,7 +278,18 @@ export class AudioProcessingService {
     }
   }
 
-  async fetchKaggleKernelOutput() {
+  async fetchKaggleKernelOutput(dto: FetchKaggleOutputDto = {}, user?: User) {
+    const requestedConsultationId = dto.consultationId
+      ? this.requireDatabaseConsultationId(dto.consultationId)
+      : undefined;
+    if (user?.role === UserRole.Doctor && !requestedConsultationId) {
+      throw new BadRequestException(
+        'A consultationId is required when fetching audio output as a doctor',
+      );
+    }
+    if (requestedConsultationId) {
+      await this.assertConsultationAccess(requestedConsultationId, user);
+    }
     try {
       const outputDir = path.join(this.runtimeRoot, 'outputs');
       await this.ensureCleanDir(outputDir);
@@ -286,6 +308,26 @@ export class AudioProcessingService {
           path.join(outputDir, 'result.json'),
           null,
         )) ?? null;
+
+      const resultConsultationId = this.nullableString(
+        resultJson?.consultation_id,
+      );
+      if (
+        requestedConsultationId &&
+        resultConsultationId !== requestedConsultationId
+      ) {
+        return {
+          ok: true,
+          ...cli,
+          outputDir,
+          status: 'stale_output',
+          staleOutput: true,
+          consultationId: requestedConsultationId,
+          resultConsultationId,
+          resultJson: null,
+          datasetPersistence: null,
+        };
+      }
 
       let datasetPersistence: unknown = null;
       if (
@@ -306,11 +348,15 @@ export class AudioProcessingService {
         }
       }
 
-      if (resultJson?.consultation_id) {
+      const databaseConsultationId = requestedConsultationId ||
+        (resultConsultationId && this.isUuid(resultConsultationId)
+          ? resultConsultationId
+          : undefined);
+      if (resultJson && databaseConsultationId) {
         const transcript = String(
           resultJson.final_transcript || resultJson.transcript || '',
         );
-        await this.markConsultation(resultJson.consultation_id, {
+        await this.markConsultation(databaseConsultationId, {
           transcript,
           audioProcessingStatus: resultJson.status
             ? 'completed'
@@ -325,16 +371,19 @@ export class AudioProcessingService {
         outputDir,
         resultJson,
         datasetPersistence,
+        consultationId: requestedConsultationId || resultConsultationId,
       };
     } catch (error) {
       throw this.toHttpError(error);
     }
   }
 
-  private async resolveConsultationId(value?: string) {
+  private async resolveConsultationId(value: string | undefined, user?: User) {
     const requestedId = String(value || '').trim();
     if (requestedId && requestedId !== 'AUTO') {
-      return this.safeConsultationId(requestedId);
+      const consultationId = this.safeConsultationId(requestedId);
+      await this.assertConsultationAccess(consultationId, user);
+      return consultationId;
     }
     return this.allocateNextConsultationId();
   }
@@ -1069,7 +1118,7 @@ export class AudioProcessingService {
       language: 'python',
       kernel_type: kernelType,
       is_private: true,
-      enable_gpu: this.isTruthyEnv(this.config.get<string>('KAGGLE_ENABLE_GPU')),
+      enable_gpu: true,
       enable_internet: this.isTruthyEnv(
         this.config.get<string>('KAGGLE_ENABLE_INTERNET'),
       ),
@@ -1381,6 +1430,7 @@ export class AudioProcessingService {
     consultationId: string,
     patch: ConsultationAudioPatch,
   ) {
+    if (!this.isUuid(consultationId)) return;
     const consultation = await this.consultations.findOne({
       where: { id: consultationId },
     });
@@ -1388,6 +1438,33 @@ export class AudioProcessingService {
 
     Object.assign(consultation, patch);
     await this.consultations.save(consultation);
+  }
+
+  private requireDatabaseConsultationId(value: string) {
+    const id = String(value || '').trim();
+    if (!this.isUuid(id)) {
+      throw new BadRequestException(
+        'consultationId must be a valid PostgreSQL UUID for database-backed audio processing',
+      );
+    }
+    return id;
+  }
+
+  private async assertConsultationAccess(id: string, user?: User) {
+    if (!this.isUuid(id) || !user || user.role !== UserRole.Doctor) return;
+    const consultation = await this.consultations.findOne({
+      where: { id },
+      relations: { doctor: true },
+    });
+    if (!consultation || consultation.doctor?.userId !== user.id) {
+      throw new NotFoundException('Consultation not found');
+    }
+  }
+
+  private isUuid(value: string) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      String(value || '').trim(),
+    );
   }
 
   private async ensureCleanDir(dir: string) {
@@ -1436,6 +1513,16 @@ export class AudioProcessingService {
     return String(value || '').toLowerCase() === 'true';
   }
 
+  private isKaggleGpuQuotaError(error: unknown) {
+    return /(?:gpu.*quota|quota.*gpu|maximum weekly gpu quota)/i.test(
+      this.errorMessage(error),
+    );
+  }
+
+  private kaggleGpuQuotaMessage() {
+    return 'Infrastructure Kaggle indisponible : le quota GPU hebdomadaire de 30 heures est épuisé. Ce notebook nécessite un GPU. Veuillez attendre la réinitialisation du quota avant de relancer le traitement.';
+  }
+
   private csvEnv(value?: string) {
     return String(value || '')
       .split(',')
@@ -1467,6 +1554,7 @@ export class AudioProcessingService {
   private toHttpError(error: unknown) {
     if (error instanceof BadRequestException) return error;
     if (error instanceof InternalServerErrorException) return error;
+    if (error instanceof ServiceUnavailableException) return error;
     return new InternalServerErrorException(this.errorMessage(error));
   }
 

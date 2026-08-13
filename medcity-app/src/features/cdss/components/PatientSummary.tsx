@@ -4,7 +4,18 @@ import { AlertTriangle, Droplets, Pill, ShieldCheck, User } from "lucide-react";
 import { useI18n } from "@/i18n/I18nProvider";
 
 export function PatientSummary({ patient }: { patient: Patient }) {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
+  const labels = language === "fr"
+    ? { currentTreatment: "Traitement en cours", until: "jusqu'au", gfr: "DFG", renalStatus: "Statut rénal", weight: "Poids", height: "Taille", heartRate: "Fréquence cardiaque", bloodPressure: "Tension artérielle", temperature: "Température", oxygenSaturation: "Saturation O₂", note: "Note" }
+    : language === "ar"
+      ? { currentTreatment: "العلاج الحالي", until: "حتى", gfr: "معدل الترشيح الكبيبي", renalStatus: "حالة الكلى", weight: "الوزن", height: "الطول", heartRate: "معدل ضربات القلب", bloodPressure: "ضغط الدم", temperature: "درجة الحرارة", oxygenSaturation: "تشبع الأكسجين", note: "ملاحظة" }
+      : { currentTreatment: "Current treatment", until: "until", gfr: "eGFR", renalStatus: "Renal status", weight: "Weight", height: "Height", heartRate: "Heart rate", bloodPressure: "Blood pressure", temperature: "Temperature", oxygenSaturation: "Oxygen saturation", note: "Note" };
+  const formatValue = (value: string | number | undefined, suffix = "") => {
+    if (value === undefined || value === null || value === "" || value === 0) return t("common.notProvided");
+    return `${value}${suffix}`;
+  };
+  const renalStatus = formatClinicalStatusSafe(patient.renal.status, language);
+  const liverStatus = formatClinicalStatusSafe(patient.liver.status, language);
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-card overflow-hidden">
@@ -77,9 +88,16 @@ export function PatientSummary({ patient }: { patient: Patient }) {
             {patient.currentMedications.length === 0 ? (
               <li className="text-xs text-muted-foreground">{t("patientSummary.noMedication")}</li>
             ) : patient.currentMedications.map((medication) => (
-              <li key={`${medication.name}-${medication.dose ?? ""}`} className="flex justify-between gap-3 text-xs">
-                <span className="font-medium">{medication.name}</span>
-                <span className="text-muted-foreground text-right">{medication.dose}</span>
+              <li key={`${medication.medicineId ?? medication.name}-${medication.prescriptionId ?? ""}`} className="flex justify-between gap-3 text-xs">
+                <span className="min-w-0 font-medium">
+                  <span className="block break-words">{medication.name}</span>
+                  <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">
+                    {medication.dci && <span className="block">DCI : {medication.dci}</span>}
+                    {[medication.route, medication.frequency, medication.duration].filter(Boolean).join(" \u00b7 ") || labels.currentTreatment}
+                    {medication.endsAt && ` \u00b7 ${labels.until} ${formatMedicationDate(medication.endsAt)}`}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right text-muted-foreground">{medication.dose || "—"}</span>
               </li>
             ))}
           </ul>
@@ -93,12 +111,87 @@ export function PatientSummary({ patient }: { patient: Patient }) {
           </ul>
         </Section>
 
+        <Section title={t("patientSummary.renalLiver")} icon={ShieldCheck}>
+          <dl className="grid grid-cols-2 gap-y-2 text-xs">
+            <dt className="text-muted-foreground">{labels.gfr}</dt>
+            <dd className="font-medium">{formatValue(patient.renal.gfr, " mL/min/1.73 m\u00b2")}</dd>
+            <dt className="text-muted-foreground">{labels.renalStatus}</dt>
+            <dd className="font-medium">{renalStatus}</dd>
+            <dt className="text-muted-foreground">{t("patientSummary.liver")}</dt>
+            <dd className="font-medium">{liverStatus}</dd>
+            {patient.liver.note && (
+              <>
+                <dt className="text-muted-foreground">{labels.note}</dt>
+                <dd className="font-medium">{patient.liver.note}</dd>
+              </>
+            )}
+          </dl>
+        </Section>
+
         <Section title={t("patientSummary.vitals")} icon={Droplets}>
-          <p className="text-xs text-muted-foreground">{t("patientSummary.vitalsNote")}</p>
+          <dl className="grid grid-cols-2 gap-y-2 text-xs">
+            <dt className="text-muted-foreground">{labels.weight}</dt>
+            <dd className="font-medium">{formatValue(patient.weightKg, " kg")}</dd>
+            <dt className="text-muted-foreground">{labels.height}</dt>
+            <dd className="font-medium">{formatValue(patient.heightCm, " cm")}</dd>
+            <dt className="text-muted-foreground">{labels.heartRate}</dt>
+            <dd className="font-medium">{formatValue(patient.vitals.hr, " bpm")}</dd>
+            <dt className="text-muted-foreground">{labels.bloodPressure}</dt>
+            <dd className="font-medium">{formatValue(patient.vitals.bp)}</dd>
+            <dt className="text-muted-foreground">{labels.temperature}</dt>
+            <dd className="font-medium">{formatValue(patient.vitals.temp, " \u00b0C")}</dd>
+            <dt className="text-muted-foreground">{labels.oxygenSaturation}</dt>
+            <dd className="font-medium">{formatValue(patient.vitals.spo2, " %")}</dd>
+          </dl>
         </Section>
       </div>
     </div>
   );
+}
+
+function formatMedicationDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("fr-FR");
+}
+
+function formatClinicalStatus(value: Exclude<Patient["renal"]["status"] | Patient["liver"]["status"], "unknown">, language: "fr" | "en" | "ar") {
+  if (language === "fr") {
+    return {
+      normal: "Normal",
+      mild: "Légère",
+      moderate: "Modérée",
+      severe: "Sévère",
+      impaired: "Altérée",
+    }[value];
+  }
+  if (language === "ar") {
+    return {
+      normal: "طبيعي",
+      mild: "خفيفة",
+      moderate: "متوسطة",
+      severe: "شديدة",
+      impaired: "متأثرة",
+    }[value];
+  }
+  return {
+    normal: "Normal",
+    mild: "Mild",
+    moderate: "Moderate",
+    severe: "Severe",
+    impaired: "Impaired",
+  }[value];
+}
+
+function formatClinicalStatusSafe(
+  value: Patient["renal"]["status"] | Patient["liver"]["status"],
+  language: "fr" | "en" | "ar",
+) {
+  const labels: Record<string, Record<string, string>> = {
+    fr: { normal: "Normal", mild: "Légère", moderate: "Modérée", severe: "Sévère", impaired: "Altérée", unknown: "Non renseigné" },
+    en: { normal: "Normal", mild: "Mild", moderate: "Moderate", severe: "Severe", impaired: "Impaired", unknown: "Not provided" },
+    ar: { normal: "طبيعي", mild: "خفيفة", moderate: "متوسطة", severe: "شديدة", impaired: "متأثرة", unknown: "غير معلوم" },
+  };
+  return labels[language][value] ?? labels[language].unknown;
 }
 
 function Section({

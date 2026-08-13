@@ -20,8 +20,8 @@ test("logs in as a doctor and loads backend dashboard data", async ({ page }) =>
   await page.locator('button[type="submit"]').click();
 
   await expect(page).toHaveURL(/\/doctor$/);
-  await expect(page.getByRole("heading", { name: "Clinical dashboard" })).toBeVisible();
-  await expect(page.getByText("Pending prescriptions")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Tableau de bord clinique" })).toBeVisible();
+  await expect(page.getByText("Prescriptions à revoir").first()).toBeVisible();
   await expect(page.getByText("Eleanor Whitfield")).toBeVisible();
   await expect(page.getByText("Community-acquired pneumonia")).toBeVisible();
 });
@@ -78,6 +78,6 @@ test("logs in as an admin and loads administration KPIs", async ({ page }) => {
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByText("MedCity Admin", { exact: true }).first()).toBeVisible();
   await expect(page.getByText(/Administration plateforme|Platform administration/i)).toBeVisible();
-  await expect(page.getByText("pending_review")).toBeVisible();
+  await expect(page.getByText("À revoir")).toBeVisible();
   await expect(page.getByText(/Eleanor Whitfield.*Review high-risk interaction/)).toBeVisible();
 });

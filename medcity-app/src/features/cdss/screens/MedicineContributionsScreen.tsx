@@ -1,13 +1,13 @@
 ﻿import { Link } from "wouter";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus, CheckCircle2, XCircle, Clock, FileEdit, FilePlus2, StickyNote, Pill, User, Calendar, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Plus, CheckCircle2, XCircle, Clock, FileEdit, FilePlus2, StickyNote, Pill, User, Calendar, AlertTriangle, ShieldCheck, ChevronLeft, ChevronRight } from "lucide-react";
 import type { DrugClass, TunisianMedicine } from "@/lib/tunisia-medicines";
 import { type ContributionKind, type ContributionStatus, type MedicineContribution, editableFields } from "@/lib/stores/medicine-contributions-store";
 import { useAuth } from "@/contexts/AuthContext";
 import { LoadingState } from "@/components/molecules/LoadingState";
 import { CdssModal, DetailRow as Row, FormField as Field, FormLabel as Label, SearchablePicker } from "@/features/cdss/components/DialogPrimitives";
-import { createMedicineContribution, listMedicineClasses, listMedicineContributions, listMedicines, refuseMedicineContribution, validateMedicineContribution } from "@/lib/backend-api";
+import { createMedicineContribution, getMedicineContributionsPage, listMedicineClasses, listMedicines, refuseMedicineContribution, validateMedicineContribution } from "@/lib/backend-api";
 
 
 const kindMeta: Record<ContributionKind, { label: string; icon: React.ComponentType<{ className?: string }>; cls: string }> = {
@@ -31,6 +31,9 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [submissionMessage, setSubmissionMessage] = useState<string | null>(null);
   const [reviewMessage, setReviewMessage] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [counts, setCounts] = useState({ pending: 0, validated: 0, refused: 0, all: 0 });
 
   const [tab, setTab] = useState<ContributionStatus | "all">("pending");
   const [openCreate, setOpenCreate] = useState(false);
@@ -41,7 +44,21 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
     setLoading(true);
     setError(null);
     try {
-      setItems(await listMedicineContributions());
+      const [current, pending, validated, refused, all] = await Promise.all([
+        getMedicineContributionsPage({ page, limit: 20, status: tab === "all" ? undefined : tab }),
+        getMedicineContributionsPage({ page: 1, limit: 1, status: "pending" }),
+        getMedicineContributionsPage({ page: 1, limit: 1, status: "validated" }),
+        getMedicineContributionsPage({ page: 1, limit: 1, status: "refused" }),
+        getMedicineContributionsPage({ page: 1, limit: 1 }),
+      ]);
+      setItems(current.data);
+      setTotalPages(current.meta.totalPages);
+      setCounts({
+        pending: pending.meta.total,
+        validated: validated.meta.total,
+        refused: refused.meta.total,
+        all: all.meta.total,
+      });
     } catch (loadError) {
       setItems([]);
       setError(loadError instanceof Error ? loadError.message : "Impossible de charger les contributions.");
@@ -52,19 +69,7 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
 
   useEffect(() => {
     void refresh();
-  }, []);
-
-  const filtered = useMemo(
-    () => (tab === "all" ? items : items.filter((i) => i.status === tab)),
-    [items, tab],
-  );
-
-  const counts = useMemo(() => ({
-    pending: items.filter((i) => i.status === "pending").length,
-    validated: items.filter((i) => i.status === "validated").length,
-    refused: items.filter((i) => i.status === "refused").length,
-    all: items.length,
-  }), [items]);
+  }, [page, tab]);
 
   const handleValidate = (c: MedicineContribution) => {
     if (!isAdmin) {
@@ -72,9 +77,13 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
       return;
     }
     void (async () => {
-      await validateMedicineContribution(c.id);
-      setReviewMessage("Contribution validée. La mise à jour du catalogue est appliquée ou sera disponible dès la prochaine synchronisation.");
-      await refresh();
+      try {
+        await validateMedicineContribution(c.id);
+        setReviewMessage("Contribution validée et enregistrée dans l'historique de revue. Le catalogue Firebase reste géré par son ingestion approuvée.");
+        await refresh();
+      } catch (validationError) {
+        setError(validationError instanceof Error ? validationError.message : "Cette contribution ne peut pas être validée dans le catalogue Firebase.");
+      }
     })();
   };
 
@@ -86,7 +95,7 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
           <p className="text-sm text-muted-foreground mt-1">
             {isAdmin
               ? "Revoyez les corrections et nouveaux médicaments proposés par les médecins avant application au catalogue."
-              : "Proposez de nouveaux médicaments, corrigez ou complétez les fiches existantes. L'administration vérifiera la contribution avant application."}
+              : "Proposez une correction ou une précision. L'administration vérifiera la contribution avant enregistrement dans l'historique Firebase."}
           </p>
         </div>
         {!isAdmin && (
@@ -120,7 +129,10 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
         {(["pending", "validated", "refused", "all"] as const).map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => {
+              setTab(t);
+              setPage(1);
+            }}
             className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-smooth ${
               tab === t ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
             }`}
@@ -144,11 +156,11 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
           <div className="p-4">
             <LoadingState title="Chargement des contributions" subtitle="Lecture des propositions et statuts de validation..." />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : items.length === 0 ? (
           <div className="p-12 text-center text-sm text-muted-foreground">Aucune contribution dans cette catégorie.</div>
         ) : (
           <ul className="divide-y divide-border">
-            {filtered.map((c) => {
+            {items.map((c) => {
               const Kind = kindMeta[c.kind];
               const Stat = statusMeta[c.status];
               return (
@@ -235,11 +247,25 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
         )}
       </div>
 
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-sm">
+          <span className="text-muted-foreground">Page {page} / {totalPages}</span>
+          <div className="flex gap-2">
+            <button disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} className="inline-flex items-center gap-1 rounded-lg border border-input px-3 py-2 font-semibold disabled:opacity-40">
+              <ChevronLeft className="h-4 w-4" /> Précédent
+            </button>
+            <button disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))} className="inline-flex items-center gap-1 rounded-lg border border-input px-3 py-2 font-semibold disabled:opacity-40">
+              Suivant <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-lg border border-info/30 bg-info-soft p-3 text-xs text-info">
         <AlertTriangle className="inline h-3.5 w-3.5 mr-1" />
         {isAdmin
           ? "Règle de gouvernance : l'administration valide ou refuse les contributions. Le refus doit toujours être motivé."
-          : "Votre contribution est reçue par l'administration. Si elle est validée, la mise à jour sera appliquée au catalogue dès que possible."}
+          : "Votre contribution est reçue par l'administration. Les corrections du catalogue sont appliquées uniquement par l'ingestion Firebase approuvée."}
         Voir aussi <Link href={`${basePath}/medicines`} className="font-semibold underline">base medicaments Tunisie</Link>.
       </div>
 
@@ -250,7 +276,7 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
             void refresh();
           }}
           onCreated={() => {
-            setSubmissionMessage("Contribution reçue. La mise à jour sera vérifiée par l'administration et appliquée dès que possible.");
+            setSubmissionMessage("Contribution reçue. Elle sera vérifiée par l'administration et conservée dans l'historique de revue.");
             setOpenCreate(false);
             void refresh();
           }}
@@ -263,11 +289,15 @@ function ContributionsPage({ basePath = "/doctor" }: { basePath?: string }) {
           onSubmit={(reason) => {
             if (!user) return;
             void (async () => {
-              await refuseMedicineContribution(refuseTarget.id, reason);
-              setReviewMessage("Contribution refusée. Le motif est conservé dans l'historique de revue.");
-              await refresh();
+              try {
+                await refuseMedicineContribution(refuseTarget.id, reason);
+                setReviewMessage("Contribution refusée. Le motif est conservé dans l'historique de revue.");
+                await refresh();
+                setRefuseTarget(null);
+              } catch (error) {
+                setReviewMessage(error instanceof Error ? error.message : "Impossible de refuser la contribution.");
+              }
             })();
-            setRefuseTarget(null);
           }}
         />
       )}

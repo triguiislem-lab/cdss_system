@@ -1,13 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, Repository, SelectQueryBuilder } from 'typeorm';
 import { ConsultationVitals } from '../consultations/consultation-vitals.entity';
 import { Consultation } from '../consultations/consultation.entity';
 import { toPaginated } from '../common/dto/pagination.dto';
-import { UserRole } from '../common/entities/enums';
+import { Gender, UserRole } from '../common/entities/enums';
 import { DoctorsService } from '../doctors/doctors.service';
+import { PharmacyDispatch } from '../pharmacy/pharmacy-dispatch.entity';
 import { Prescription } from '../prescriptions/prescription.entity';
 import { User } from '../users/user.entity';
+import { buildPatientFlags } from './patient-flags';
+import { pruneExpiredPatientMedications } from './patient-medications';
 import {
   CreatePatientDto,
   PatientQueryDto,
@@ -26,6 +33,8 @@ export class PatientsService {
     private readonly prescriptionsRepository: Repository<Prescription>,
     @InjectRepository(ConsultationVitals)
     private readonly vitalsRepository: Repository<ConsultationVitals>,
+    @InjectRepository(PharmacyDispatch)
+    private readonly dispatchesRepository: Repository<PharmacyDispatch>,
     private readonly doctorsService: DoctorsService,
   ) {}
 
@@ -62,10 +71,21 @@ export class PatientsService {
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
-    return toPaginated(data, total, page, limit);
+    const presented = await Promise.all(
+      data.map((patient) => this.presentPatient(patient)),
+    );
+    return toPaginated(presented, total, page, limit);
   }
 
   async getById(id: string, user?: User) {
+    const patient = await this.findPatientEntity(id, user);
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
+    return this.presentPatient(patient);
+  }
+
+  private async findPatientEntity(id: string, user?: User) {
     const doctorId = await this.resolveDoctorId(user);
     const qb = this.patientsRepository
       .createQueryBuilder('patient')
@@ -77,25 +97,25 @@ export class PatientsService {
       this.scopePatientsToDoctor(qb, doctorId);
     }
 
-    const patient = await qb.getOne();
-    if (!patient) {
-      throw new NotFoundException('Patient not found');
-    }
-    return patient;
+    return qb.getOne();
   }
 
   async create(dto: CreatePatientDto, user: User) {
     const ownerDoctorId = await this.resolveOwnerDoctorId(dto, user);
-    return this.patientsRepository.save(
-      this.patientsRepository.create({
-        ...dto,
-        ownerDoctorId,
-      }),
-    );
+    const patient = this.patientsRepository.create({
+      ...dto,
+      ownerDoctorId,
+    });
+    this.normalizePregnancyData(patient);
+    const savedPatient = await this.patientsRepository.save(patient);
+    return this.presentPatient(savedPatient);
   }
 
   async update(id: string, dto: UpdatePatientDto, user: User) {
-    const patient = await this.getById(id, user);
+    const patient = await this.findPatientEntity(id, user);
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
     const { ownerDoctorId, ...data } = dto;
     Object.assign(patient, data);
     if (user.role === UserRole.Admin && ownerDoctorId !== undefined) {
@@ -104,11 +124,25 @@ export class PatientsService {
       }
       patient.ownerDoctorId = ownerDoctorId;
     }
-    return this.patientsRepository.save(patient);
+    this.normalizePregnancyData(patient);
+    const savedPatient = await this.patientsRepository.save(patient);
+    return this.presentPatient(savedPatient);
   }
 
   async remove(id: string, user: User) {
-    const patient = await this.getById(id, user);
+    const patient = await this.findPatientEntity(id, user);
+    if (!patient) {
+      throw new NotFoundException('Patient not found');
+    }
+    const [prescriptionCount, dispatchCount] = await Promise.all([
+      this.prescriptionsRepository.count({ where: { patientId: id } }),
+      this.dispatchesRepository.count({ where: { patientId: id } }),
+    ]);
+    if (prescriptionCount || dispatchCount) {
+      throw new ConflictException(
+        'Ce patient ne peut pas être supprimé car son dossier contient des prescriptions ou des transmissions. Utilisez l’archivage.',
+      );
+    }
     await this.patientsRepository.remove(patient);
     return { ok: true };
   }
@@ -149,10 +183,35 @@ export class PatientsService {
   }
 
   private async resolveDoctorId(user?: User) {
-    if (!user || user.role !== UserRole.Doctor) {
+    if (!user || user.role === UserRole.Admin) {
       return undefined;
     }
     return (await this.doctorsService.getByUserId(user.id)).id;
+  }
+
+  private async presentPatient(patient: Patient) {
+    const { medications, changed } = pruneExpiredPatientMedications(
+      patient.currentMedications,
+    );
+    if (changed) {
+      patient.currentMedications = medications;
+      await this.patientsRepository.save(patient);
+    }
+    return {
+      ...patient,
+      ...buildPatientFlags(patient),
+    };
+  }
+
+  private normalizePregnancyData(patient: Patient) {
+    if (patient.gender !== Gender.Female) {
+      patient.pregnancyStatus = null;
+      patient.pregnancyTrimester = null;
+      return;
+    }
+    if (patient.pregnancyStatus !== 'pregnant') {
+      patient.pregnancyTrimester = null;
+    }
   }
 
   private async resolveOwnerDoctorId(dto: CreatePatientDto, user: User) {

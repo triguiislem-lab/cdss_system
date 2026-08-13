@@ -11,12 +11,12 @@ import {
   type SafetyAlert,
 } from "@/lib/mock-data";
 import { PatientSummary } from "@/features/cdss/components/PatientSummary";
-import { SafetyPanel } from "@/features/cdss/components/SafetyPanel";
+import { SafetyPanel, type SafetyPanelAction, type SafetyPanelDecision } from "@/features/cdss/components/SafetyPanel";
 import { useToast } from "@/hooks/use-toast";
 import { PrescriptionMedicationRow } from "@/features/cdss/components/PrescriptionMedicationRow";
 import { useI18n } from "@/i18n/I18nProvider";
 import { mapCdssMedications, mapCdssSafetyAlerts, requestCdssDraft } from "@/lib/cdss-api";
-import { getMedicine, getPrescription, listMedicines, listPatients, rejectPrescription, savePrescription, updatePrescription, validatePrescription } from "@/lib/backend-api";
+import { getMedicine, getPrescription, listMedicines, listPatients, recordPrescriptionSafetyAction, rejectPrescription, savePrescription, updatePrescription, validatePrescription } from "@/lib/backend-api";
 import type { TunisianMedicine } from "@/lib/tunisia-medicines";
 
 type PhysicalMeasurementsDraft = {
@@ -28,6 +28,48 @@ type PhysicalMeasurementsDraft = {
   respiratoryRate: string;
   painScore: string;
 };
+
+type EditableSafetyDecision = SafetyPanelDecision & {
+  alertTitle: string;
+  recommendation?: string;
+};
+
+type ParsedMedicationInstruction = {
+  name?: string;
+  dose?: string;
+  route?: string;
+  frequency?: string;
+  duration?: string;
+};
+
+function parseMedicationInstruction(value: string): ParsedMedicationInstruction {
+  const text = value.trim();
+  if (!text) return {};
+  const doseMatch = text.match(/\b\d+(?:[.,]\d+)?(?:\s*\/\s*\d+(?:[.,]\d+)?)?\s*(?:mg|g|mcg|µg|ml|mL|%|UI)\b/i);
+  const routeMatch = text.match(/\b(PO|per os|oral|IV|IM|SC|sous[- ]?cutan(?:ée|e)|topique|inhal[ée]e?)\b/i);
+  const frequencyMatch = text.match(/\b(BID|TID|QID|QD|OD|daily|twice daily|once daily|une fois par jour|deux fois par jour|trois fois par jour)\b/i);
+  const durationMatch = text.match(/\b\d+\s*(?:jours?|j|days?|semaines?|weeks?|mois|months?)\b/i);
+  const name = text
+    .slice(0, doseMatch?.index ?? text.length)
+    .replace(/[,:;\-]+\s*$/, "")
+    .trim();
+  const route = routeMatch?.[1].toUpperCase().replace("PER OS", "PO");
+  return {
+    name: name || undefined,
+    dose: doseMatch?.[0]?.replace(/\s+/g, " "),
+    route,
+    frequency: frequencyMatch?.[1],
+    duration: durationMatch?.[0],
+  };
+}
+
+function normalizeMedicationText(value: string) {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9à-ÿ]+/gi, " ").trim();
+}
+
+function normalizeCatalogStatus(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
+}
 
 function emptyPhysicalMeasurements(): PhysicalMeasurementsDraft {
   return {
@@ -44,11 +86,11 @@ function emptyPhysicalMeasurements(): PhysicalMeasurementsDraft {
 function physicalMeasurementsFromPatient(patient?: Patient | null): PhysicalMeasurementsDraft {
   if (!patient) return emptyPhysicalMeasurements();
   return {
-    weightKg: patient.weightKg > 0 ? String(patient.weightKg) : "",
+    weightKg: patient.weightKg && patient.weightKg > 0 ? String(patient.weightKg) : "",
     bloodPressure: patient.vitals.bp?.trim() || "",
-    temperatureC: patient.vitals.temp > 0 ? String(patient.vitals.temp) : "",
-    heartRate: patient.vitals.hr > 0 ? String(patient.vitals.hr) : "",
-    spo2: patient.vitals.spo2 > 0 ? String(patient.vitals.spo2) : "",
+    temperatureC: patient.vitals.temp && patient.vitals.temp > 0 ? String(patient.vitals.temp) : "",
+    heartRate: patient.vitals.hr && patient.vitals.hr > 0 ? String(patient.vitals.hr) : "",
+    spo2: patient.vitals.spo2 && patient.vitals.spo2 > 0 ? String(patient.vitals.spo2) : "",
     respiratoryRate: "",
     painScore: "",
   };
@@ -86,6 +128,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
   const { t } = useI18n();
   const [location, setLocation] = useLocation();
   const initialPatientId = new URLSearchParams(location.split("?")[1] ?? "").get("patientId");
+  const initialConsultationId = new URLSearchParams(location.split("?")[1] ?? "").get("consultationId") ?? undefined;
   const [patients, setPatients] = useState<Patient[]>([]);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [patientQuery, setPatientQuery] = useState("");
@@ -93,6 +136,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
   const [notes, setNotes] = useState("");
   const [meds, setMeds] = useState<Medication[]>([]);
   const [alerts, setAlerts] = useState<SafetyAlert[]>([]);
+  const [safetyDecisions, setSafetyDecisions] = useState<Record<string, EditableSafetyDecision>>({});
   const [medicineOptionsByLine, setMedicineOptionsByLine] = useState<Record<string, TunisianMedicine[]>>({});
   const [medicineLoadingByLine, setMedicineLoadingByLine] = useState<Record<string, boolean>>({});
   const [selectedMedicineByLine, setSelectedMedicineByLine] = useState<Record<string, TunisianMedicine>>({});
@@ -101,8 +145,9 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
   const [generating, setGenerating] = useState(false);
   const [patientsLoaded, setPatientsLoaded] = useState(false);
   const [physicalMeasurements, setPhysicalMeasurements] = useState<PhysicalMeasurementsDraft>(emptyPhysicalMeasurements());
-  const [caseStatus, setCaseStatus] = useState<"draft" | "pending_review" | "validated" | "rejected">("draft");
+  const [caseStatus, setCaseStatus] = useState<"draft" | "pending_review" | "validated" | "rejected" | "cancelled">("draft");
   const [savedPrescriptionId, setSavedPrescriptionId] = useState<string | null>(null);
+  const [consultationId, setConsultationId] = useState<string | undefined>(initialConsultationId);
   const [loadedPrescriptionId, setLoadedPrescriptionId] = useState<string | null>(null);
   const medicineSearchTimers = useRef<Record<string, number>>({});
   const { toast } = useToast();
@@ -148,10 +193,19 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
         setDiagnosis(prescription.diagnosis ?? "");
         setNotes(prescription.notes ?? "");
         setMeds(prescription.medications);
-        setAlerts([]);
+        setAlerts(prescription.safetyAlerts ?? []);
+        setSafetyDecisions({});
         void hydrateSelectedMedicines(prescription.medications);
         setSavedPrescriptionId(prescription.id);
-        setCaseStatus(prescription.status === "pending_review" || prescription.status === "validated" || prescription.status === "rejected" ? prescription.status : "draft");
+        setConsultationId(prescription.consultationId);
+        setCaseStatus(
+          prescription.status === "pending_review" ||
+            prescription.status === "validated" ||
+            prescription.status === "rejected" ||
+            prescription.status === "cancelled"
+            ? prescription.status
+            : "draft",
+        );
         const isAiProposal = prescription.status === "pending_review" || prescription.medications.some((med) => med.status === "ai_proposed");
         setGenerated(isAiProposal);
         setManualStarted(!isAiProposal);
@@ -201,6 +255,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
     } catch (error) {
       setMeds([]);
       setAlerts([]);
+      setSafetyDecisions({});
       setGenerated(false);
       setManualStarted(true);
       setCaseStatus("draft");
@@ -225,6 +280,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
     setManualStarted(false);
     setMeds([]);
     setAlerts([]);
+    setSafetyDecisions({});
     setMedicineOptionsByLine({});
     setMedicineLoadingByLine({});
     setSelectedMedicineByLine({});
@@ -281,7 +337,6 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
     setGenerated(false);
     setManualStarted(true);
     setCaseStatus("draft");
-    setAlerts([]);
     setMeds((current) => [...current, createManualMedication()]);
   }
 
@@ -349,6 +404,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
     setMedicineOptionsByLine((current) => ({ ...current, [lineId]: [] }));
     updateMed(lineId, {
       medicineId: medicine.id,
+      dci: medicine.dci,
       name: productName,
       dose,
       route: inferRouteFromMedicine(medicine),
@@ -357,7 +413,36 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
     });
   }
 
-  const saveCurrentPrescription = async (statusPatch?: Partial<Medication>) => {
+  const persistSafetyDecisions = async (
+    prescriptionId: string,
+    decisionsToPersist = safetyDecisions,
+  ) => {
+    for (const [alertId, decision] of Object.entries(decisionsToPersist)) {
+      if (decision.persisted) continue;
+      try {
+        await recordPrescriptionSafetyAction(prescriptionId, {
+          action: decision.action,
+          alertTitle: decision.alertTitle,
+          recommendation: decision.recommendation,
+          reason: decision.reason,
+        });
+        setSafetyDecisions((current) => ({
+          ...current,
+          [alertId]: { ...current[alertId], persisted: true },
+        }));
+      } catch (error) {
+        toast({
+          title: "Action de securite non enregistree",
+          description: error instanceof Error ? error.message : "La trace d'audit n'a pas pu etre enregistree.",
+        });
+      }
+    }
+  };
+
+  const saveCurrentPrescription = async (
+    statusPatch?: Partial<Medication>,
+    safetyAlertsOverride?: SafetyAlert[],
+  ) => {
     if (!selectedPatient) {
       toast({
         title: t("rx.selectPatientToastTitle"),
@@ -388,21 +473,24 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
     }
     const payload = {
       patientId: selectedPatient.id,
+      consultationId,
       diagnosis,
       notes,
+      safetyAlerts: safetyAlertsOverride ?? alerts,
       medications: meds.map((med) => ({ ...med, ...statusPatch })),
     };
     const saved = savedPrescriptionId
       ? await updatePrescription(savedPrescriptionId, payload)
       : await savePrescription(payload);
     setSavedPrescriptionId(saved.id);
+    await persistSafetyDecisions(saved.id);
     return saved;
   };
 
   const openOrdonnance = async () => {
     if (!selectedPatient) return;
     try {
-      const saved = await saveCurrentPrescription();
+      const saved = await saveCurrentPrescription(undefined, safetyPanelAlerts);
       if (!saved) return;
       setLocation(`${basePath}/prescription/${saved.id}/ordonnance?patientId=${encodeURIComponent(selectedPatient.id)}`);
     } catch (error) {
@@ -414,7 +502,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
   };
 
   const hasMissingData = !!selectedPatient?.missingData?.length;
-  const isRejected = caseStatus === "rejected";
+  const isRejected = caseStatus === "rejected" || caseStatus === "cancelled";
   const hasMedicationLines = meds.length > 0;
   const hasMedicationWithoutName = meds.some((med) => !med.name.trim());
   const showPrescriptionEditor = !!selectedPatient && (generated || manualStarted || hasMedicationLines || !!savedPrescriptionId);
@@ -424,6 +512,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
   const summaryLabel = useMemo(() => {
     if (caseStatus === "validated") return t("rx.status.validated");
     if (caseStatus === "rejected") return t("rx.status.rejected");
+    if (caseStatus === "cancelled") return "Annulée";
     if (caseStatus === "draft") return savedPrescriptionId ? t("rx.status.draft") : t("rx.status.manualDraft");
     return t("rx.status.awaiting");
   }, [caseStatus, savedPrescriptionId, t]);
@@ -455,22 +544,28 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
       }
 
       const pregnancy = medicine.pregnancy || "";
-      const pregnancyText = pregnancy.toLowerCase();
-      const pregnancySeverity = pregnancyText.includes("contre") ? "major" : pregnancyText.includes("prec") ? "moderate" : "info";
-      medicineAlerts.push({
-        id: `tn-med-pregnancy-${lineId}`,
-        severity: pregnancySeverity,
-        title: `Pregnancy - ${productName}: ${pregnancy}`,
-        drugsInvolved: [productName],
-        explanation: `TN Med pregnancy status: ${pregnancy}.`,
-        recommendedAction:
-          pregnancySeverity === "major"
-            ? "Avoid during pregnancy unless a specialist explicitly justifies the exception."
-            : pregnancySeverity === "moderate"
-              ? "Use only after benefit-risk review and document the clinical rationale."
-              : "No specific pregnancy restriction is listed in the local product record.",
-        evidence: source,
-      });
+      if (pregnancy.trim()) {
+        const pregnancyText = normalizeCatalogStatus(pregnancy);
+        const pregnancySeverity = pregnancyText.includes("contre")
+          ? "major"
+          : pregnancyText.includes("precaution")
+            ? "moderate"
+            : "info";
+        medicineAlerts.push({
+          id: `tn-med-pregnancy-${lineId}`,
+          severity: pregnancySeverity,
+          title: `Pregnancy - ${productName}: ${pregnancy}`,
+          drugsInvolved: [productName],
+          explanation: `TN Med pregnancy status: ${pregnancy}.`,
+          recommendedAction:
+            pregnancySeverity === "major"
+              ? "Avoid during pregnancy unless a specialist explicitly justifies the exception."
+              : pregnancySeverity === "moderate"
+                ? "Use only after benefit-risk review and document the clinical rationale."
+                : "No specific pregnancy restriction is listed in the local product record.",
+          evidence: source,
+        });
+      }
 
       return medicineAlerts;
     });
@@ -480,6 +575,119 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
     () => [...alerts, ...tnMedicineSafetyAlerts],
     [alerts, tnMedicineSafetyAlerts],
   );
+
+  function findAffectedMedication(alert: SafetyAlert) {
+    const involved = alert.drugsInvolved
+      .map(normalizeMedicationText)
+      .filter((value) => value.length > 2);
+    return meds.find((med) => {
+      const medicationText = normalizeMedicationText(`${med.name} ${med.dci ?? ""}`);
+      return involved.some((drug) => medicationText.includes(drug) || drug.includes(medicationText));
+    }) ?? (meds.length === 1 ? meds[0] : undefined);
+  }
+
+  const handleSafetyAction = async (
+    action: SafetyPanelAction,
+    alert: SafetyAlert,
+    reason?: string,
+  ) => {
+    const actionRecommendation = [alert.recommendedAction, alert.alternative].filter(Boolean).join(" | ");
+    const decision: EditableSafetyDecision = {
+      action,
+      reason,
+      alertTitle: alert.title,
+      recommendation: actionRecommendation,
+      persisted: false,
+    };
+    setSafetyDecisions((current) => ({ ...current, [alert.id]: decision }));
+
+    const target = findAffectedMedication(alert);
+    let nextMeds = meds;
+    let nextNotes = notes;
+    const appendActionNote = (note: string) => {
+      nextNotes = [nextNotes.trim(), note.trim()].filter(Boolean).join("\n");
+      setNotes(nextNotes);
+    };
+    if (action === "replace") {
+      const parsed = parseMedicationInstruction(alert.alternative ?? "");
+      if (target && parsed.name) {
+        nextMeds = meds.map((med) => med.id === target.id ? {
+          ...med,
+          name: parsed.name ?? med.name,
+          dose: parsed.dose ?? med.dose,
+          route: parsed.route ?? med.route,
+          frequency: parsed.frequency ?? med.frequency,
+          duration: parsed.duration ?? med.duration,
+          medicineId: undefined,
+          dci: undefined,
+          status: "edited",
+        } : med);
+        setMeds(nextMeds);
+        setSelectedMedicineByLine((current) => {
+          const next = { ...current };
+          delete next[target.id];
+          return next;
+        });
+        appendActionNote(`Remplacement applique pour ${target.name}: ${alert.alternative}`);
+        toast({ title: "Remplacement applique", description: `${target.name} -> ${parsed.name}. Selectionnez le produit TN Med avant validation.` });
+      } else {
+        appendActionNote(`Remplacement recommande (${alert.title}): ${alert.alternative ?? alert.recommendedAction}`);
+        toast({ title: "Remplacement a confirmer", description: "La recommandation a ete ajoutee aux notes; selectionnez le nouveau produit dans le catalogue TN Med." });
+      }
+    } else if (action === "adjust_dose") {
+      const parsed = parseMedicationInstruction(alert.recommendedAction);
+      if (target && parsed.dose) {
+        nextMeds = meds.map((med) => med.id === target.id ? {
+          ...med,
+          dose: parsed.dose ?? med.dose,
+          route: parsed.route ?? med.route,
+          frequency: parsed.frequency ?? med.frequency,
+          duration: parsed.duration ?? med.duration,
+          status: "edited",
+        } : med);
+        setMeds(nextMeds);
+        appendActionNote(`Ajustement de dose applique pour ${target.name}: ${parsed.dose}`);
+        toast({ title: "Dose ajustee", description: `${target.name}: ${parsed.dose}` });
+      } else {
+        appendActionNote(`Ajustement de dose recommande (${alert.title}): ${alert.recommendedAction}`);
+        toast({ title: "Dose a confirmer", description: "La recommandation a ete ajoutee aux notes car aucune dose exploitable n'a ete detectee." });
+      }
+    } else if (action === "monitor") {
+      appendActionNote(`Surveillance demandee (${alert.title}): ${alert.recommendedAction}`);
+      toast({ title: "Surveillance enregistree", description: alert.recommendedAction });
+    } else {
+      appendActionNote(`Forçage documente (${alert.title}): ${reason}`);
+      toast({ title: "Forçage documente", description: "La justification sera tracee dans l'audit de la prescription." });
+    }
+
+    if (savedPrescriptionId) {
+      try {
+        await updatePrescription(savedPrescriptionId, {
+          patientId: selectedPatient?.id ?? "",
+          consultationId,
+          diagnosis,
+          notes: nextNotes,
+          medications: nextMeds,
+          safetyAlerts: safetyPanelAlerts,
+        });
+        await recordPrescriptionSafetyAction(savedPrescriptionId, {
+          action,
+          alertTitle: alert.title,
+          recommendation: actionRecommendation,
+          reason,
+        });
+        setSafetyDecisions((current) => ({
+          ...current,
+          [alert.id]: { ...current[alert.id], persisted: true },
+        }));
+      } catch (error) {
+        toast({
+          title: "Action de securite non enregistree",
+          description: error instanceof Error ? error.message : "La trace d'audit n'a pas pu etre enregistree.",
+        });
+      }
+    }
+  };
 
   return (
     <div className="p-4 lg:p-6 space-y-4">
@@ -753,7 +961,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
                   onClick={() => {
                     void (async () => {
                       try {
-                        const saved = await saveCurrentPrescription();
+                        const saved = await saveCurrentPrescription(undefined, safetyPanelAlerts);
                         if (!saved) return;
                         setCaseStatus("draft");
                         toast({
@@ -781,6 +989,7 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
                           setCaseStatus("rejected");
                           setGenerated(false);
                           setAlerts([]);
+                          setSafetyDecisions({});
                           toast({
                             title: t("rx.rejectedTitle"),
                             description: t("rx.rejectedDescription"),
@@ -804,12 +1013,19 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
                     onClick={() => {
                       void (async () => {
                         try {
-                          const saved = await saveCurrentPrescription({ status: "validated" });
+                          const saved = await saveCurrentPrescription({ status: "validated" }, safetyPanelAlerts);
                           if (!saved) return;
                           const validated = await validatePrescription(saved.id);
                           setSavedPrescriptionId(validated.id);
                           setCaseStatus("validated");
                           setMeds((current) => current.map((med) => ({ ...med, status: "validated" })));
+                          const updatedPatient = validated.patient;
+                          if (updatedPatient) {
+                            setSelectedPatient(updatedPatient);
+                            setPatients((current) => current.map((patient) => (
+                              patient.id === updatedPatient.id ? updatedPatient : patient
+                            )));
+                          }
                           toast({
                             title: t("rx.validatedTitle"),
                             description: t("rx.validatedDescription"),
@@ -859,7 +1075,11 @@ export default function NewPrescription({ basePath = "/admin/cdss", prescription
         </div>
 
         <div className="lg:col-span-3 lg:sticky lg:top-20 self-start">
-          <SafetyPanel alerts={selectedPatient ? safetyPanelAlerts : []} />
+          <SafetyPanel
+            alerts={selectedPatient ? safetyPanelAlerts : []}
+            decisions={safetyDecisions}
+            onAction={handleSafetyAction}
+          />
         </div>
       </div>
     </div>

@@ -351,8 +351,6 @@ export function CmsProvider({ children }: { children: ReactNode }) {
   const [whyFeatures, setWhyFeatures] = useState<WhyFeature[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const now = () => new Date().toLocaleDateString("fr-TN", { day: "numeric", month: "short", year: "numeric" });
-
   const refreshCms = async () => {
     setLoading(true);
     try {
@@ -379,11 +377,12 @@ export function CmsProvider({ children }: { children: ReactNode }) {
       setSpecialties(apiSpecialties.map(mapSpecialty));
       setWhyFeatures(apiWhyFeatures.map(mapWhyFeature));
     } catch {
-      setPosts(INITIAL_POSTS);
-      setTestimonials(INITIAL_TESTIMONIALS);
-      setPartners(INITIAL_PARTNERS);
-      setSpecialties(INITIAL_SPECIALTIES);
-      setWhyFeatures(INITIAL_WHY_FEATURES);
+      // CMS content is database-backed. An API failure must not display demo data.
+      setPosts([]);
+      setTestimonials([]);
+      setPartners([]);
+      setSpecialties([]);
+      setWhyFeatures([]);
     } finally {
       setLoading(false);
     }
@@ -395,131 +394,165 @@ export function CmsProvider({ children }: { children: ReactNode }) {
 
   const addPost: CmsContextValue["addPost"] = (data) => {
     void (async () => {
-      const created = await createCmsPost({
-        ...mapPostPayload(data),
-        views: 0,
-        commentsCount: 0,
-        readTime: data.readTime,
-      });
-      setPosts((prev) => [mapPost(created), ...prev.filter((post) => post.id !== created.id)]);
+      try {
+        const created = await createCmsPost({ ...mapPostPayload(data), views: 0, commentsCount: 0, readTime: data.readTime });
+        setPosts((prev) => [mapPost(created), ...prev.filter((post) => post.id !== created.id)]);
+      } catch {
+        await refreshCms();
+      }
     })();
-    setPosts((prev) => [
-      {
-        ...data,
-        id: Date.now(),
-        views: 0,
-        commentsCount: 0,
-        publishedAt: data.status === "publi\u00e9" ? now() : "",
-        updatedAt: now(),
-      },
-      ...prev,
-    ]);
   };
 
   const updatePost: CmsContextValue["updatePost"] = (id, data) => {
+    if (typeof id !== "string") return;
     void (async () => {
-      if (typeof id === "string") {
+      try {
         const updated = await updateCmsPost(id, mapPostPayload(data));
         setPosts((prev) => prev.map((post) => (post.id === id ? mapPost(updated) : post)));
+      } catch {
+        await refreshCms();
       }
     })();
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === id
-          ? {
-              ...post,
-              ...data,
-              updatedAt: now(),
-              publishedAt: data.status === "publi\u00e9" && !post.publishedAt ? now() : data.publishedAt ?? post.publishedAt,
-            }
-          : post,
-      ),
-    );
   };
 
   const deletePost = (id: Post["id"]) => {
-    void (async () => { if (typeof id === "string") await deleteCmsPost(id); })();
-    setPosts((prev) => prev.filter((post) => post.id !== id));
+    if (typeof id !== "string") return;
+    void (async () => {
+      try {
+        await deleteCmsPost(id);
+        setPosts((prev) => prev.filter((post) => post.id !== id));
+      } catch {
+        await refreshCms();
+      }
+    })();
   };
   const addTestimonial = (testimonial: Omit<Testimonial, "id">) => {
     void (async () => {
-      const created = mapTestimonial(await createCmsTestimonial(testimonial));
-      setTestimonials((prev) => [...prev.filter((item) => typeof item.id === "string"), created]);
-    })();
-    setTestimonials((prev) => [...prev, { ...testimonial, id: Date.now() }]);
-  };
-  const updateTestimonial = (id: Testimonial["id"], data: Partial<Testimonial>) => {
-    void (async () => {
-      if (typeof id === "string") {
-        const updated = mapTestimonial(await updateCmsTestimonial(id, withoutId(data)));
-        setTestimonials((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      try {
+        const created = mapTestimonial(await createCmsTestimonial(testimonial));
+        setTestimonials((prev) => [...prev, created]);
+      } catch {
+        await refreshCms();
       }
     })();
-    setTestimonials((prev) => prev.map((item) => (item.id === id ? { ...item, ...data } : item)));
+  };
+  const updateTestimonial = (id: Testimonial["id"], data: Partial<Testimonial>) => {
+    if (typeof id !== "string") return;
+    void (async () => {
+      try {
+        const updated = mapTestimonial(await updateCmsTestimonial(id, withoutId(data)));
+        setTestimonials((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      } catch {
+        await refreshCms();
+      }
+    })();
   };
   const deleteTestimonial = (id: Testimonial["id"]) => {
-    void (async () => { if (typeof id === "string") await deleteCmsTestimonial(id); })();
-    setTestimonials((prev) => prev.filter((item) => item.id !== id));
+    if (typeof id !== "string") return;
+    void (async () => {
+      try {
+        await deleteCmsTestimonial(id);
+        setTestimonials((prev) => prev.filter((item) => item.id !== id));
+      } catch {
+        await refreshCms();
+      }
+    })();
   };
   const addPartner = (partner: Omit<Partner, "id">) => {
     void (async () => {
-      const created = mapPartner(await createCmsPartner(partner));
-      setPartners((prev) => [...prev.filter((item) => typeof item.id === "string"), created]);
-    })();
-    setPartners((prev) => [...prev, { ...partner, id: Date.now() }]);
-  };
-  const updatePartner = (id: Partner["id"], data: Partial<Partner>) => {
-    void (async () => {
-      if (typeof id === "string") {
-        const updated = mapPartner(await updateCmsPartner(id, withoutId(data)));
-        setPartners((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      try {
+        const created = mapPartner(await createCmsPartner(partner));
+        setPartners((prev) => [...prev, created]);
+      } catch {
+        await refreshCms();
       }
     })();
-    setPartners((prev) => prev.map((item) => (item.id === id ? { ...item, ...data } : item)));
+  };
+  const updatePartner = (id: Partner["id"], data: Partial<Partner>) => {
+    if (typeof id !== "string") return;
+    void (async () => {
+      try {
+        const updated = mapPartner(await updateCmsPartner(id, withoutId(data)));
+        setPartners((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      } catch {
+        await refreshCms();
+      }
+    })();
   };
   const deletePartner = (id: Partner["id"]) => {
-    void (async () => { if (typeof id === "string") await deleteCmsPartner(id); })();
-    setPartners((prev) => prev.filter((item) => item.id !== id));
+    if (typeof id !== "string") return;
+    void (async () => {
+      try {
+        await deleteCmsPartner(id);
+        setPartners((prev) => prev.filter((item) => item.id !== id));
+      } catch {
+        await refreshCms();
+      }
+    })();
   };
   const addSpecialty = (specialty: Omit<Specialty, "id">) => {
     void (async () => {
-      const created = mapSpecialty(await createCmsSpecialty(specialty));
-      setSpecialties((prev) => [...prev.filter((item) => typeof item.id === "string"), created]);
-    })();
-    setSpecialties((prev) => [...prev, { ...specialty, id: Date.now() }]);
-  };
-  const updateSpecialty = (id: Specialty["id"], data: Partial<Specialty>) => {
-    void (async () => {
-      if (typeof id === "string") {
-        const updated = mapSpecialty(await updateCmsSpecialty(id, withoutId(data)));
-        setSpecialties((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      try {
+        const created = mapSpecialty(await createCmsSpecialty(specialty));
+        setSpecialties((prev) => [...prev, created]);
+      } catch {
+        await refreshCms();
       }
     })();
-    setSpecialties((prev) => prev.map((item) => (item.id === id ? { ...item, ...data } : item)));
+  };
+  const updateSpecialty = (id: Specialty["id"], data: Partial<Specialty>) => {
+    if (typeof id !== "string") return;
+    void (async () => {
+      try {
+        const updated = mapSpecialty(await updateCmsSpecialty(id, withoutId(data)));
+        setSpecialties((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      } catch {
+        await refreshCms();
+      }
+    })();
   };
   const deleteSpecialty = (id: Specialty["id"]) => {
-    void (async () => { if (typeof id === "string") await deleteCmsSpecialty(id); })();
-    setSpecialties((prev) => prev.filter((item) => item.id !== id));
+    if (typeof id !== "string") return;
+    void (async () => {
+      try {
+        await deleteCmsSpecialty(id);
+        setSpecialties((prev) => prev.filter((item) => item.id !== id));
+      } catch {
+        await refreshCms();
+      }
+    })();
   };
   const addWhyFeature = (feature: Omit<WhyFeature, "id">) => {
     void (async () => {
-      const created = mapWhyFeature(await createCmsWhyFeature(feature));
-      setWhyFeatures((prev) => [...prev.filter((item) => typeof item.id === "string"), created]);
-    })();
-    setWhyFeatures((prev) => [...prev, { ...feature, id: Date.now() }]);
-  };
-  const updateWhyFeature = (id: WhyFeature["id"], data: Partial<WhyFeature>) => {
-    void (async () => {
-      if (typeof id === "string") {
-        const updated = mapWhyFeature(await updateCmsWhyFeature(id, withoutId(data)));
-        setWhyFeatures((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      try {
+        const created = mapWhyFeature(await createCmsWhyFeature(feature));
+        setWhyFeatures((prev) => [...prev, created]);
+      } catch {
+        await refreshCms();
       }
     })();
-    setWhyFeatures((prev) => prev.map((item) => (item.id === id ? { ...item, ...data } : item)));
+  };
+  const updateWhyFeature = (id: WhyFeature["id"], data: Partial<WhyFeature>) => {
+    if (typeof id !== "string") return;
+    void (async () => {
+      try {
+        const updated = mapWhyFeature(await updateCmsWhyFeature(id, withoutId(data)));
+        setWhyFeatures((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      } catch {
+        await refreshCms();
+      }
+    })();
   };
   const deleteWhyFeature = (id: WhyFeature["id"]) => {
-    void (async () => { if (typeof id === "string") await deleteCmsWhyFeature(id); })();
-    setWhyFeatures((prev) => prev.filter((item) => item.id !== id));
+    if (typeof id !== "string") return;
+    void (async () => {
+      try {
+        await deleteCmsWhyFeature(id);
+        setWhyFeatures((prev) => prev.filter((item) => item.id !== id));
+      } catch {
+        await refreshCms();
+      }
+    })();
   };
 
   return (

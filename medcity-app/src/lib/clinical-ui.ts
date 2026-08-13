@@ -16,10 +16,15 @@ export const riskMeta: Record<RiskLevel, { label: string; cls: string }> = {
   low:    { label: "Low risk",    cls: "bg-success-soft text-success border-success/30" },
 };
 
+export const notAssessedRiskMeta = {
+  label: "Not assessed",
+  cls: "bg-muted text-muted-foreground border-border",
+};
+
 export const statusMeta: Record<PrescriptionStatus, { label: string; cls: string }> = {
   draft:          { label: "Draft",          cls: "bg-muted text-muted-foreground border-border" },
   pending_review: { label: "Pending review", cls: "bg-info-soft text-info border-info/30" },
   validated:      { label: "Validated",      cls: "bg-success-soft text-success border-success/30" },
   rejected:       { label: "Rejected",       cls: "bg-critical-soft text-critical border-critical/30" },
-  needs_data:     { label: "Needs data",     cls: "bg-warning-soft text-warning-foreground border-warning/30" },
+  cancelled:      { label: "Cancelled",      cls: "bg-muted text-muted-foreground border-border" },
 };
