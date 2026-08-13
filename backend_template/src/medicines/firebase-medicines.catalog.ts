@@ -131,11 +131,17 @@ export class FirebaseMedicinesCatalog {
 
     const result = await this.execute<{ medicaments: FirebaseMedicament[] }>(
       'ListMedicaments',
-      { limit: this.config.get<number>('FIREBASE_MEDICINES_FETCH_LIMIT', 6093) },
+      {
+        // ConfigModule reads values from .env as strings. Firebase Data
+        // Connect validates this variable against the GraphQL Int type, so
+        // normalize it before serializing the request body.
+        limit: readIntegerConfig(this.config, 'FIREBASE_MEDICINES_FETCH_LIMIT', 6093, 1),
+      },
     );
     this.cachedMedicines = result.medicaments ?? [];
     this.cacheExpiresAt =
-      Date.now() + this.config.get<number>('FIREBASE_MEDICINES_CACHE_TTL_MS', 300_000);
+      Date.now() +
+      readIntegerConfig(this.config, 'FIREBASE_MEDICINES_CACHE_TTL_MS', 300_000, 0);
     return this.cachedMedicines;
   }
 
@@ -173,7 +179,12 @@ export class FirebaseMedicinesCatalog {
       'FIREBASE_APP_ID',
       '1:1049284848818:web:2818c155ad602bf1882dab',
     );
-    const timeoutMs = this.config.get<number>('FIREBASE_DATACONNECT_TIMEOUT_MS', 15_000);
+    const timeoutMs = readIntegerConfig(
+      this.config,
+      'FIREBASE_DATACONNECT_TIMEOUT_MS',
+      15_000,
+      1,
+    );
 
     if (!apiKey || !appId) {
       throw new ServiceUnavailableException(
@@ -210,6 +221,22 @@ export class FirebaseMedicinesCatalog {
       clearTimeout(timer);
     }
   }
+}
+
+function readIntegerConfig(
+  config: ConfigService,
+  key: string,
+  fallback: number,
+  minimum: number,
+) {
+  const raw = config.get<unknown>(key);
+  const value = typeof raw === 'number' ? raw : Number(raw);
+
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(minimum, Math.trunc(value));
 }
 
 function normalizeFirebaseUuid(value: string) {
